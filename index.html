@@ -273,7 +273,7 @@ body.light .z{background:#eef2f8;color:#8090a8}
 
 
 
-.content{display:grid;grid-template-columns:1fr 290px;gap:10px;padding:12px 16px;flex:1}
+.content{display:grid;grid-template-columns:1fr 290px;gap:10px;padding:12px 16px;flex:1;align-items:start}
 .content > *{min-width:0}
 .section-label{font-size:9px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px;display:flex;align-items:center;gap:7px}
 .section-label::before{content:'';display:inline-block;width:3px;height:11px;border-radius:2px;background:var(--blue)}
@@ -305,7 +305,7 @@ body.light .cz{background:#eef2f8;color:#8090a8}
 .lc{background:linear-gradient(90deg,var(--bg3),var(--bg4),var(--bg3));background-size:300%;animation:sh 1.4s infinite;color:transparent!important}
 @keyframes sh{0%{background-position:200%}100%{background-position:-200%}}
 
-.right-col{display:flex;flex-direction:column;gap:10px}
+.right-col{display:flex;flex-direction:column;gap:10px;min-width:0}
 .chart-box{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px}
 canvas{display:block;width:100%!important}
 .sum-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -567,31 +567,22 @@ body.light .news-card:hover {
 }
 
 /* ── TOP MOVERS ── */
-.movers-section {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 14px;
-  margin-top: 10px;
+/* ── MOVERS CARD ── */
+.movers-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:8px;padding:12px 14px;
 }
-.movers-header {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--dim);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 6px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.movers-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
+.movers-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mover-col-inner{display:flex;flex-direction:column;gap:5px}
+.mover-col-title{font-size:11px;font-weight:800;margin-bottom:8px;text-align:center}
+.mover-col-title.green{color:var(--green)}
+.mover-col-title.red{color:var(--red)}
+.mover-row{display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:11px;padding:5px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;transition:background .1s}
+.mover-row:hover{background:var(--bg4)}
+.mover-sym{color:var(--text);font-weight:700}
+.mover-val{font-weight:800}
+.mover-val.up{color:var(--green)}
+.mover-val.down{color:var(--red)}
 .mover-col-title {
   font-size: 12px;
   font-weight: 800;
@@ -768,6 +759,91 @@ body.light .news-card:hover {
 }
 .tech-badge.oversold { background: rgba(0, 144, 74, 0.15); color: var(--green); }
 .tech-badge.overbought { background: rgba(204, 26, 58, 0.15); color: var(--red); }
+/* ══════════════════════════════════════════════
+   6 NEW FEATURES — CSS
+══════════════════════════════════════════════ */
+
+/* ── 1. MARKET CLOCK BAR ── */
+.market-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  padding:5px 16px;gap:12px;font-size:11px;
+}
+.market-status{display:flex;align-items:center;gap:7px}
+.market-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;animation:pulse 2s ease infinite}
+.market-dot.open{background:#00e87a;box-shadow:0 0 8px #00e87a}
+.market-dot.pre{background:#f59e0b;box-shadow:0 0 8px #f59e0b}
+.market-dot.after{background:#f59e0b;box-shadow:0 0 8px #f59e0b}
+.market-dot.closed{background:var(--dim);box-shadow:none;animation:none}
+.market-label{font-weight:700;font-family:var(--mono);font-size:10px;letter-spacing:.5px}
+.market-label.open{color:#00e87a}
+.market-label.pre,.market-label.after{color:#f59e0b}
+.market-label.closed{color:var(--dim)}
+.market-countdown{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.market-countdown b{color:var(--text)}
+.market-times{font-size:9px;color:var(--dim);font-family:var(--mono);opacity:.6}
+@media(max-width:480px){.market-times{display:none}}
+
+/* ── 2. FEAR & GREED ── */
+.fg-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.fg-gauge-wrap{position:relative;width:160px;height:88px;margin:0 auto}
+.fg-gauge-wrap canvas{display:block}
+.fg-center{position:absolute;bottom:0;left:50%;transform:translateX(-50%);text-align:center;line-height:1}
+.fg-num{font-family:var(--mono);font-size:20px;font-weight:800}
+.fg-lbl{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin-top:1px}
+.fg-components{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;width:100%;margin-top:5px}
+.fg-comp{background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:5px 4px;text-align:center}
+.fg-comp-val{font-family:var(--mono);font-size:11px;font-weight:700}
+.fg-comp-lbl{font-size:8px;color:var(--dim);margin-top:1px}
+
+/* ── 3. BREADTH INDICATOR ── */
+.breadth-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+.breadth-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.breadth-title{font-size:9px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px}
+.breadth-btn{background:var(--bg3);border:1px solid var(--border2);color:var(--dim);padding:4px 10px;border-radius:5px;cursor:pointer;font-size:10px;font-family:var(--sans);transition:background .15s}
+.breadth-btn:hover{background:var(--bg4);color:var(--text)}
+.breadth-bar-wrap{height:7px;background:var(--bg4);border-radius:4px;overflow:hidden;margin-bottom:7px}
+.breadth-bar-fill{height:100%;border-radius:4px;transition:width .8s ease}
+.breadth-stats{display:flex;justify-content:space-between;font-size:10px;color:var(--dim);font-family:var(--mono)}
+.breadth-big{font-size:24px;font-weight:800;font-family:var(--mono);text-align:center;margin:6px 0 5px}
+.breadth-sub{font-size:10px;color:var(--dim);text-align:center}
+
+.insight-panel{
+  background:var(--bg3);border:1px solid var(--border);border-radius:8px;
+  padding:12px 14px;
+}
+@media(max-width:768px){
+  .insights-row{grid-template-columns:1fr;padding:10px}
+  .fg-gauge-wrap{width:180px;height:98px}
+  .fg-num{font-size:22px}
+}
+
+/* ── 4. YTD SECTION ── */
+.ytd-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px 14px}
+.ytd-bars{display:flex;flex-direction:column;gap:5px;margin-top:10px}
+.ytd-row{display:flex;align-items:center;gap:6px;min-height:18px}
+.ytd-sym{font-family:var(--mono);font-size:10px;color:var(--dim);width:36px;text-align:right;flex-shrink:0}
+.ytd-bar-track{flex:1;position:relative;height:14px;background:var(--bg3);border-radius:3px;overflow:hidden;min-width:0}
+.ytd-bar-fill{height:100%;border-radius:3px;transition:width .6s ease;min-width:2px}
+.ytd-val{font-family:var(--mono);font-size:10px;font-weight:700;width:48px;text-align:left;flex-shrink:0}
+@media(max-width:480px){.ytd-section{padding:12px 10px}}
+
+/* ── 5. 52W HIGH/LOW TABLE COLUMNS ── */
+.hi52{color:#00e87a;font-size:10px}
+.lo52{color:#ff3a5c;font-size:10px}
+body.light .hi52{color:#00904a}
+body.light .lo52{color:#cc1a3a}
+
+/* ── 6. CORRELATION MATRIX ── */
+.corr-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;min-width:0;width:100%;border-radius:8px;border:1px solid var(--border);display:block;box-sizing:border-box}
+.corr-table{border-collapse:separate;border-spacing:0;font-size:9px;min-width:400px;width:100%}
+.corr-table th{padding:5px 6px;font-family:var(--mono);font-size:9px;color:var(--dim);background:var(--bg);border-bottom:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap;text-align:center}
+.corr-table th:last-child{border-right:none}
+.corr-table th:first-child{text-align:right;position:sticky;right:0;z-index:2;background:var(--bg);border-left:1px solid var(--border)}
+.corr-table td{padding:4px 5px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);text-align:center;font-family:var(--mono);font-size:9px;font-weight:700;min-width:36px}
+.corr-table td:last-child{border-right:none}
+.corr-table tr:last-child td{border-bottom:none}
+.corr-table td:first-child{text-align:right;font-family:var(--sans);font-size:10px;color:var(--dim);background:var(--bg2)!important;padding:4px 10px;position:sticky;right:0;z-index:1;white-space:nowrap;border-left:1px solid var(--border)}
 </style>
 </head>
 <body class="light">
@@ -856,7 +932,15 @@ body.light .news-card:hover {
 
   <div class="ticker-wrap"><div class="ticker" id="ticker"></div></div>
 
-  <!-- תפריט מובייל -->
+  <!-- שעון שוק -->
+  <div class="market-bar">
+    <div class="market-status">
+      <div class="market-dot closed" id="market-dot"></div>
+      <span class="market-label closed" id="market-label">טוען...</span>
+    </div>
+    <div class="market-countdown" id="market-countdown"></div>
+    <div class="market-times">NYSE: 09:30–16:00 ET</div>
+  </div>
   <div class="mobile-menu" id="mobile-menu">
     <button class="mob-menu-item" onclick="openLabModal();closeMobileMenu()">🛠️ מעבדת תיקים</button>
     <button class="mob-menu-item" onclick="logout()">🚪 התנתק</button>
@@ -877,11 +961,41 @@ body.light .news-card:hover {
 	<div class="tbl-wrap">
         <table class="t">
           <thead>
-            <tr><th>סקטור</th><th>יום %</th><th>שבוע</th><th>חודש</th><th>3 חד׳</th><th>6 חד׳</th><th>שנה</th><th>ממוצע</th></tr>
+            <tr><th>סקטור</th><th>יום %</th><th>שבוע</th><th>חודש</th><th>3 חד׳</th><th>6 חד׳</th><th>שנה</th><th>שיא 52W</th><th>שפל 52W</th><th>ממוצע</th></tr>
           </thead>
           <tbody id="sector-tbody"></tbody>
         </table>
     </div>
+
+      <!-- YTD + Correlation — inline below sectors table -->
+      <div id="ytd-section" style="display:none;margin-top:10px">
+        <div class="section-label">תשואה שנתית לפי סקטור (1Y)</div>
+        <div class="ytd-card">
+          <div class="ytd-bars" id="ytd-bars"></div>
+        </div>
+      </div>
+
+      <div id="corr-section" style="display:none;margin-top:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div class="section-label" style="margin-bottom:0">מתאם בין סקטורים</div>
+          <div style="font-size:9px;color:var(--dim)">1=מתאם מלא | 0=עצמאי | &#x2212;1=הפוך</div>
+        </div>
+        <div class="corr-wrap"><div id="corr-table-wrap"></div></div>
+      </div>
+
+      <!-- מזנקות והצוללות — inside left column -->
+      <div style="margin-top:10px">
+        <div class="section-label">המזנקות והצוללות (S&P 500)</div>
+        <div class="movers-card" id="movers-section">
+          <div class="movers-grid" id="movers-grid">
+            <div style="grid-column:1/-1;text-align:center;color:var(--dim);font-size:11px;padding:12px">
+              <div class="mini-ring" style="margin:0 auto 8px"></div>
+              סורק 220 מניות ברקע...
+            </div>
+          </div>
+        </div>
+      </div>
+
 	<div class="modal-overlay" id="lab-overlay" onclick="closeLab(event)">
   <div class="modal" id="lab-modal" style="max-width: 800px;">
     <div class="modal-hdr">
@@ -965,16 +1079,7 @@ body.light .news-card:hover {
     </div>
   </div>
 </div>
-	  	<div class="movers-section" id="movers-section">
-        <div class="movers-header">🔥 המזנקות והצוללות (S&P 500)</div>
-        <div class="movers-grid" id="movers-grid">
-          <div style="grid-column: 1/-1; text-align: center; color: var(--dim); font-size: 11px; padding: 10px;">
-            <div class="mini-ring" style="margin: 0 auto 8px;"></div>
-            סורק 220 מניות ברקע...
-          </div>
-        </div>
-      </div>
-    </div>
+    </div><!-- /left-col -->
     <div class="right-col">
       <div>
         <div class="section-label">ביצוע יומי</div>
@@ -992,16 +1097,45 @@ body.light .news-card:hover {
         </div>
         <div class="sum-grid" id="summary"></div>
       </div>
+      <!-- Fear & Greed -->
+      <div>
+        <div class="section-label">מדד פחד &amp; חמדנות</div>
+        <div class="fg-card">
+          <div class="fg-gauge-wrap">
+            <canvas id="fg-canvas" width="160" height="88"></canvas>
+            <div class="fg-center">
+              <div class="fg-num" id="fg-num">–</div>
+              <div class="fg-lbl" id="fg-lbl">ממתין...</div>
+            </div>
+          </div>
+          <div class="fg-components" id="fg-components"></div>
+        </div>
+      </div>
+      <!-- Breadth Indicator -->
+      <div>
+        <div class="section-label">בריאות שוק (Breadth)</div>
+        <div class="breadth-card">
+          <div class="breadth-header">
+            <span class="breadth-title">מניות מעל ממוצע 200 יום</span>
+            <button class="breadth-btn" onclick="runBreadth()">סרוק</button>
+          </div>
+          <div class="breadth-big" id="breadth-big">–</div>
+          <div class="breadth-bar-wrap"><div class="breadth-bar-fill" id="breadth-fill" style="width:0%"></div></div>
+          <div class="breadth-stats"><span id="breadth-above">–</span><span id="breadth-sub">לחץ סרוק</span><span id="breadth-total">–</span></div>
+        </div>
+      </div>
     </div>
   </div>
-  
+
+
+  <!-- חדשות — בסוף -->
   <div class="news-section">
     <div class="section-label">חדשות שוק (Yahoo Finance)</div>
     <div class="news-grid" id="news-grid">
       <div class="modal-loading" style="color:var(--dim); font-size:12px;">טוען חדשות...</div>
     </div>
   </div>
-  
+
   <div class="footer" id="footer"></div>
 </div>
 <!-- SECTOR MODAL -->
@@ -1417,56 +1551,51 @@ function renderMovers(holdingsSet) {
     </div>
   `).join('');
 
-  // מזריקים ל-HTML
   $('movers-grid').innerHTML = `
     <div>
       <div class="mover-col-title green">🚀 מזנקות</div>
-      ${buildRows(topGainers, true)}
+      <div class="mover-col-inner">${buildRows(topGainers, true)}</div>
     </div>
     <div>
       <div class="mover-col-title red">📉 צוללות</div>
-      ${buildRows(topLosers, false)}
+      <div class="mover-col-inner">${buildRows(topLosers, false)}</div>
     </div>
   `;
 }
 
 async function fetchHistoricalReturns(sym) {
-  // התוספת של cb מונעת מהדפדפן לשמור נתונים ישנים בזיכרון (Cache)
   const cb = Math.floor(Date.now() / 10000);
   const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=1y&interval=1d&cb=${cb}`;
-  
-  // כאן הכנסנו את הפרוקסי הפרטי שלך!
   const proxyUrl = `${_proxyUrl}/?url=${encodeURIComponent(yahooUrl)}`;  
-  
   try {
     const r = await fetch(proxyUrl);
-    if (!r.ok) {
-      console.error("Proxy returned status:", r.status);
-      return {};
-    }
+    if (!r.ok) return {};
     const d = await r.json();
-    
-    // משיכת מערך מחירי הסגירה וסינון ימים ללא מסחר
-    const prices = d.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(p => p != null);
+    const result = d.chart?.result?.[0];
+    const prices = result?.indicators?.quote?.[0]?.close?.filter(p => p != null);
+    const timestamps = result?.timestamp;
     if (!prices || prices.length === 0) return {};
-
     const current = prices[prices.length - 1];
-
-    // חישוב אחוזי שינוי לפי ימי מסחר
     const getPct = (daysBack) => {
-      // אם אין מספיק ימי היסטוריה, ניקח את היום הראשון שיש
       const idx = Math.max(0, prices.length - 1 - daysBack);
       if (!prices[idx]) return null;
       return ((current - prices[idx]) / prices[idx]) * 100;
     };
-
-    return {
-      w1: getPct(5),   // שבוע (כ-5 ימי מסחר)
-      m1: getPct(21),  // חודש (כ-21 ימי מסחר)
-      m3: getPct(63),  // 3 חודשים
-      m6: getPct(126), // 6 חודשים
-      y1: getPct(252)  // שנה
-    };
+    // 52w high/low
+    const hi52 = Math.max(...prices);
+    const lo52 = Math.min(...prices);
+    const fromHi = ((current - hi52) / hi52) * 100; // שלילי
+    const fromLo = ((current - lo52) / lo52) * 100; // חיובי
+    // YTD — מוצאים את מחיר פתיחת השנה
+    let ytd = null;
+    if (timestamps) {
+      const yearStart = new Date(new Date().getFullYear(), 0, 1).getTime() / 1000;
+      const ytdIdx = timestamps.findIndex(t => t >= yearStart);
+      if (ytdIdx >= 0 && prices[ytdIdx]) ytd = ((current - prices[ytdIdx]) / prices[ytdIdx]) * 100;
+    }
+    // raw prices for correlation
+    const rawPrices = prices;
+    return { w1:getPct(5), m1:getPct(21), m3:getPct(63), m6:getPct(126), y1:getPct(252), fromHi, fromLo, ytd, rawPrices };
   } catch (e) {
     console.error("Error fetching history for " + sym, e);
     return {};
@@ -1706,9 +1835,11 @@ function renderSectors(){
     const vals=[d.d1,h.w1,h.m1,h.m3,h.m6,h.y1];
     const a=avg(vals);
     const td=(v,cls='')=>`<td class="${cellCls(v)}${cls?' '+cls:''}">${pct(v)}</td>`;
+    const hiTd = h.fromHi!=null ? `<td class="hi52">${pct(h.fromHi)}</td>` : '<td style="color:var(--dim)">–</td>';
+    const loTd = h.fromLo!=null ? `<td class="lo52">${pct(h.fromLo)}</td>` : '<td style="color:var(--dim)">–</td>';
     return`<tr onclick="openSectorModal('${s.sym}','${s.name}')" title="לחץ לראות אחזקות">
       <td><span class="sym">${s.sym}</span>${s.name}</td>
-      ${td(d.d1)}${td(h.w1)}${td(h.m1)}${td(h.m3)}${td(h.m6)}${td(h.y1)}
+      ${td(d.d1)}${td(h.w1)}${td(h.m1)}${td(h.m3)}${td(h.m6)}${td(h.y1)}${hiTd}${loTd}
       <td class="${cellCls(a)}">${pct(a)}</td>
     </tr>`;
   });
@@ -1718,7 +1849,7 @@ function renderSectors(){
   })));
   const ov=avg(periodAvgs);
   rows.push(`<tr class="avgrow"><td>ממוצע סקטורים</td>
-    ${periodAvgs.map((v)=>`<td class="${cellCls(v)}">${pct(v)}</td>`).join('')}
+    ${periodAvgs.map((v)=>`<td class="${cellCls(v)}">${pct(v)}</td>`).join('')}<td></td><td></td>
     <td class="${cellCls(ov)}"><b>${pct(ov)}</b></td>
   </tr>`);
   $('sector-tbody').innerHTML=rows.join('');
@@ -2010,6 +2141,7 @@ async function init(){
     renderPositivity();
     renderSectors();
     renderSummary();
+    renderFearGreed();
 	fetchMarketNews();
 	fetchAndRenderMovers();
     drawChart();
@@ -2027,6 +2159,9 @@ async function init(){
       }
     }
     renderSectors(); // re-render with historical data
+    renderFearGreed(); // עדכון לאחר שיש היסטוריה
+    renderYTDChart();
+    renderCorrelationMatrix();
     const pos=SECTORS.filter(s=>(qmap[s.sym]||{}).d1>0).length;
     $('footer').textContent=`${pos}/${SECTORS.length} סקטורים חיוביים • Yahoo Finance • ${now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}`;
 
@@ -2040,7 +2175,259 @@ async function init(){
   }
 }
 
+// ══════════════════════════════════════════════
+// 6 NEW FEATURES — JS
+// ══════════════════════════════════════════════
+
+// ── 1. MARKET CLOCK ──────────────────────────
+function getETHour() {
+  // מחשב שעה בET תוך כדי תמיכה ב-DST אמריקאי
+  const now = new Date();
+  const etStr = now.toLocaleString('en-US', { timeZone: 'America/New_York' });
+  return new Date(etStr);
+}
+function startMarketClock() {
+  function tick() {
+    const et = getETHour();
+    const day = et.getDay(); // 0=ראשון,6=שבת
+    const h = et.getHours(), m = et.getMinutes(), s = et.getSeconds();
+    const totalMin = h * 60 + m;
+    const dotEl = $('market-dot'), lblEl = $('market-label'), cntEl = $('market-countdown');
+    if (!dotEl) return;
+    const isWeekend = day === 0 || day === 6;
+    let status, cls, countdownText = '';
+    if (isWeekend) {
+      status = 'סגור (סוף שבוע)'; cls = 'closed';
+      const daysTo = day === 6 ? 2 : 1;
+      countdownText = `נפתח בעוד ${daysTo} ימים`;
+    } else if (totalMin < 4*60) {       // לפני 04:00
+      status = 'סגור'; cls = 'closed';
+      const rem = 4*60 - totalMin;
+      countdownText = `פרי-מרקט בעוד ${String(Math.floor(rem/60)).padStart(2,'0')}:${String(rem%60).padStart(2,'0')}`;
+    } else if (totalMin < 9*60+30) {    // פרי-מרקט 04:00–09:30
+      status = 'פרי-מרקט'; cls = 'pre';
+      const rem = 9*60+30 - totalMin;
+      const remS = (60 - s) % 60;
+      const remM = remS > 0 ? rem - 1 : rem;
+      countdownText = `פתיחה בעוד <b>${String(Math.floor(remM/60)).padStart(2,'0')}:${String(remM%60).padStart(2,'0')}:${String(remS).padStart(2,'0')}</b>`;
+    } else if (totalMin < 16*60) {      // פתוח 09:30–16:00
+      status = 'שוק פתוח'; cls = 'open';
+      const rem = 16*60 - totalMin;
+      const remS = (60 - s) % 60;
+      const remM = remS > 0 ? rem - 1 : rem;
+      countdownText = `סגירה בעוד <b>${String(Math.floor(remM/60)).padStart(2,'0')}:${String(remM%60).padStart(2,'0')}:${String(remS).padStart(2,'0')}</b>`;
+    } else if (totalMin < 20*60) {      // אחרי 16:00–20:00
+      status = 'אפטר-אוורס'; cls = 'after';
+      const rem = 20*60 - totalMin;
+      countdownText = `נסגר בעוד ${String(Math.floor(rem/60)).padStart(2,'0')}:${String(rem%60).padStart(2,'0')}`;
+    } else {
+      status = 'סגור'; cls = 'closed';
+      countdownText = 'פרי-מרקט מחר בשעה 04:00 ET';
+    }
+    dotEl.className = `market-dot ${cls}`;
+    lblEl.className = `market-label ${cls}`;
+    lblEl.textContent = status;
+    cntEl.innerHTML = countdownText;
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+// ── 2. FEAR & GREED INDEX ────────────────────
+function calcFearGreed() {
+  const vixData = qmap['VIXY'] || {};
+  const vixD1 = vixData.d1 || 0;
+  // VIX proxy: VIXY d1 — עלייה ב-VIX = פחד
+  // נמיר ל-score: VIXY +5% ומעלה = פחד קיצוני (0), VIXY -5% ומטה = חמדנות קיצונית (100)
+  const vixScore = Math.min(100, Math.max(0, 50 - vixD1 * 7));
+
+  // מומנטום שוק — ממוצע d1 של כל הסקטורים
+  const sectorD1 = SECTORS.map(s => (qmap[s.sym]||{}).d1).filter(v => v!=null&&!isNaN(v));
+  const momentum = sectorD1.length ? sectorD1.reduce((a,b)=>a+b,0)/sectorD1.length : 0;
+  const momScore = Math.min(100, Math.max(0, 50 + momentum * 12));
+
+  // חיוביות — כמה סקטורים חיוביים
+  const posCount = sectorD1.filter(v => v > 0).length;
+  const posScore = (posCount / Math.max(sectorD1.length, 1)) * 100;
+
+  const total = Math.round(vixScore * 0.35 + momScore * 0.40 + posScore * 0.25);
+  return { total, vixScore: Math.round(vixScore), momScore: Math.round(momScore), posScore: Math.round(posScore), momentum: momentum.toFixed(2) };
+}
+
+function renderFearGreed() {
+  const fg = calcFearGreed();
+  const score = fg.total;
+  // ציבע ותווית
+  const getLabelAndColor = (s) => {
+    if (s >= 75) return { lbl: 'חמדנות קיצונית', color: '#00e87a' };
+    if (s >= 55) return { lbl: 'חמדנות', color: '#5bc27f' };
+    if (s >= 45) return { lbl: 'ניטרלי', color: '#f59e0b' };
+    if (s >= 25) return { lbl: 'פחד', color: '#f97316' };
+    return { lbl: 'פחד קיצוני', color: '#ff3a5c' };
+  };
+  const { lbl, color } = getLabelAndColor(score);
+  $('fg-num').textContent = score;
+  $('fg-num').style.color = color;
+  $('fg-lbl').textContent = lbl;
+  // מצייר את הגאוג'
+  drawFGGauge(score, color);
+  // קומפוננטים
+  $('fg-components').innerHTML = `
+    <div class="fg-comp"><div class="fg-comp-val" style="color:${score>=50?'var(--green)':'var(--red)'}">VIX ${fg.vixScore}</div><div class="fg-comp-lbl">תנודתיות</div></div>
+    <div class="fg-comp"><div class="fg-comp-val" style="color:${fg.momentum>=0?'var(--green)':'var(--red)'}">${fg.momentum}%</div><div class="fg-comp-lbl">מומנטום</div></div>
+    <div class="fg-comp"><div class="fg-comp-val" style="color:${fg.posScore>=50?'var(--green)':'var(--red)'}">${Math.round(fg.posScore)}%</div><div class="fg-comp-lbl">חיוביות</div></div>`;
+}
+
+function drawFGGauge(score, activeColor) {
+  const canvas = $('fg-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height, cx = W/2, cy = H-10, R = Math.min(cx-10, H-20), r = R - 22;
+  ctx.clearRect(0, 0, W, H);
+  const isL = document.body.classList.contains('light');
+  const bgTrack = isL ? '#dce6f2' : '#162840';
+  // zones: 5 חלקים — extreme fear, fear, neutral, greed, extreme greed
+  const zones = [
+    { from: 0,  to: 20,  color: '#ff3a5c' },
+    { from: 20, to: 40,  color: '#f97316' },
+    { from: 40, to: 60,  color: '#f59e0b' },
+    { from: 60, to: 80,  color: '#5bc27f' },
+    { from: 80, to: 100, color: '#00e87a' },
+  ];
+  const toAngle = v => Math.PI + (v / 100) * Math.PI; // 180°→360°
+  // background arc
+  ctx.beginPath(); ctx.arc(cx, cy, R, Math.PI, 2*Math.PI); ctx.arc(cx, cy, r, 2*Math.PI, Math.PI, true);
+  ctx.fillStyle = bgTrack; ctx.fill();
+  // colored zones
+  zones.forEach(z => {
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, toAngle(z.from), toAngle(z.to));
+    ctx.arc(cx, cy, r, toAngle(z.to), toAngle(z.from), true);
+    ctx.fillStyle = z.color + 'cc'; ctx.fill();
+  });
+  // needle
+  const angle = toAngle(score);
+  const nx = cx + Math.cos(angle) * (r + (R-r)/2);
+  const ny = cy + Math.sin(angle) * (r + (R-r)/2);
+  ctx.beginPath(); ctx.arc(nx, ny, 5, 0, 2*Math.PI);
+  ctx.fillStyle = '#fff'; ctx.fill();
+  ctx.strokeStyle = activeColor; ctx.lineWidth = 2; ctx.stroke();
+}
+
+// ── 3. YTD BAR CHART ─────────────────────────
+function renderYTDChart() {
+  const data = SECTORS.map(s => ({ sym: s.sym, name: s.name, ytd: (histMap[s.sym]||{}).ytd }))
+    .filter(s => s.ytd != null).sort((a,b) => b.ytd - a.ytd);
+  if (!data.length) return;
+  const ytdSec = $('ytd-section');
+  if (ytdSec) ytdSec.style.display = 'block';
+  const maxAbs = Math.max(...data.map(s => Math.abs(s.ytd)), 1);
+  const isL = document.body.classList.contains('light');
+  $('ytd-bars').innerHTML = data.map(s => {
+    const pct = s.ytd;
+    const barW = Math.abs(pct) / maxAbs * 100;
+    const isPos = pct >= 0;
+    const color = isPos ? (isL ? '#00904a' : '#00e87a') : (isL ? '#cc1a3a' : '#ff3a5c');
+    const bgColor = isPos ? (isL ? 'rgba(0,144,74,.12)' : 'rgba(0,232,122,.1)') : (isL ? 'rgba(204,26,58,.12)' : 'rgba(255,58,92,.1)');
+    return `<div class="ytd-row">
+      <span class="ytd-sym">${s.sym}</span>
+      <div class="ytd-bar-track">
+        <div class="ytd-bar-fill" style="width:${barW}%;background:${color};background:linear-gradient(90deg,${bgColor},${color})"></div>
+      </div>
+      <span class="ytd-val" style="color:${color}">${pct>0?'+':''}${pct.toFixed(1)}%</span>
+    </div>`;
+  }).join('');
+}
+
+// ── 4. CORRELATION MATRIX ────────────────────
+function pearson(a, b) {
+  const n = Math.min(a.length, b.length);
+  if (n < 3) return null;
+  const ax = a.slice(-n), bx = b.slice(-n);
+  const ma = ax.reduce((s,v)=>s+v,0)/n;
+  const mb = bx.reduce((s,v)=>s+v,0)/n;
+  let num=0, da=0, db=0;
+  for(let i=0;i<n;i++){const x=ax[i]-ma,y=bx[i]-mb;num+=x*y;da+=x*x;db+=y*y;}
+  return da&&db ? num/Math.sqrt(da*db) : null;
+}
+function renderCorrelationMatrix() {
+  const syms = SECTORS.filter(s => histMap[s.sym]?.rawPrices?.length > 20);
+  if (syms.length < 3) return;
+  const corrSec = $('corr-section');
+  if (corrSec) corrSec.style.display = 'block';
+  const isL = document.body.classList.contains('light');
+  // header row
+  let html = `<table class="corr-table"><thead><tr><th>סקטור</th>${syms.map(s=>`<th>${s.sym}</th>`).join('')}</tr></thead><tbody>`;
+  syms.forEach(row => {
+    html += `<tr><td>${row.name}</td>`;
+    syms.forEach(col => {
+      const a = histMap[row.sym].rawPrices;
+      const b = histMap[col.sym].rawPrices;
+      if (row.sym === col.sym) {
+        html += `<td style="background:var(--border2);color:var(--dim)">1.0</td>`;
+      } else {
+        const r = pearson(a, b);
+        if (r == null) { html += `<td style="color:var(--dim)">–</td>`; return; }
+        const v = parseFloat(r.toFixed(2));
+        // צבע: ירוק = מתאם גבוה, אדום = הפוך, אפור = ניטרלי
+        const intensity = Math.abs(v);
+        let bg;
+        if (v > 0.6) bg = isL ? `rgba(0,144,74,${intensity*.35})` : `rgba(0,232,122,${intensity*.25})`;
+        else if (v < -0.2) bg = isL ? `rgba(204,26,58,${intensity*.35})` : `rgba(255,58,92,${intensity*.25})`;
+        else bg = 'transparent';
+        const col2 = v > 0.5 ? (isL?'#005828':'#00e87a') : v < -0.1 ? (isL?'#cc1a3a':'#ff3a5c') : (isL?'#4070a0':'#5070a0');
+        html += `<td style="background:${bg};color:${col2}">${v.toFixed(2)}</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  $('corr-table-wrap').innerHTML = html;
+}
+
+// ── 5. BREADTH INDICATOR (200-day SMA) ───────
+async function runBreadth() {
+  const btn = document.querySelector('.breadth-btn');
+  if (btn) { btn.textContent = 'סורק...'; btn.disabled = true; }
+  $('breadth-big').textContent = '⏳';
+  $('breadth-sub').textContent = 'מחשב ממוצע 200 יום...';
+
+  const holdingsSet = new Set();
+  Object.values(ETF_HOLDINGS).forEach(sector => sector.forEach(h => holdingsSet.add(h.s)));
+  const symbols = Array.from(holdingsSet).slice(0, 60); // top 60 לביצועים
+
+  let above = 0, total = 0;
+  await Promise.all(symbols.map(async sym => {
+    try {
+      const cb = Math.floor(Date.now() / 10000);
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym.replace('/','–').replace('.','-')}?range=1y&interval=1d&cb=${cb}`;
+      const r = await fetch(`${_proxyUrl}/?url=${encodeURIComponent(url)}`);
+      if (!r.ok) return;
+      const d = await r.json();
+      const closes = d.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(p => p != null);
+      if (!closes || closes.length < 20) return;
+      const current = closes[closes.length - 1];
+      const sma200 = closes.slice(-200).reduce((a,b)=>a+b,0) / Math.min(200, closes.length);
+      total++;
+      if (current > sma200) above++;
+    } catch(e) {}
+  }));
+
+  if (btn) { btn.textContent = 'רענן'; btn.disabled = false; }
+  if (!total) { $('breadth-big').textContent = '?'; return; }
+  const pct = Math.round((above / total) * 100);
+  const color = pct >= 60 ? 'var(--green)' : pct >= 40 ? '#f59e0b' : 'var(--red)';
+  $('breadth-big').textContent = pct + '%';
+  $('breadth-big').style.color = color;
+  $('breadth-fill').style.width = pct + '%';
+  $('breadth-fill').style.background = color;
+  $('breadth-above').textContent = `${above} מניות מעל`;
+  $('breadth-total').textContent = `מתוך ${total}`;
+  $('breadth-sub').textContent = pct >= 60 ? '📈 שוק בריא' : pct >= 40 ? '⚖️ מעורב' : '📉 שוק חלש';
+}
+
 // Auto-start if key saved
+startMarketClock(); // שעון שוק פועל תמיד, גם לפני לוגין
 if (_proxyUrl) {
   init();
 } else {
