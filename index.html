@@ -1804,6 +1804,23 @@ async function runScreener() {
   `).join('');
 }
 
+function renderSectorsWithSkeleton(){
+  // מציג את כל השורות מיד עם יום% אמיתי + shimmer לשאר
+  const sk='<td class="lc">–</td>'; // shimmer cell
+  const rows=SECTORS.map(s=>{
+    const d=qmap[s.sym]||{};
+    const d1Td=`<td class="${cellCls(d.d1)}">${pct(d.d1)}</td>`;
+    return`<tr onclick="openSectorModal('${s.sym}','${s.name}')">
+      <td><span class="sym">${s.sym}</span>${s.name}</td>
+      ${d1Td}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}
+    </tr>`;
+  });
+  rows.push(`<tr class="avgrow"><td>ממוצע סקטורים</td>
+    ${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}<td class="cz">–</td>
+  </tr>`);
+  $('sector-tbody').innerHTML=rows.join('');
+}
+
 function renderSectors(){
   const rows=SECTORS.map(s=>{
     const d=qmap[s.sym]||{};
@@ -2121,26 +2138,29 @@ async function init(){
     fetchMarketNews();
     fetchAndRenderMovers();
     drawChart();
-    // הצג סקשנים מיד עם מצב טעינה
-    showLoadingState('ytd-section','ytd-bars','טוען נתונים היסטוריים...');
-    showLoadingState('corr-section','corr-table-wrap','ממתין לנתוני כל הסקטורים...');
+    // הצג skeleton ל-YTD ו-Correlation מיד
+    const ytdSec=$('ytd-section'); if(ytdSec) ytdSec.style.display='block';
+    $('ytd-bars').innerHTML=`<div style="display:flex;flex-direction:column;gap:5px">${SECTORS.map(()=>`
+      <div class="ytd-row"><span class="ytd-sym lc" style="width:36px;height:12px;border-radius:3px">&nbsp;</span>
+      <div class="ytd-bar-track"><div class="lc" style="width:60%;height:100%"></div></div>
+      <span style="width:40px;height:12px" class="lc">&nbsp;</span></div>`).join('')}</div>`;
+    const corrSec=$('corr-section'); if(corrSec) corrSec.style.display='block';
+    $('corr-table-wrap').innerHTML=`<div style="text-align:center;color:var(--dim);font-size:11px;padding:20px;font-family:var(--mono)"><div class="mini-ring" style="margin:0 auto 8px"></div>מחשב מתאמים...</div>`;
     showScreen('app');
 
-    // Background: fetch historical data via basic-financials (free tier)
+    // Background: skeleton + parallel fetch → single render
     $('footer').textContent='טוען נתונים היסטוריים...';
-	for (const s of SECTORS) {
-      try { 
-        histMap[s.sym] = await fetchHistoricalReturns(s.sym); 
-        renderSectors();
-        renderYTDChart();
-        renderCorrelationMatrix();
-        await sleep(400); // חשוב להשאיר את המרווח הזה
-      } catch (e) { 
-        histMap[s.sym] = {}; 
-      }
-    }
-    renderSectors(); // re-render with historical data
-    renderFearGreed(); // עדכון לאחר שיש היסטוריה
+    renderSectorsWithSkeleton(); // מציג skeleton מיידי
+
+    // מביא את כל הסקטורים במקביל
+    await Promise.all(SECTORS.map(async s => {
+      try { histMap[s.sym] = await fetchHistoricalReturns(s.sym); }
+      catch (e) { histMap[s.sym] = {}; }
+    }));
+
+    // רנדור אחד אחרי שהכל מוכן
+    renderSectors();
+    renderFearGreed();
     renderYTDChart();
     renderCorrelationMatrix();
     const pos=SECTORS.filter(s=>(qmap[s.sym]||{}).d1>0).length;
