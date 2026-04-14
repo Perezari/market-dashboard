@@ -242,8 +242,8 @@ body.light .hdr-btn:hover{background:rgba(255,255,255,.22);color:#fff}
 .tag-live{display:none}/* merged into live-pill */
 .tag-src{display:none}/* removed */
 
-.ticker-wrap{background:var(--bg2);border-bottom:1px solid var(--border);height:28px;overflow:hidden;display:flex;align-items:center}
-.ticker{display:flex;animation:scroll 55s linear infinite;white-space:nowrap;align-items:center}
+.ticker-wrap{background:var(--bg2);border-bottom:1px solid var(--border);height:28px;overflow:hidden;display:flex;align-items:center;direction:ltr}
+.ticker{display:flex;animation:scroll 60s linear infinite;white-space:nowrap;align-items:center;direction:ltr;will-change:transform;flex-shrink:0}
 @keyframes scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 .tick-item{display:flex;align-items:center;gap:6px;padding:0 18px;font-family:var(--mono);font-size:11px}
 .tick-sym{color:var(--dim)}.tick-price{color:var(--text);font-weight:600}
