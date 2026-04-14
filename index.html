@@ -402,19 +402,15 @@ body.light .news-card:hover {
 <!-- KEY INPUT -->
 <div id="screen-key">
   <div class="key-box">
-    <div class="key-title">📈 דשבורד שוק אמריקאי</div>
+    <div class="key-title">🔒 כניסה למערכת</div>
     <div class="key-steps">
-      <b>קבלת API Key חינמי — 30 שניות:</b><br>
-      1. כנס ל־<a class="key-sub" href="https://finnhub.io" target="_blank" style="color:var(--blue)">finnhub.io</a> ← לחץ Get free API key<br>
-      2. הרשם עם אימייל (ללא כרטיס אשראי)<br>
-      3. הדבק את ה-Key כאן ↓
+      הזן את מפתח המערכת (Worker URL) כדי לגשת לדשבורד.
     </div>
-    <input class="key-input" id="key-input" type="password"
-      placeholder="c..." autocomplete="off"
+    <input class="key-input" id="key-input" type="text"
+      placeholder="https://your-worker..." autocomplete="off"
       onkeydown="if(event.key==='Enter')startWithKey()" />
-    <div class="key-err" id="key-err">Key לא תקין — הוא מתחיל ב-c (לא sk-ant)</div>
-    <button class="key-btn" onclick="startWithKey()">טען נתונים ←</button>
-    <div class="key-note">המפתח נשמר בזיכרון בלבד • Finnhub חינמי: 60 קריאות/דקה</div>
+    <div class="key-err" id="key-err">המפתח לא תקין, נסה שוב.</div>
+    <button class="key-btn" onclick="startWithKey()">היכנס ←</button>
   </div>
 </div>
 
@@ -535,6 +531,7 @@ const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 
 let _key = localStorage.getItem('fh_key') || '';
+let _proxyUrl = localStorage.getItem('app_proxy_url') || '';
 
 const INDICES = [
   {sym:'SPY',  name:'S&P 500'},
@@ -592,13 +589,26 @@ function showScreen(name){
 }
 function showKey(){showScreen('screen-key')}
 
-function startWithKey(){
-  const k=$('key-input').value.trim();
-  if(!k||k.length<8){$('key-err').style.display='block';return;}
-  $('key-err').style.display='none';
-  _key=k;
-  localStorage.setItem('fh_key',k);
-  init();
+function startWithKey() {
+  const k = $('key-input').value.trim();
+  if (!k || !k.startsWith('http')) {
+    $('key-err').style.display = 'block';
+    return;
+  }
+  $('key-err').style.display = 'none';
+  
+  // מוודאים שהכתובת מסתיימת בלי לוכסן
+  const cleanUrl = k.endsWith('/') ? k.slice(0, -1) : k;
+  
+  _proxyUrl = cleanUrl;
+  localStorage.setItem('app_proxy_url', _proxyUrl);
+  
+  init(); // מנסים לטעון את הדשבורד (ה-init יבדוק אם המפתח עובד)
+}
+
+function logout() {
+  localStorage.removeItem('app_proxy_url');
+  location.reload();
 }
 
 // ── Finnhub API ─────────────────────────────────────
@@ -631,7 +641,7 @@ async function fetchMarketNews() {
   // נשתמש בנקודת החיפוש של יאהו כדי להביא 5 כתבות על שוק המניות
   const cb = Math.floor(Date.now() / 10000);
   const yahooUrl = `https://query2.finance.yahoo.com/v1/finance/search?q=stock+market&newsCount=5&cb=${cb}`;
-  const proxyUrl = `https://solitary-disk-72f6.ari-perez25-06.workers.dev/?url=${encodeURIComponent(yahooUrl)}`;
+  const proxyUrl = `${_proxyUrl}/?url=${encodeURIComponent(yahooUrl)}`;  
   
   try {
     const r = await fetch(proxyUrl);
@@ -731,7 +741,7 @@ async function fetchHistoricalReturns(sym) {
   const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=1y&interval=1d&cb=${cb}`;
   
   // כאן הכנסנו את הפרוקסי הפרטי שלך!
-  const proxyUrl = `https://solitary-disk-72f6.ari-perez25-06.workers.dev/?url=${encodeURIComponent(yahooUrl)}`;
+  const proxyUrl = `${_proxyUrl}/?url=${encodeURIComponent(yahooUrl)}`;  
   
   try {
     const r = await fetch(proxyUrl);
@@ -787,8 +797,8 @@ async function fetchYahooQuotesBatch(symbolsArray) {
     const cb = Math.floor(Date.now() / 10000); 
     
     const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/spark?symbols=${symbolsStr}&range=1d&interval=1d&cb=${cb}`;
-    const proxyUrl = `https://solitary-disk-72f6.ari-perez25-06.workers.dev/?url=${encodeURIComponent(yahooUrl)}`;
-    
+    const proxyUrl = `${_proxyUrl}/?url=${encodeURIComponent(yahooUrl)}`;
+	
     try {
       const r = await fetch(proxyUrl);
       if (!r.ok) return;
@@ -1155,7 +1165,11 @@ async function init(){
 }
 
 // Auto-start if key saved
-if(_key){init();}else{showScreen('screen-key');}
+if (_proxyUrl) {
+  init();
+} else {
+  showScreen('screen-key');
+}
 </script>
 </body>
 </html>
