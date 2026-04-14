@@ -25,9 +25,14 @@ body.light{
   --blue:#0070c0;
   --shadow:rgba(0,30,60,.12);
 }
+body.light .tag-src {
+  background: #eaf0f8 !important;
+  color: #1a3560 !important;
+  font-weight: 700;
+}
 body.light::after{opacity:.04}
 body.light .hdr{background:linear-gradient(180deg,#1a3560,#1e4070)!important;border-bottom-color:#2a5090}
-body.light .hdr-title,body.light .live-tag,body.light .ts,body.light .tag-src,body.light .hdr-btn{color:#e8f0fc!important}
+body.light .hdr-title,body.light .live-tag,body.light .ts,body.light .hdr-btn{color:#e8f0fc!important}
 body.light .hdr-btn{background:#2a5080;border-color:#3a6090}
 body.light .hdr-btn:hover{background:#3a6090}
 body.light .ticker-wrap{background:#1e3a70;border-bottom-color:#2a4a80}
@@ -328,6 +333,68 @@ body.light .news-card:hover {
   gap: 5px;
 }
 
+/* ── TOP MOVERS ── */
+.movers-section {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  margin-top: 10px;
+}
+.movers-header {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.movers-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.mover-col-title {
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 10px;
+  text-align: center;
+}
+.mover-col-title.green { color: var(--green); }
+.mover-col-title.red { color: var(--red); }
+.mover-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  margin-bottom: 6px;
+  padding: 5px 8px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  transition: transform 0.15s;
+  cursor: default;
+}
+.mover-row:hover {
+  transform: scale(1.03);
+  border-color: var(--border2);
+}
+.mover-sym {
+  color: var(--text);
+  font-weight: 700;
+}
+.mover-val {
+  font-weight: 800;
+}
+.mover-val.up { color: var(--green); }
+.mover-val.down { color: var(--red); }
+
 </style>
 </head>
 <body class="light">
@@ -378,7 +445,7 @@ body.light .news-card:hover {
     </div>
     <div class="hdr-right">
       <span class="tag tag-live">LIVE</span>
-      <span class="tag tag-src">Finnhub</span>
+	  <span class="tag tag-src">Yahoo</span>
       <span class="ts" id="ts"></span>
       <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="מצב בהיר/כהה">☀️</button>
       <button class="hdr-btn" onclick="showKey()">🔑</button>
@@ -398,13 +465,22 @@ body.light .news-card:hover {
   <div class="content">
     <div>
       <div class="section-label">ביצועי סקטורים — SPDR ETFs</div>
-<div class="tbl-wrap">
+	<div class="tbl-wrap">
         <table class="t">
           <thead>
             <tr><th>סקטור</th><th>יום %</th><th>שבוע</th><th>חודש</th><th>3 חד׳</th><th>6 חד׳</th><th>שנה</th><th>ממוצע</th></tr>
           </thead>
           <tbody id="sector-tbody"></tbody>
         </table>
+      </div>
+	  	<div class="movers-section" id="movers-section">
+        <div class="movers-header">🔥 המזנקות והצוללות (S&P 500)</div>
+        <div class="movers-grid" id="movers-grid">
+          <div style="grid-column: 1/-1; text-align: center; color: var(--dim); font-size: 11px; padding: 10px;">
+            <div class="mini-ring" style="margin: 0 auto 8px;"></div>
+            סורק 220 מניות ברקע...
+          </div>
+        </div>
       </div>
     </div>
     <div class="right-col">
@@ -589,6 +665,66 @@ async function fetchMarketNews() {
   }
 }
 
+async function fetchAndRenderMovers() {
+  // 1. אוספים את כל הסמלים הייחודיים מתוך המילון של הסקטורים (220 מניות)
+  const holdingsSet = new Set();
+  Object.values(ETF_HOLDINGS).forEach(sector => {
+    sector.forEach(stock => holdingsSet.add(stock.s));
+  });
+  const holdingSymbols = Array.from(holdingsSet);
+
+  // 2. מושכים את כל ה-220 מניות בבקשה מרוכזת אחת מ-Yahoo!
+  const newQuotes = await fetchYahooQuotesBatch(holdingSymbols);
+  Object.assign(qmap, newQuotes); // מעדכנים את מילון המחירים הראשי
+
+  // 3. מרנדרים את הפאנל
+  renderMovers(holdingsSet);
+}
+
+function renderMovers(holdingsSet) {
+  const validMovers = [];
+  
+  // מסננים החוצה מניות שאין להן נתונים
+  holdingsSet.forEach(sym => {
+    const d = qmap[sym];
+    if (d && d.d1 != null && !isNaN(d.d1)) {
+      validMovers.push({ sym: sym, d1: d.d1 });
+    }
+  });
+
+  if (validMovers.length === 0) {
+    $('movers-grid').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--dim);">אין נתונים זמינים כרגע</div>';
+    return;
+  }
+
+  // ממיינים מהגבוה לנמוך
+  validMovers.sort((a, b) => b.d1 - a.d1);
+
+  // לוקחים את 5 העולות הכי הרבה ואת 5 היורדות הכי הרבה
+  const topGainers = validMovers.slice(0, 5);
+  const topLosers = validMovers.slice(-5).reverse();
+
+  // פונקציית עזר ליצירת שורות
+  const buildRows = (items, isUp) => items.map(item => `
+    <div class="mover-row">
+      <span class="mover-sym">${item.sym}</span>
+      <span class="mover-val ${isUp ? 'up' : 'down'}">${item.d1 > 0 ? '+' : ''}${item.d1.toFixed(2)}%</span>
+    </div>
+  `).join('');
+
+  // מזריקים ל-HTML
+  $('movers-grid').innerHTML = `
+    <div>
+      <div class="mover-col-title green">🚀 מזנקות</div>
+      ${buildRows(topGainers, true)}
+    </div>
+    <div>
+      <div class="mover-col-title red">📉 צוללות</div>
+      ${buildRows(topLosers, false)}
+    </div>
+  `;
+}
+
 async function fetchHistoricalReturns(sym) {
   // התוספת של cb מונעת מהדפדפן לשמור נתונים ישנים בזיכרון (Cache)
   const cb = Math.floor(Date.now() / 10000);
@@ -635,50 +771,56 @@ async function fetchHistoricalReturns(sym) {
 async function fetchYahooQuotesBatch(symbolsArray) {
   if (!symbolsArray || symbolsArray.length === 0) return {};
   
-  // Yahoo דורש מקף במקום לוכסן (למשל BRK-B במקום BRK/B)
-  const yahooSymbols = symbolsArray.map(s => s.replace('/', '-').replace('.', '-'));
-  const symbolsStr = yahooSymbols.join(',');
-  const cb = Math.floor(Date.now() / 10000); 
+  const chunkSize = 20; // נחלק את הבקשה לקבוצות של 40 מניות כדי לא להכעיס את יאהו
+  const allQuotes = {};
   
-  // אנחנו משתמשים כאן ב-spark במקום ב-quote! זה עוקף את חסימת ה-401.
-  const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/spark?symbols=${symbolsStr}&range=1d&interval=1d&cb=${cb}`;
-  const proxyUrl = `https://solitary-disk-72f6.ari-perez25-06.workers.dev/?url=${encodeURIComponent(yahooUrl)}`;
-  
-  try {
-    const r = await fetch(proxyUrl);
-    if (!r.ok) return {};
-    const d = await r.json();
-    const results = d.spark?.result || [];
-
-    const newQuotes = {};
-    for (const res of results) {
-      // ב-spark, הנתונים החיים נמצאים בתוך אובייקט meta
-      const meta = res.response?.[0]?.meta;
-      if (!meta) continue;
-
-      const price = meta.regularMarketPrice;
-      const prev = meta.chartPreviousClose || meta.previousClose;
-      
-      // חישוב אחוז השינוי היומי
-      let d1 = 0;
-      if (price && prev) {
-        d1 = ((price - prev) / prev) * 100;
-      }
-
-      // מוצאים מה היה הסמל המקורי שביקשנו (כדי לתקן חזרה את BRK-B ל-BRK/B)
-      const originalSym = symbolsArray.find(s => s.replace('/', '-').replace('.', '-') === res.symbol) || res.symbol;
-      
-      newQuotes[originalSym] = {
-        price: price,
-        d1: d1,
-        prev: prev
-      };
-    }
-    return newQuotes;
-  } catch (e) {
-    console.error("Error fetching Yahoo spark quotes", e);
-    return {};
+  // פיצול המערך הגדול לתת-מערכים קטנים
+  const chunks = [];
+  for (let i = 0; i < symbolsArray.length; i += chunkSize) {
+    chunks.push(symbolsArray.slice(i, i + chunkSize));
   }
+
+  // שולחים את כל הבקשות במקביל (Parallel) כדי לשמור על מהירות שיא
+  await Promise.all(chunks.map(async (chunk) => {
+    const yahooSymbols = chunk.map(s => s.replace('/', '-').replace('.', '-'));
+    const symbolsStr = yahooSymbols.join(',');
+    const cb = Math.floor(Date.now() / 10000); 
+    
+    const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/spark?symbols=${symbolsStr}&range=1d&interval=1d&cb=${cb}`;
+    const proxyUrl = `https://solitary-disk-72f6.ari-perez25-06.workers.dev/?url=${encodeURIComponent(yahooUrl)}`;
+    
+    try {
+      const r = await fetch(proxyUrl);
+      if (!r.ok) return;
+      const d = await r.json();
+      const results = d.spark?.result || [];
+
+      for (const res of results) {
+        const meta = res.response?.[0]?.meta;
+        if (!meta) continue;
+
+        const price = meta.regularMarketPrice;
+        const prev = meta.chartPreviousClose || meta.previousClose;
+        
+        let d1 = 0;
+        if (price && prev) {
+          d1 = ((price - prev) / prev) * 100;
+        }
+
+        const originalSym = chunk.find(s => s.replace('/', '-').replace('.', '-') === res.symbol) || res.symbol;
+        
+        allQuotes[originalSym] = {
+          price: price,
+          d1: d1,
+          prev: prev
+        };
+      }
+    } catch (e) {
+      console.error("Error fetching Yahoo chunk", e);
+    }
+  }));
+
+  return allQuotes; // מחזירים את כל הנתונים שאספנו מכל המנות
 }
 
 // ── Render helpers ──────────────────────────────────
@@ -981,6 +1123,7 @@ async function init(){
     renderSectors();
     renderSummary();
 	fetchMarketNews();
+	fetchAndRenderMovers();
     drawChart();
     showScreen('app');
 
@@ -997,7 +1140,7 @@ async function init(){
     }
     renderSectors(); // re-render with historical data
     const pos=SECTORS.filter(s=>(qmap[s.sym]||{}).d1>0).length;
-    $('footer').textContent=`${pos}/${SECTORS.length} סקטורים חיוביים • Finnhub • ${now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}`;
+    $('footer').textContent=`${pos}/${SECTORS.length} סקטורים חיוביים • Yahoo Finance • ${now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}`;
 
   }catch(e){
     console.error(e);
