@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>דשבורד שוק אמריקאי</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050d1a;--bg2:#091525;--bg3:#0d1c32;--bg4:#122038;
+  --border:#162840;--border2:#1e3550;
+  --text:#ccd8ea;--dim:#3d5470;
+  --green:#00e87a;--gd:#002e18;
+  --red:#ff3a5c;--rd:#320010;
+  --blue:#00b4ff;
+  --shadow:rgba(0,0,0,.5);
+  --mono:'JetBrains Mono',monospace;--sans:'Heebo',sans-serif;
+}
+body.light{
+  --bg:#f2f6fc;--bg2:#ffffff;--bg3:#eaf0f8;--bg4:#dce6f2;
+  --border:#d0daea;--border2:#b8c8de;
+  --text:#0e1e34;--dim:#7090b0;
+  --green:#00904a;--gd:#e0faee;
+  --red:#cc1a3a;--rd:#fde0e6;
+  --blue:#0070c0;
+  --shadow:rgba(0,30,60,.12);
+}
+body.light::after{opacity:.04}
+body.light .hdr{background:linear-gradient(180deg,#1a3560,#1e4070)!important;border-bottom-color:#2a5090}
+body.light .hdr-title,body.light .live-tag,body.light .ts,body.light .tag-src,body.light .hdr-btn{color:#e8f0fc!important}
+body.light .hdr-btn{background:#2a5080;border-color:#3a6090}
+body.light .hdr-btn:hover{background:#3a6090}
+body.light .ticker-wrap{background:#1e3a70;border-bottom-color:#2a4a80}
+body.light .tick-sym{color:#8aabcc!important}
+body.light .tick-price{color:#d8eafc!important}
+body.light .tick-sep{background:#2e4e80}
+body.light .live-dot{background:#00dd70;box-shadow:0 0 10px #00dd70}
+body.light .indices-section{background:var(--bg2)}
+body.light .idx{background:#fff;border-color:var(--border);box-shadow:0 1px 4px rgba(0,30,80,.08)}
+body.light .idx:hover{border-color:var(--blue);box-shadow:0 2px 8px rgba(0,80,160,.12)}
+body.light .idx-name{color:var(--text)}
+body.light .content{background:transparent}
+body.light .t th{background:var(--bg3);color:#4070a0;border-color:var(--border)}
+body.light .t td{border-color:var(--border)}
+body.light .t td:first-child{background:var(--bg2)!important;color:var(--text)}
+body.light .avgrow td{background:var(--bg3)!important}
+body.light .chart-box{background:#fff;border-color:var(--border);box-shadow:0 1px 4px rgba(0,30,80,.08)}
+body.light .sum-card{background:#fff;border-color:var(--border);box-shadow:0 1px 4px rgba(0,30,80,.08)}
+body.light .sum-card-label{color:var(--dim)}
+body.light .pos-track{background:rgba(200,0,50,.12)}
+body.light .modal{background:#fff;border-color:var(--border2)}
+body.light .modal-hdr{border-bottom-color:var(--border)}
+body.light .modal-title{color:var(--text)}
+body.light .modal-sub{color:var(--dim)}
+body.light .modal-body{background:#fff}
+body.light .modal-footer{background:var(--bg3);border-top-color:var(--border);color:var(--dim)}
+body.light .modal-close{background:var(--bg3);border-color:var(--border);color:var(--dim)}
+body.light .modal-overlay{background:rgba(10,30,70,.55)}
+body.light .htbl th{background:var(--bg3);color:var(--dim);border-color:var(--border)}
+body.light .htbl td{border-color:var(--border)}
+body.light .s-name{color:var(--dim)}
+body.light .w-val{color:var(--dim)}
+body.light .section-label{color:var(--dim)}
+body.light .section-label::before{background:var(--blue)}
+body.light .footer{border-top-color:var(--border);color:var(--dim)}
+body.light .key-box{background:#fff;border-color:var(--border2);box-shadow:0 4px 20px rgba(0,30,80,.1)}
+body.light .key-title{color:var(--text)}
+body.light .key-steps{background:var(--bg3);border-color:var(--border)}
+body.light .key-input{background:#fff;border-color:var(--border2);color:var(--text)}
+body.light .sym{color:var(--dim)}
+body.light .t tr:hover td{filter:brightness(.96)!important}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;min-height:100vh}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:40px 40px;opacity:.13}
+
+/* ── KEY SCREEN ── */
+#screen-key{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;z-index:100;background:var(--bg);padding:20px}
+.key-box{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:28px 26px;width:100%;max-width:440px;display:flex;flex-direction:column;gap:14px}
+.key-title{font-size:16px;font-weight:800;color:#fff}
+.key-sub{font-size:12px;color:var(--dim);line-height:1.7}
+.key-sub a{color:var(--blue);text-decoration:none}
+.key-sub a:hover{text-decoration:underline}
+.key-steps{font-size:11px;color:var(--dim);line-height:2;background:var(--bg3);border-radius:8px;padding:10px 14px;border:1px solid var(--border)}
+.key-steps b{color:var(--text)}
+.key-input{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:10px 14px;color:var(--text);font-family:var(--mono);font-size:12px;width:100%;outline:none;transition:border-color .2s;letter-spacing:.3px}
+.key-input:focus{border-color:var(--blue)}
+.key-input::placeholder{color:var(--dim)}
+.key-btn{background:var(--blue);color:#000;font-weight:800;border:none;border-radius:8px;padding:11px;cursor:pointer;font-size:14px;font-family:var(--sans);width:100%;transition:opacity .15s}
+.key-btn:hover{opacity:.85}
+.key-note{font-size:10px;color:var(--dim);text-align:center}
+.key-err{font-size:11px;color:var(--red);display:none;text-align:center}
+
+/* ── LOADING ── */
+#screen-loading{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:100;background:var(--bg)}
+.loader-ring{width:52px;height:52px;border:2px solid var(--border2);border-top-color:var(--blue);border-right-color:var(--green);border-radius:50%;animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader-text{color:var(--dim);font-size:13px}
+.loader-sub{color:var(--blue);font-size:11px;font-family:var(--mono)}
+
+/* ── ERROR ── */
+#screen-error{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:100;background:var(--bg);padding:24px;text-align:center}
+.err-title{color:var(--red);font-size:18px;font-weight:700}
+.err-body{color:var(--dim);max-width:400px;line-height:1.7;font-size:12px}
+.err-code{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px;max-width:400px;width:100%;font-family:var(--mono);font-size:10px;color:#e05050;text-align:left;direction:ltr;word-break:break-all;max-height:100px;overflow-y:auto}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.btn{background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px;font-family:var(--sans);transition:background .15s}
+.btn:hover{background:var(--bg4)}
+.btn.primary{background:var(--blue);color:#000;font-weight:700;border-color:var(--blue)}
+.btn.loading{opacity:.5;pointer-events:none}
+
+/* ── APP ── */
+#app{display:none;flex-direction:column;min-height:100vh;position:relative;z-index:1}
+.hdr{background:linear-gradient(180deg,rgba(5,15,32,.98),rgba(9,21,37,.95));border-bottom:1px solid var(--border2);padding:0 18px;height:50px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;backdrop-filter:blur(8px)}
+.hdr-left{display:flex;align-items:center;gap:12px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);animation:pulse 2s ease infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.hdr-title{font-size:15px;font-weight:800;color:#fff}
+.hdr-right{display:flex;align-items:center;gap:10px}
+.ts{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.tag{font-size:10px;padding:2px 8px;border-radius:3px;font-family:var(--mono)}
+.tag-live{background:var(--gd);border:1px solid #00e87a33;color:var(--green)}
+.tag-src{background:var(--bg3);border:1px solid var(--border);color:var(--dim)}
+.hdr-btn{background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:5px 12px;border-radius:4px;cursor:pointer;font-size:11px;font-family:var(--sans);transition:background .15s}
+.hdr-btn:hover{background:var(--bg4)}
+.hdr-btn.loading{opacity:.5;pointer-events:none}
+
+.ticker-wrap{background:var(--bg2);border-bottom:1px solid var(--border);height:28px;overflow:hidden;display:flex;align-items:center}
+.ticker{display:flex;animation:scroll 55s linear infinite;white-space:nowrap;align-items:center}
+@keyframes scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.tick-item{display:flex;align-items:center;gap:6px;padding:0 18px;font-family:var(--mono);font-size:11px}
+.tick-sym{color:var(--dim)}.tick-price{color:var(--text);font-weight:600}
+.tick-sep{width:1px;height:12px;background:var(--border2)}
+
+.indices-section{background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 16px}
+.indices-main{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+.indices-other{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.idx{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:9px 11px;transition:border-color .2s}
+.idx:hover{border-color:var(--border2)}
+.idx-sym{font-size:10px;color:var(--dim);font-family:var(--mono);margin-bottom:1px}
+.idx-name{font-size:11px;font-weight:700;margin-bottom:5px}
+.idx-price{font-family:var(--mono);font-size:16px;font-weight:700;margin-bottom:6px;line-height:1}
+.badges{display:flex;gap:4px}
+.b{flex:1;text-align:center;padding:3px 2px;border-radius:3px;font-family:var(--mono);font-size:10px;font-weight:700;line-height:1.3}
+.bl{font-size:8px;display:block;font-weight:400;opacity:.75;font-family:var(--sans)}
+.p3{background:#003520;color:#00e87a}.p2{background:#002515;color:#00c862}.p1{background:#001a0e;color:#3db370}
+.n3{background:#3a0010;color:#ff3a5c}.n2{background:#280008;color:#ef4444}.n1{background:#1a0008;color:#d97070}
+.z{background:#0c1a2a;color:#3d5470}
+body.light .p3{background:#c8f0dc;color:#005828}
+body.light .p2{background:#d4f5e4;color:#006830}
+body.light .p1{background:#e4faee;color:#007838}
+body.light .n3{background:#f8b8c4;color:#cc0018}
+body.light .n2{background:#fcd0d8;color:#b80020}
+body.light .n1{background:#fde4e8;color:#aa2020}
+body.light .z{background:#eef2f8;color:#8090a8}
+
+
+
+.content{display:grid;grid-template-columns:1fr 290px;gap:10px;padding:12px 16px;flex:1}
+.section-label{font-size:9px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px;display:flex;align-items:center;gap:7px}
+.section-label::before{content:'';display:inline-block;width:3px;height:11px;border-radius:2px;background:var(--blue)}
+
+.tbl-wrap{overflow-x:auto}
+table.t{width:100%;border-collapse:collapse;font-size:11px}
+.t th{background:var(--bg);color:var(--dim);font-weight:600;padding:5px 8px;border:1px solid var(--border);font-size:9px;text-align:center;white-space:nowrap;text-transform:uppercase;letter-spacing:.8px}
+.t th:first-child{text-align:right}
+.t td{padding:4px 7px;border:1px solid var(--border);text-align:center;font-family:var(--mono);font-size:11px}
+.t td:first-child{text-align:right;font-family:var(--sans);font-weight:600;font-size:12px;background:var(--bg2)!important;white-space:nowrap}
+.sym{font-family:var(--mono);font-size:10px;color:var(--dim);margin-left:8px;}
+.t tr:hover td{filter:brightness(1.15)}
+.avgrow td{background:var(--bg4)!important;font-weight:700!important;border-top:2px solid var(--border2)!important}
+.avgrow td:first-child{font-family:var(--sans)!important}
+.c3{background:#003e24;color:#00e87a}.c2{background:#002918;color:#1db85a}.c1{background:#001a10;color:#2f9e52}
+.m1{background:#1c0010;color:#e57373}.m2{background:#2a0010;color:#ef5350}.m3{background:#3e0014;color:#ff3a5c}
+.cz{background:#0a1828;color:#2e4560}
+body.light .c3{background:#c8f0dc;color:#005828}
+body.light .c2{background:#d4f5e4;color:#006830}
+body.light .c1{background:#e0faee;color:#007838}
+body.light .m1{background:#fde4e8;color:#aa1020}
+body.light .m2{background:#fcd0d8;color:#b80020}
+body.light .m3{background:#f8b8c4;color:#cc0018}
+body.light .cz{background:#eef2f8;color:#8090a8}
+/* shimmer for loading cells */
+.lc{background:linear-gradient(90deg,var(--bg3),var(--bg4),var(--bg3));background-size:300%;animation:sh 1.4s infinite;color:transparent!important}
+@keyframes sh{0%{background-position:200%}100%{background-position:-200%}}
+
+.right-col{display:flex;flex-direction:column;gap:10px}
+.chart-box{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px}
+canvas{display:block;width:100%!important}
+.sum-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sum-card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px 12px}
+.sum-card-label{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px}
+.sum-card-val{font-family:var(--mono);font-size:20px;font-weight:700;line-height:1}
+.sum-card-sub{font-size:10px;color:var(--dim);margin-top:3px}
+
+
+.footer{padding:8px 16px;color:var(--dim);font-size:10px;text-align:center;border-top:1px solid var(--border);font-family:var(--mono)}
+
+@media(max-width:900px){.content{grid-template-columns:1fr}.indices-main{grid-template-columns:repeat(2,1fr)}.indices-other{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:500px){.indices-other{grid-template-columns:repeat(2,1fr)}}
+
+
+/* ── POSITIVITY CARD ── */
+.pos-card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:8px}
+.pos-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.pos-card-label{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px}
+#pos-pct{font-family:var(--mono);font-size:20px;font-weight:700}
+.pos-mini-bar{height:5px;background:var(--rd);border-radius:3px;overflow:hidden;margin-bottom:5px}
+.pos-fill{height:100%;border-radius:3px;transition:width .8s ease}
+#pos-mood{font-size:10px;color:var(--dim)}
+/* ── THEME TOGGLE ── */
+.theme-btn{background:var(--bg3);border:1px solid var(--border2);color:var(--text);width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:background .2s,transform .2s;flex-shrink:0}
+.theme-btn:hover{background:var(--bg4);transform:scale(1.1)}
+
+/* ── SECTOR MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:200;display:none;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;overflow:hidden;width:100%;max-width:560px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 64px var(--shadow);animation:slideUp .2s ease}
+@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.modal-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.modal-title{font-size:15px;font-weight:800;color:var(--text)}
+.modal-sub{font-size:11px;color:var(--dim);margin-top:2px}
+.modal-close{background:var(--bg3);border:1px solid var(--border);color:var(--dim);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s}
+.modal-close:hover{background:var(--bg4);color:var(--text)}
+.modal-body{padding:14px 20px;overflow-y:auto;flex:1}
+.modal-loading{display:flex;align-items:center;justify-content:center;gap:10px;padding:32px;color:var(--dim);font-size:13px}
+.mini-ring{width:20px;height:20px;border:2px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
+/* holdings table */
+.htbl{width:100%;border-collapse:collapse;font-size:12px}
+.htbl th{background:var(--bg);color:var(--dim);font-size:9px;text-transform:uppercase;letter-spacing:.8px;padding:5px 8px;border:1px solid var(--border);text-align:center;white-space:nowrap}
+.htbl th:first-child,.htbl th:nth-child(2){text-align:right}
+.htbl td{padding:5px 8px;border:1px solid var(--border);text-align:center;font-family:var(--mono);font-size:11px}
+.htbl td:first-child{text-align:center;font-weight:700;color:var(--dim);font-size:10px;width:28px}
+.htbl td:nth-child(2){text-align:right;font-family:var(--sans);font-weight:600;font-size:12px;white-space:nowrap}
+.htbl td.s-name{font-family:var(--sans);font-size:11px;color:var(--dim);font-weight:400;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.htbl tr:hover td{filter:brightness(1.1)}
+.w-bar-cell{min-width:80px}
+.w-bar-wrap{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;width:100%}
+.w-bar{height:6px;background:var(--blue);border-radius:3px;opacity:.7;min-width:2px}
+.w-val{font-size:10px;color:var(--dim);white-space:nowrap}
+.modal-footer{padding:10px 20px;border-top:1px solid var(--border);font-size:10px;color:var(--dim);font-family:var(--mono);text-align:center;flex-shrink:0}
+/* clickable row hint */
+.t tbody tr{cursor:pointer;transition:filter .1s}
+.t tbody tr:hover td{filter:brightness(1.2)!important}
+.t tbody tr td:first-child::after{content:' ↗';color:transparent;font-size:10px;transition:color .2s}
+.t tbody tr:hover td:first-child::after{color:var(--blue)}
+</style>
+</head>
+<body class="light">
+
+<!-- KEY INPUT -->
+<div id="screen-key">
+  <div class="key-box">
+    <div class="key-title">📈 דשבורד שוק אמריקאי</div>
+    <div class="key-steps">
+      <b>קבלת API Key חינמי — 30 שניות:</b><br>
+      1. כנס ל־<a class="key-sub" href="https://finnhub.io" target="_blank" style="color:var(--blue)">finnhub.io</a> ← לחץ Get free API key<br>
+      2. הרשם עם אימייל (ללא כרטיס אשראי)<br>
+      3. הדבק את ה-Key כאן ↓
+    </div>
+    <input class="key-input" id="key-input" type="password"
+      placeholder="c..." autocomplete="off"
+      onkeydown="if(event.key==='Enter')startWithKey()" />
+    <div class="key-err" id="key-err">Key לא תקין — הוא מתחיל ב-c (לא sk-ant)</div>
+    <button class="key-btn" onclick="startWithKey()">טען נתונים ←</button>
+    <div class="key-note">המפתח נשמר בזיכרון בלבד • Finnhub חינמי: 60 קריאות/דקה</div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="screen-loading">
+  <div class="loader-ring"></div>
+  <div class="loader-text">מביא נתוני שוק חיים...</div>
+  <div class="loader-sub" id="progress">Finnhub • ללא proxy</div>
+</div>
+
+<!-- ERROR -->
+<div id="screen-error" style="display:none">
+  <div class="err-title">⚠️ שגיאה</div>
+  <div class="err-body" id="err-msg"></div>
+  <div class="err-code" id="err-code" style="display:none"></div>
+  <div class="btn-row">
+    <button class="btn primary" onclick="init()">↻ נסה שוב</button>
+    <button class="btn" onclick="showKey()">🔑 שנה Key</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="hdr">
+    <div class="hdr-left">
+      <div class="live-dot"></div>
+      <span class="hdr-title">דשבורד שוק אמריקאי</span>
+    </div>
+    <div class="hdr-right">
+      <span class="tag tag-live">LIVE</span>
+      <span class="tag tag-src">Finnhub</span>
+      <span class="ts" id="ts"></span>
+      <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="מצב בהיר/כהה">☀️</button>
+      <button class="hdr-btn" onclick="showKey()">🔑</button>
+      <button class="hdr-btn" id="refresh-btn" onclick="init()">↻ רענן</button>
+    </div>
+  </div>
+
+  <div class="ticker-wrap"><div class="ticker" id="ticker"></div></div>
+
+  <div class="indices-section">
+    <div class="indices-main" id="idx-main"></div>
+    <div class="indices-other" id="idx-other"></div>
+  </div>
+
+
+
+  <div class="content">
+    <div>
+      <div class="section-label">ביצועי סקטורים — SPDR ETFs</div>
+<div class="tbl-wrap">
+        <table class="t">
+          <thead>
+            <tr><th>סקטור</th><th>יום %</th><th>שבוע</th><th>חודש</th><th>3 חד׳</th><th>6 חד׳</th><th>שנה</th><th>ממוצע</th></tr>
+          </thead>
+          <tbody id="sector-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="right-col">
+      <div>
+        <div class="section-label">ביצוע יומי</div>
+        <div class="chart-box"><canvas id="chart" width="266" height="264"></canvas></div>
+      </div>
+      <div>
+        <div class="section-label">סיכום יום</div>
+        <div class="pos-card" id="pos-card">
+          <div class="pos-card-top">
+            <span class="pos-card-label">חיוביות יומית</span>
+            <span class="pos-pct" id="pos-pct">–</span>
+          </div>
+          <div class="pos-mini-bar"><div class="pos-fill" id="pos-fill"></div></div>
+          <div class="pos-mood" id="pos-mood"></div>
+        </div>
+        <div class="sum-grid" id="summary"></div>
+      </div>
+    </div>
+  </div>
+  <div class="footer" id="footer"></div>
+</div>
+<!-- SECTOR MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-hdr">
+      <div>
+        <div class="modal-title" id="modal-title">אחזקות סקטור</div>
+        <div class="modal-sub" id="modal-sub"></div>
+      </div>
+      <button class="modal-close" onclick="closeModalDirect()">×</button>
+    </div>
+    <div class="modal-body" id="modal-body">
+      <div class="modal-loading"><div class="mini-ring"></div>טוען אחזקות...</div>
+    </div>
+    <div class="modal-footer" id="modal-footer">מקור: Finnhub ETF Holdings API</div>
+  </div>
+</div>
+
+
+<script>
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+
+let _key = localStorage.getItem('fh_key') || '';
+
+const INDICES = [
+  {sym:'SPY',  name:'S&P 500'},
+  {sym:'QQQ',  name:'נאסד״ק 100'},
+  {sym:'DIA',  name:'דאו ג׳ונס'},
+  {sym:'IWM',  name:'ראסל 2000'},
+];
+const OTHER = [
+  {sym:'GLD',  name:'זהב'},
+  {sym:'IBIT', name:'Bitcoin ETF'},
+  {sym:'VIXY', name:'VIX (VIXY)'},
+  {sym:'TLT',  name:'אג״ח 20Y'},
+  {sym:'UUP',  name:'דולר (UUP)'},
+];
+const SECTORS = [
+  {sym:'XLK',  name:'טכנולוגיה'},
+  {sym:'XLF',  name:'פיננסים'},
+  {sym:'XLE',  name:'אנרגיה'},
+  {sym:'XLV',  name:'בריאות'},
+  {sym:'XLC',  name:'תקשורת'},
+  {sym:'XLI',  name:'תעשייה'},
+  {sym:'XLB',  name:'חומרים'},
+  {sym:'XLRE', name:'נדל״ן'},
+  {sym:'XLU',  name:'תשתיות'},
+  {sym:'XLP',  name:'צריכה בסיסית'},
+  {sym:'XLY',  name:'צריכה שיקולית'},
+];
+const ALL = [...INDICES,...OTHER,...SECTORS];
+
+// ── helpers ────────────────────────────────────────
+function pct(v){if(v==null||isNaN(v))return'–';return(v>0?'+':'')+Number(v).toFixed(1)+'%'}
+function cellCls(v){
+  if(v==null||isNaN(v))return'cz';
+  if(v>5)return'c3';if(v>2)return'c2';if(v>0)return'c1';
+  if(v<-5)return'm3';if(v<-2)return'm2';if(v<0)return'm1';return'cz';
+}
+function badgeCls(v){
+  if(v==null||isNaN(v))return'z';
+  if(v>5)return'p3';if(v>2)return'p2';if(v>0)return'p1';
+  if(v<-5)return'n3';if(v<-2)return'n2';if(v<0)return'n1';return'z';
+}
+function avg(arr){const v=arr.filter(x=>x!=null&&!isNaN(x));return v.length?v.reduce((a,b)=>a+b,0)/v.length:null}
+function fmtPrice(p,sym){
+  if(p==null)return'–';
+  if(sym==='BTCUSD')return Math.round(p).toLocaleString('en-US');
+  if(p>1000)return p.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  return Number(p).toFixed(2);
+}
+
+function showScreen(name){
+  ['screen-key','screen-loading','screen-error','app'].forEach(id=>{
+    const el=$(id);if(!el)return;
+    el.style.display=id===name?(id==='app'?'flex':'flex'):'none';
+  });
+}
+function showKey(){showScreen('screen-key')}
+
+function startWithKey(){
+  const k=$('key-input').value.trim();
+  if(!k||k.length<8){$('key-err').style.display='block';return;}
+  $('key-err').style.display='none';
+  _key=k;
+  localStorage.setItem('fh_key',k);
+  init();
+}
+
+// ── Finnhub API ─────────────────────────────────────
+// Quote: current price + day change
+async function fhQuote(sym){
+  const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${_key}`);
+  if(!r.ok)throw new Error(`Finnhub quote ${sym}: HTTP ${r.status}`);
+  const d=await r.json();
+  if(d.error)throw new Error(d.error);
+  // d = {c: current, d: change, dp: change%, h, l, o, pc}
+  return{price:d.c, d1:d.dp, prev:d.pc};
+}
+
+// Fetch historical returns via basic-financials (free tier)
+async function fetchBasicFinancials(sym){
+  const r=await fetch(`https://finnhub.io/api/v1/stock/basic-financials?symbol=${sym}&metric=all&token=${_key}`);
+  if(!r.ok)return{};
+  const j=await r.json();
+  const m=j.metric||{};
+  return{
+    w1: m['5DayPriceReturnDaily']??null,
+    m1: m['4WeekPriceReturnDaily']??null,
+    m3: m['13WeekPriceReturnDaily']??null,
+    m6: m['26WeekPriceReturnDaily']??null,
+    y1: m['52WeekPriceReturnDaily']??null,
+  };
+}
+
+async function fetchHistoricalReturns(sym) {
+  // התוספת של cb מונעת מהדפדפן לשמור נתונים ישנים בזיכרון (Cache)
+  const cb = Math.floor(Date.now() / 10000);
+  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=1y&interval=1d&cb=${cb}`;
+  
+  // כאן הכנסנו את הפרוקסי הפרטי שלך!
+  const proxyUrl = `https://solitary-disk-72f6.ari-perez25-06.workers.dev/?url=${encodeURIComponent(yahooUrl)}`;
+  
+  try {
+    const r = await fetch(proxyUrl);
+    if (!r.ok) {
+      console.error("Proxy returned status:", r.status);
+      return {};
+    }
+    const d = await r.json();
+    
+    // משיכת מערך מחירי הסגירה וסינון ימים ללא מסחר
+    const prices = d.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(p => p != null);
+    if (!prices || prices.length === 0) return {};
+
+    const current = prices[prices.length - 1];
+
+    // חישוב אחוזי שינוי לפי ימי מסחר
+    const getPct = (daysBack) => {
+      // אם אין מספיק ימי היסטוריה, ניקח את היום הראשון שיש
+      const idx = Math.max(0, prices.length - 1 - daysBack);
+      if (!prices[idx]) return null;
+      return ((current - prices[idx]) / prices[idx]) * 100;
+    };
+
+    return {
+      w1: getPct(5),   // שבוע (כ-5 ימי מסחר)
+      m1: getPct(21),  // חודש (כ-21 ימי מסחר)
+      m3: getPct(63),  // 3 חודשים
+      m6: getPct(126), // 6 חודשים
+      y1: getPct(252)  // שנה
+    };
+  } catch (e) {
+    console.error("Error fetching history for " + sym, e);
+    return {};
+  }
+}
+
+async function fetchYahooQuotesBatch(symbolsArray) {
+  if (!symbolsArray || symbolsArray.length === 0) return {};
+  
+  // Yahoo דורש מקף במקום לוכסן (למשל BRK-B במקום BRK/B)
+  const yahooSymbols = symbolsArray.map(s => s.replace('/', '-').replace('.', '-'));
+  const symbolsStr = yahooSymbols.join(',');
+  const cb = Math.floor(Date.now() / 10000); 
+  
+  // אנחנו משתמשים כאן ב-spark במקום ב-quote! זה עוקף את חסימת ה-401.
+  const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/spark?symbols=${symbolsStr}&range=1d&interval=1d&cb=${cb}`;
+  const proxyUrl = `https://solitary-disk-72f6.ari-perez25-06.workers.dev/?url=${encodeURIComponent(yahooUrl)}`;
+  
+  try {
+    const r = await fetch(proxyUrl);
+    if (!r.ok) return {};
+    const d = await r.json();
+    const results = d.spark?.result || [];
+
+    const newQuotes = {};
+    for (const res of results) {
+      // ב-spark, הנתונים החיים נמצאים בתוך אובייקט meta
+      const meta = res.response?.[0]?.meta;
+      if (!meta) continue;
+
+      const price = meta.regularMarketPrice;
+      const prev = meta.chartPreviousClose || meta.previousClose;
+      
+      // חישוב אחוז השינוי היומי
+      let d1 = 0;
+      if (price && prev) {
+        d1 = ((price - prev) / prev) * 100;
+      }
+
+      // מוצאים מה היה הסמל המקורי שביקשנו (כדי לתקן חזרה את BRK-B ל-BRK/B)
+      const originalSym = symbolsArray.find(s => s.replace('/', '-').replace('.', '-') === res.symbol) || res.symbol;
+      
+      newQuotes[originalSym] = {
+        price: price,
+        d1: d1,
+        prev: prev
+      };
+    }
+    return newQuotes;
+  } catch (e) {
+    console.error("Error fetching Yahoo spark quotes", e);
+    return {};
+  }
+}
+
+// ── Render helpers ──────────────────────────────────
+let qmap={};
+const histMap={};
+
+function renderTicker(){
+  const items=[...INDICES,...OTHER].map(s=>{
+    const d=qmap[s.sym]||{};
+    const col=(d.d1||0)>0?'#00e87a':(d.d1||0)<0?'#ff3a5c':'#4a6480';
+    const arrow=(d.d1||0)>0?'▲':(d.d1||0)<0?'▼':'–';
+    return`<span class="tick-item"><span class="tick-sym">${s.sym}</span><span class="tick-price">${fmtPrice(d.price,s.sym)}</span><span class="tick-chg" style="color:${col}">${arrow} ${pct(d.d1)}</span></span><div class="tick-sep"></div>`;
+  }).join('');
+  $('ticker').innerHTML=items+items;
+}
+
+function renderCards(elId,items,labels,keys){
+  $(elId).innerHTML=items.map(s=>{
+    const d=qmap[s.sym]||{};
+    const col=(d.d1||0)>0?'var(--green)':(d.d1||0)<0?'var(--red)':'var(--text)';
+    const badges=labels.map((l,i)=>{
+      const v=d[keys[i]];
+      return`<div class="b ${badgeCls(v)}"><span class="bl">${l}</span>${pct(v)}</div>`;
+    }).join('');
+    return`<div class="idx"><div class="idx-sym">${s.sym}</div><div class="idx-name">${s.name}</div><div class="idx-price" style="color:${col}">${fmtPrice(d.price,s.sym)}</div><div class="badges">${badges}</div></div>`;
+  }).join('');
+}
+
+function renderPositivity(){
+  const vals=ALL.map(s=>(qmap[s.sym]||{}).d1).filter(v=>v!=null&&!isNaN(v));
+  const pos=vals.filter(v=>v>0).length;
+  const p=Math.round(pos/vals.length*100);
+  $('pos-fill').style.cssText=`width:${p}%;background:${p>=50?'var(--green)':'var(--red)'}`;
+  $('pos-pct').style.color=p>=50?'var(--green)':'var(--red)';
+  $('pos-pct').textContent=p+'%';
+  $('pos-mood').textContent=`(${pos}/${vals.length}) — ${p>=70?'יום חיובי מאוד':p>=50?'מעורב-חיובי':p>=30?'מעורב-שלילי':'שלילי חזק'}`;
+}
+
+function renderSectors(){
+  const rows=SECTORS.map(s=>{
+    const d=qmap[s.sym]||{};
+    const h=histMap[s.sym]||{};
+    const vals=[d.d1,h.w1,h.m1,h.m3,h.m6,h.y1];
+    const a=avg(vals);
+    const td=(v)=>`<td class="${cellCls(v)}">${pct(v)}</td>`;
+    return`<tr onclick="openSectorModal('${s.sym}','${s.name}')" title="לחץ לראות אחזקות">
+      <td><span class="sym">${s.sym}</span>${s.name}</td>
+      ${td(d.d1)}${td(h.w1)}${td(h.m1)}${td(h.m3)}${td(h.m6)}${td(h.y1)}
+      <td class="${cellCls(a)}">${pct(a)}</td>
+    </tr>`;
+  });
+  const periodAvgs=[0,1,2,3,4,5].map(pi=>avg(SECTORS.map(s=>{
+    const d=qmap[s.sym]||{},h=histMap[s.sym]||{};
+    return[d.d1,h.w1,h.m1,h.m3,h.m6,h.y1][pi];
+  })));
+  const ov=avg(periodAvgs);
+  rows.push(`<tr class="avgrow"><td>ממוצע סקטורים</td>
+    ${periodAvgs.map(v=>`<td class="${cellCls(v)}">${pct(v)}</td>`).join('')}
+    <td class="${cellCls(ov)}"><b>${pct(ov)}</b></td>
+  </tr>`);
+  $('sector-tbody').innerHTML=rows.join('');
+}
+
+function renderSummary(){
+  const dv=SECTORS.map(s=>({s,v:(qmap[s.sym]||{}).d1})).filter(x=>x.v!=null&&!isNaN(x.v)).sort((a,b)=>b.v-a.v);
+  if(!dv.length)return;
+  const pos=dv.filter(x=>x.v>0).length;
+  const a=avg(dv.map(x=>x.v));
+  const best=dv[0],worst=dv[dv.length-1];
+  $('summary').innerHTML=`
+    <div class="sum-card"><div class="sum-card-label">חיוביים</div><div class="sum-card-val" style="color:${pos>0?'var(--green)':'var(--red)'}">${pos}</div><div class="sum-card-sub">מתוך ${SECTORS.length} סקטורים</div></div>
+    <div class="sum-card"><div class="sum-card-label">ממוצע יומי</div><div class="sum-card-val" style="color:${(a||0)>=0?'var(--green)':'var(--red)'}">${pct(a)}</div><div class="sum-card-sub">כל הסקטורים</div></div>
+    <div class="sum-card"><div class="sum-card-label">הכי חזק</div><div class="sum-card-val" style="color:var(--green);font-size:15px">${best?.s?.sym||'–'}</div><div class="sum-card-sub" style="color:var(--green)">${pct(best?.v)} ${best?.s?.name||''}</div></div>
+    <div class="sum-card"><div class="sum-card-label">הכי חלש</div><div class="sum-card-val" style="color:var(--red);font-size:15px">${worst?.s?.sym||'–'}</div><div class="sum-card-sub" style="color:var(--red)">${pct(worst?.v)} ${worst?.s?.name||''}</div></div>`;
+}
+
+function drawChart(){
+  const sorted=SECTORS.map(s=>({name:s.sym,v:(qmap[s.sym]||{}).d1||0})).sort((a,b)=>b.v-a.v);
+  const canvas=$('chart');
+  const n=sorted.length,BAR=18,GAP=4,PT=6;
+  canvas.height=n*(BAR+GAP)+PT+8;
+  const W=canvas.width,H=canvas.height,ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  const CW=W-78,maxAbs=Math.max(...sorted.map(s=>Math.abs(s.v)),.5),ZERO=CW*.42;
+  ctx.strokeStyle='#0d1e32';ctx.lineWidth=1;
+  [-3,-2,-1,1,2,3].forEach(v=>{const x=ZERO+(v/maxAbs)*(CW*.55);if(x>0&&x<CW){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}});
+  ctx.strokeStyle='#1e3a56';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(ZERO,0);ctx.lineTo(ZERO,H);ctx.stroke();
+  sorted.forEach((s,i)=>{
+    const y=PT+i*(BAR+GAP),v=s.v,pos=v>=0,bw=Math.min(Math.abs(v)/maxAbs*CW*.55,CW*.55),bx=pos?ZERO:ZERO-bw;
+    ctx.shadowColor=pos?'#00e87a':'#ff3a5c';ctx.shadowBlur=3;
+    ctx.fillStyle=pos?'#003a20':'#3a0010';ctx.fillRect(bx,y,bw||1,BAR);ctx.shadowBlur=0;
+    ctx.strokeStyle=pos?'#00e87a':'#ff3a5c';ctx.lineWidth=1;if(bw>1)ctx.strokeRect(bx,y,bw,BAR);
+    ctx.fillStyle='#5a7090';ctx.font='10px Heebo,Arial';ctx.textAlign='right';ctx.fillText(s.name,W-3,y+BAR-5);
+    ctx.fillStyle=pos?'#00e87a':'#ff3a5c';ctx.font='bold 10px JetBrains Mono,monospace';
+    ctx.textAlign=pos?'left':'right';ctx.fillText(pct(v),pos?ZERO+bw+3:ZERO-bw-3,y+BAR-5);
+  });
+}
+
+
+// ── THEME ──────────────────────────────────────────
+let isDark = false;
+function toggleTheme(){
+  isDark=!isDark;
+  document.body.classList.toggle('light',!isDark);
+  $('theme-btn').textContent=isDark?'🌙':'☀️';
+  // redraw chart for new colors
+  drawChart();
+}
+
+// ── SECTOR HOLDINGS (hardcoded, SPDR Q1 2025) ─────
+const ETF_HOLDINGS={
+  XLK:[
+    {s:'NVDA',n:'NVIDIA',w:23.1},{s:'MSFT',n:'Microsoft',w:20.8},{s:'AAPL',n:'Apple',w:18.4},
+    {s:'AVGO',n:'Broadcom',w:4.9},{s:'ORCL',n:'Oracle',w:3.6},{s:'AMD',n:'AMD',w:2.4},
+    {s:'NOW',n:'ServiceNow',w:2.1},{s:'PLTR',n:'Palantir',w:1.9},{s:'CRM',n:'Salesforce',w:1.7},
+    {s:'CSCO',n:'Cisco',w:1.5},{s:'ACN',n:'Accenture',w:1.4},{s:'IBM',n:'IBM',w:1.2},
+    {s:'ADBE',n:'Adobe',w:1.1},{s:'QCOM',n:'Qualcomm',w:1.0},{s:'TXN',n:'Texas Instruments',w:0.9},
+    {s:'INTU',n:'Intuit',w:0.8},{s:'MU',n:'Micron',w:0.7},{s:'AMAT',n:'Applied Materials',w:0.7},
+    {s:'LRCX',n:'Lam Research',w:0.6},{s:'ADI',n:'Analog Devices',w:0.5}
+  ],
+  XLF:[
+    {s:'BRK/B',n:'Berkshire Hathaway',w:13.2},{s:'JPM',n:'JPMorgan Chase',w:12.8},{s:'V',n:'Visa',w:8.4},
+    {s:'MA',n:'Mastercard',w:6.9},{s:'BAC',n:'Bank of America',w:4.1},{s:'WFC',n:'Wells Fargo',w:3.8},
+    {s:'GS',n:'Goldman Sachs',w:3.2},{s:'MS',n:'Morgan Stanley',w:2.9},{s:'SPGI',n:'S&P Global',w:2.7},
+    {s:'BLK',n:'BlackRock',w:2.5},{s:'AXP',n:'American Express',w:2.3},{s:'C',n:'Citigroup',w:2.0},
+    {s:'PGR',n:'Progressive',w:1.9},{s:'COF',n:'Capital One',w:1.7},{s:'ICE',n:'ICE',w:1.5},
+    {s:'CME',n:'CME Group',w:1.4},{s:'CB',n:'Chubb',w:1.3},{s:'MMC',n:'Marsh & McLennan',w:1.1},
+    {s:'SCHW',n:'Charles Schwab',w:1.0},{s:'USB',n:'U.S. Bancorp',w:0.9}
+  ],
+  XLE:[
+    {s:'XOM',n:'ExxonMobil',w:23.4},{s:'CVX',n:'Chevron',w:15.2},{s:'COP',n:'ConocoPhillips',w:8.1},
+    {s:'EOG',n:'EOG Resources',w:5.3},{s:'SLB',n:'Schlumberger',w:4.2},{s:'MPC',n:'Marathon Petroleum',w:3.8},
+    {s:'PSX',n:'Phillips 66',w:3.4},{s:'VLO',n:'Valero Energy',w:3.1},{s:'OXY',n:'Occidental',w:2.8},
+    {s:'HAL',n:'Halliburton',w:2.5},{s:'DVN',n:'Devon Energy',w:2.2},{s:'FANG',n:'Diamondback Energy',w:2.0},
+    {s:'HES',n:'Hess',w:1.9},{s:'BKR',n:'Baker Hughes',w:1.7},{s:'TRGP',n:'Targa Resources',w:1.5},
+    {s:'WMB',n:'Williams Companies',w:1.4},{s:'KMI',n:'Kinder Morgan',w:1.2},{s:'OKE',n:'ONEOK',w:1.1},
+    {s:'EQT',n:'EQT Corp',w:0.9},{s:'MRO',n:'Marathon Oil',w:0.8}
+  ],
+  XLV:[
+    {s:'UNH',n:'UnitedHealth',w:12.5},{s:'LLY',n:'Eli Lilly',w:11.8},{s:'ABBV',n:'AbbVie',w:8.2},
+    {s:'JNJ',n:'Johnson & Johnson',w:7.4},{s:'MRK',n:'Merck',w:6.1},{s:'TMO',n:'Thermo Fisher',w:4.3},
+    {s:'ABT',n:'Abbott Labs',w:3.9},{s:'DHR',n:'Danaher',w:3.5},{s:'ISRG',n:'Intuitive Surgical',w:3.2},
+    {s:'BSX',n:'Boston Scientific',w:2.8},{s:'SYK',n:'Stryker',w:2.6},{s:'VRTX',n:'Vertex Pharma',w:2.3},
+    {s:'REGN',n:'Regeneron',w:2.1},{s:'CI',n:'Cigna',w:1.9},{s:'ELV',n:'Elevance Health',w:1.7},
+    {s:'HUM',n:'Humana',w:1.5},{s:'ZTS',n:'Zoetis',w:1.4},{s:'MRNA',n:'Moderna',w:1.2},
+    {s:'MCK',n:'McKesson',w:1.1},{s:'A',n:'Agilent',w:0.9}
+  ],
+  XLC:[
+    {s:'META',n:'Meta Platforms',w:22.6},{s:'GOOGL',n:'Alphabet A',w:15.3},{s:'GOOG',n:'Alphabet C',w:13.1},
+    {s:'NFLX',n:'Netflix',w:7.8},{s:'T',n:'AT&T',w:4.2},{s:'VZ',n:'Verizon',w:3.8},
+    {s:'CHTR',n:'Charter Comm',w:3.1},{s:'TMUS',n:'T-Mobile',w:2.9},{s:'EA',n:'Electronic Arts',w:2.4},
+    {s:'TTWO',n:'Take-Two Interactive',w:1.8},{s:'LYV',n:'Live Nation',w:1.6},{s:'IPG',n:'Interpublic',w:1.4},
+    {s:'OMC',n:'Omnicom',w:1.3},{s:'MTCH',n:'Match Group',w:1.1},{s:'PARA',n:'Paramount',w:0.9},
+    {s:'WBD',n:'Warner Bros Discovery',w:0.8},{s:'FOXA',n:'Fox Corp A',w:0.7},{s:'DIS',n:'Disney',w:0.6}
+  ],
+  XLI:[
+    {s:'RTX',n:'RTX Corp (Raytheon)',w:6.8},{s:'HON',n:'Honeywell',w:6.2},{s:'CAT',n:'Caterpillar',w:5.9},
+    {s:'GE',n:'GE Aerospace',w:5.4},{s:'UNP',n:'Union Pacific',w:4.8},{s:'DE',n:'John Deere',w:4.3},
+    {s:'ETN',n:'Eaton',w:4.0},{s:'LMT',n:'Lockheed Martin',w:3.7},{s:'UPS',n:'UPS',w:3.4},
+    {s:'PH',n:'Parker Hannifin',w:3.1},{s:'ITW',n:'Illinois Tool Works',w:2.9},{s:'WM',n:'Waste Management',w:2.7},
+    {s:'EMR',n:'Emerson Electric',w:2.5},{s:'NOC',n:'Northrop Grumman',w:2.3},{s:'GD',n:'General Dynamics',w:2.1},
+    {s:'CSX',n:'CSX',w:2.0},{s:'NSC',n:'Norfolk Southern',w:1.9},{s:'FDX',n:'FedEx',w:1.7},
+    {s:'AXON',n:'Axon Enterprise',w:1.5},{s:'VRSK',n:'Verisk',w:1.3}
+  ],
+  XLB:[
+    {s:'LIN',n:'Linde',w:17.8},{s:'SHW',n:'Sherwin-Williams',w:8.4},{s:'FCX',n:'Freeport-McMoRan',w:7.2},
+    {s:'APD',n:'Air Products',w:6.1},{s:'ECL',n:'Ecolab',w:5.3},{s:'NEM',n:'Newmont',w:4.8},
+    {s:'NUE',n:'Nucor',w:4.2},{s:'ALB',n:'Albemarle',w:3.6},{s:'PPG',n:'PPG Industries',w:3.3},
+    {s:'DD',n:'DuPont',w:3.0},{s:'VMC',n:'Vulcan Materials',w:2.8},{s:'MLM',n:'Martin Marietta',w:2.6},
+    {s:'CE',n:'Celanese',w:2.3},{s:'MOS',n:'Mosaic',w:2.1},{s:'IFF',n:'Intl Flavors',w:1.9},
+    {s:'BALL',n:'Ball Corp',w:1.7},{s:'AVY',n:'Avery Dennison',w:1.5},{s:'FMC',n:'FMC Corp',w:1.3},
+    {s:'CF',n:'CF Industries',w:1.2},{s:'CTVA',n:'Corteva',w:1.0}
+  ],
+  XLRE:[
+    {s:'AMT',n:'American Tower',w:11.2},{s:'PLD',n:'Prologis',w:10.5},{s:'CCI',n:'Crown Castle',w:7.8},
+    {s:'EQIX',n:'Equinix',w:7.3},{s:'PSA',n:'Public Storage',w:5.9},{s:'SBAC',n:'SBA Comm',w:4.8},
+    {s:'O',n:'Realty Income',w:4.5},{s:'DLR',n:'Digital Realty',w:4.2},{s:'WY',n:'Weyerhaeuser',w:3.9},
+    {s:'EXR',n:'Extra Space Storage',w:3.6},{s:'SPG',n:'Simon Property',w:3.3},{s:'AVB',n:'AvalonBay',w:3.0},
+    {s:'EQR',n:'Equity Residential',w:2.8},{s:'VTR',n:'Ventas',w:2.6},{s:'ARE',n:'Alexandria RE',w:2.4},
+    {s:'ESS',n:'Essex Property',w:2.2},{s:'MAA',n:'Mid-America Apt',w:2.0},{s:'INVH',n:'Invitation Homes',w:1.8},
+    {s:'VICI',n:'VICI Properties',w:1.6},{s:'HST',n:'Host Hotels',w:1.4}
+  ],
+  XLU:[
+    {s:'NEE',n:'NextEra Energy',w:16.4},{s:'SO',n:'Southern Company',w:7.8},{s:'DUK',n:'Duke Energy',w:7.2},
+    {s:'SRE',n:'Sempra',w:5.9},{s:'AEP',n:'American Electric Power',w:5.4},{s:'EXC',n:'Exelon',w:5.1},
+    {s:'XEL',n:'Xcel Energy',w:4.8},{s:'ED',n:'Consolidated Edison',w:4.3},{s:'ETR',n:'Entergy',w:3.9},
+    {s:'ES',n:'Eversource',w:3.6},{s:'WEC',n:'WEC Energy',w:3.3},{s:'AWK',n:'American Water Works',w:3.0},
+    {s:'CMS',n:'CMS Energy',w:2.8},{s:'DTE',n:'DTE Energy',w:2.6},{s:'AES',n:'AES Corp',w:2.4},
+    {s:'NI',n:'NiSource',w:2.2},{s:'AEE',n:'Ameren',w:2.0},{s:'LNT',n:'Alliant Energy',w:1.8},
+    {s:'EVRG',n:'Evergy',w:1.6},{s:'PNW',n:'Pinnacle West',w:1.4}
+  ],
+  XLP:[
+    {s:'PG',n:'Procter & Gamble',w:16.2},{s:'KO',n:'Coca-Cola',w:11.8},{s:'PEP',n:'PepsiCo',w:11.4},
+    {s:'COST',n:'Costco',w:10.9},{s:'PM',n:'Philip Morris',w:6.3},{s:'MO',n:'Altria',w:4.8},
+    {s:'MDLZ',n:'Mondelez',w:4.2},{s:'CL',n:'Colgate',w:3.7},{s:'KMB',n:'Kimberly-Clark',w:3.3},
+    {s:'STZ',n:'Constellation Brands',w:3.0},{s:'GIS',n:'General Mills',w:2.8},{s:'SYY',n:'Sysco',w:2.6},
+    {s:'CAG',n:'Conagra Brands',w:2.4},{s:'HRL',n:'Hormel Foods',w:2.2},{s:'KHC',n:'Kraft Heinz',w:2.0},
+    {s:'TSN',n:'Tyson Foods',w:1.8},{s:'K',n:'Kellanova',w:1.6},{s:'CPB',n:'Campbell Soup',w:1.4},
+    {s:'CHD',n:'Church & Dwight',w:1.2},{s:'CLX',n:'Clorox',w:1.0}
+  ],
+  XLY:[
+    {s:'AMZN',n:'Amazon',w:24.8},{s:'TSLA',n:'Tesla',w:17.2},{s:'HD',n:'Home Depot',w:8.6},
+    {s:'MCD',n:"McDonald's",w:5.4},{s:'NKE',n:'Nike',w:4.1},{s:'LOW',n:"Lowe's",w:3.8},
+    {s:'SBUX',n:'Starbucks',w:3.5},{s:'TJX',n:'TJX Companies',w:3.2},{s:'BKNG',n:'Booking Holdings',w:2.9},
+    {s:'F',n:'Ford Motor',w:2.6},{s:'GM',n:'General Motors',w:2.4},{s:'YUM',n:'Yum! Brands',w:2.2},
+    {s:'ORLY',n:"O'Reilly Auto",w:2.0},{s:'AZO',n:'AutoZone',w:1.8},{s:'APTV',n:'Aptiv',w:1.6},
+    {s:'DHI',n:'D.R. Horton',w:1.4},{s:'LEN',n:'Lennar',w:1.3},{s:'PHM',n:'PulteGroup',w:1.2},
+    {s:'CCL',n:'Carnival',w:1.1},{s:'RCL',n:'Royal Caribbean',w:1.0}
+  ]
+};
+
+async function openSectorModal(sym,name){
+  $('modal-title').textContent='אחזקות '+name+' ('+sym+')';
+  $('modal-sub').textContent='טוען נתוני יום בזמן אמת...';
+  $('modal-body').innerHTML='<div class="modal-loading"><div class="mini-ring"></div>מביא מחירים חיים מ-Yahoo...</div>';
+  $('modal-overlay').classList.add('open');
+  document.body.style.overflow='hidden';
+
+  const data=ETF_HOLDINGS[sym]||[];
+  if(!data.length){renderHoldings(sym,name,data);return;}
+
+  // מסננים רק מניות שעדיין אין לנו את המחיר שלהן
+  const missingSymbols = data.map(h => h.s).filter(s => !qmap[s] || qmap[s].price == null);
+  
+  if (missingSymbols.length > 0) {
+    // מביאים את כל המניות החסרות בבקשה *אחת* בלבד!
+    const newQuotes = await fetchYahooQuotesBatch(missingSymbols);
+    Object.assign(qmap, newQuotes); // שומרים את התוצאות לזיכרון
+  }
+  
+  renderHoldings(sym,name,data);
+}
+
+function renderHoldings(sym,name,data){
+  if(!data||!data.length){
+    $('modal-body').innerHTML='<div class="modal-loading">אין נתוני אחזקות זמינים</div>';
+    return;
+  }
+  const sorted=[...data].sort((a,b)=>(b.w||0)-(a.w||0));
+  const maxW=sorted[0]?.w||1;
+  const total=sorted.reduce((acc,h)=>acc+(h.w||0),0);
+  $('modal-sub').textContent=sorted.length+' מניות • סה"כ חשיפה: '+total.toFixed(1)+'%';
+  $('modal-footer').textContent=sorted.length+' מניות • SPDR '+sym+' • נתוני משקל: Q1 2025';
+  const rows=sorted.map(function(h,i){
+    const w=h.w||0;
+    const barW=Math.round((w/maxW)*100);
+    const dq=qmap[h.s]||{};
+    const hasDay=dq.d1!=null&&!isNaN(dq.d1);
+    const dayTd=hasDay
+      ?'<td style="font-family:var(--mono);font-size:11px;color:'+(dq.d1>0?'var(--green)':dq.d1<0?'var(--red)':'var(--dim)')+'">'+(dq.d1>0?'+':'')+Number(dq.d1).toFixed(1)+'%</td>'
+      :'<td style="color:var(--dim)">–</td>';
+    return '<tr><td>'+(i+1)+'</td>'
+      +'<td><b style="font-family:var(--mono)">'+(h.s||'–')+'</b></td>'
+      +'<td class="s-name">'+(h.n||'–')+'</td>'
+      +'<td class="w-bar-cell"><div class="w-bar-wrap"><div class="w-bar" style="width:'+barW+'%"></div><span class="w-val">'+w.toFixed(2)+'%</span></div></td>'
+      +dayTd+'</tr>';
+  }).join('');
+  $('modal-body').innerHTML='<table class="htbl"><thead><tr><th>#</th><th>סמל</th><th>שם</th><th>משקל</th><th>יום %</th></tr></thead><tbody>'+rows+'</tbody></table>';
+}
+
+function closeModal(e){
+  if(e.target===$('modal-overlay'))closeModalDirect();
+}
+function closeModalDirect(){
+  $('modal-overlay').classList.remove('open');
+  document.body.style.overflow='';
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModalDirect()});
+
+// ── MAIN ─────────────────────────────────────────────
+async function init(){
+  if(!_key){showKey();return;}
+  showScreen('screen-loading');
+  const btn=$('refresh-btn');if(btn)btn.classList.add('loading');
+
+  try{
+    // Step 1: quotes for all symbols in parallel (fast, all at once)
+    $('progress').textContent=`מביא מחירים — ${ALL.length} סמלים...`;
+    const quoteResults=await Promise.all(ALL.map(async s=>{
+      try{return{sym:s.sym,data:await fhQuote(s.sym)}}
+      catch(e){return{sym:s.sym,data:{}}}
+    }));
+    quoteResults.forEach(({sym,data})=>qmap[sym]=data);
+
+    // Check if API key works (all data empty = bad key)
+    const gotData=quoteResults.filter(r=>r.data.price).length;
+    if(gotData===0){
+      $('key-err').style.display='block';
+      $('key-err').textContent='Key לא עובד — בדוק שהעתקת נכון מ-finnhub.io';
+      showKey();return;
+    }
+
+    // Render with day data
+    const now=new Date();
+    $('ts').textContent=now.toLocaleDateString('he-IL')+' '+now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+    renderTicker();
+    renderCards('idx-main',  INDICES, ['יום'], ['d1']);
+    renderCards('idx-other', OTHER,   ['יום'], ['d1']);
+    renderPositivity();
+    renderSectors();
+    renderSummary();
+    drawChart();
+    showScreen('app');
+
+    // Background: fetch historical data via basic-financials (free tier)
+    $('footer').textContent='טוען נתונים היסטוריים...';
+	for (const s of SECTORS) {
+      try { 
+        histMap[s.sym] = await fetchHistoricalReturns(s.sym); 
+        renderSectors();
+        await sleep(400); // חשוב להשאיר את המרווח הזה
+      } catch (e) { 
+        histMap[s.sym] = {}; 
+      }
+    }
+    renderSectors(); // re-render with historical data
+    const pos=SECTORS.filter(s=>(qmap[s.sym]||{}).d1>0).length;
+    $('footer').textContent=`${pos}/${SECTORS.length} סקטורים חיוביים • Finnhub • ${now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}`;
+
+  }catch(e){
+    console.error(e);
+    const isAuth=e.message?.includes('401')||e.message?.includes('403');
+    if(isAuth){$('key-err').style.display='block';$('key-err').textContent='Key לא תקין';showKey();return;}
+    $('err-msg').textContent='שגיאה בטעינת נתונים.';
+    $('err-code').textContent=e.message;$('err-code').style.display='block';
+    showScreen('screen-error');
+  }finally{
+    if(btn)btn.classList.remove('loading');
+  }
+}
+
+// Auto-start if key saved
+if(_key){init();}else{showScreen('screen-key');}
+</script>
+</body>
+</html>
