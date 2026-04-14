@@ -1717,24 +1717,21 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModalDirect()})
 
 // ── MAIN ─────────────────────────────────────────────
 async function init(){
-  if(!_key){showKey();return;}
   showScreen('screen-loading');
   const btn=$('refresh-btn');if(btn)btn.classList.add('loading');
 
   try{
-    // Step 1: quotes for all symbols in parallel (fast, all at once)
+    // Step 1: quotes for all symbols via Yahoo Finance proxy
     $('progress').textContent=`מביא מחירים — ${ALL.length} סמלים...`;
-    const quoteResults=await Promise.all(ALL.map(async s=>{
-      try{return{sym:s.sym,data:await fhQuote(s.sym)}}
-      catch(e){return{sym:s.sym,data:{}}}
-    }));
-    quoteResults.forEach(({sym,data})=>qmap[sym]=data);
+    const allSymbols = ALL.map(s => s.sym);
+    const allQuotes = await fetchYahooQuotesBatch(allSymbols);
+    Object.assign(qmap, allQuotes);
 
-    // Check if API key works (all data empty = bad key)
-    const gotData=quoteResults.filter(r=>r.data.price).length;
+    // Check if proxy works (all data empty = bad proxy URL)
+    const gotData = Object.values(allQuotes).filter(d => d.price).length;
     if(gotData===0){
       $('key-err').style.display='block';
-      $('key-err').textContent='Key לא עובד — בדוק שהעתקת נכון מ-finnhub.io';
+      $('key-err').textContent='שגיאה בחיבור לשרת — בדוק את ה-Worker URL';
       showKey();return;
     }
 
@@ -1769,8 +1766,6 @@ async function init(){
 
   }catch(e){
     console.error(e);
-    const isAuth=e.message?.includes('401')||e.message?.includes('403');
-    if(isAuth){$('key-err').style.display='block';$('key-err').textContent='Key לא תקין';showKey();return;}
     $('err-msg').textContent='שגיאה בטעינת נתונים.';
     $('err-code').textContent=e.message;$('err-code').style.display='block';
     showScreen('screen-error');
