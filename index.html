@@ -444,7 +444,7 @@ body.light .news-card:hover {
 	  <span class="tag tag-src">Yahoo</span>
       <span class="ts" id="ts"></span>
       <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="מצב בהיר/כהה">☀️</button>
-      <button class="hdr-btn" onclick="showKey()">🔑</button>
+	  <button class="hdr-btn" onclick="logout()" title="התנתק מהמערכת">התנתק</button>
       <button class="hdr-btn" id="refresh-btn" onclick="init()">↻ רענן</button>
     </div>
   </div>
@@ -589,26 +589,53 @@ function showScreen(name){
 }
 function showKey(){showScreen('screen-key')}
 
-function startWithKey() {
+async function startWithKey() {
   const k = $('key-input').value.trim();
   if (!k || !k.startsWith('http')) {
+    $('key-err').textContent = 'אנא הזן כתובת חוקית שמתחילה ב-http';
     $('key-err').style.display = 'block';
     return;
   }
-  $('key-err').style.display = 'none';
-  
-  // מוודאים שהכתובת מסתיימת בלי לוכסן
+
   const cleanUrl = k.endsWith('/') ? k.slice(0, -1) : k;
   
-  _proxyUrl = cleanUrl;
-  localStorage.setItem('app_proxy_url', _proxyUrl);
-  
-  init(); // מנסים לטעון את הדשבורד (ה-init יבדוק אם המפתח עובד)
+  // הפיכת הכפתור למצב טעינה
+  const btn = document.querySelector('.key-btn');
+  const originalText = btn.textContent;
+  btn.textContent = 'מוודא הרשאות...';
+  btn.style.opacity = '0.7';
+  btn.style.pointerEvents = 'none';
+
+  try {
+    // שליחת בדיקת "פינג" מהירה למשיכת נתון אחד (SPY)
+    const testUrl = `https://query1.finance.yahoo.com/v7/finance/spark?symbols=SPY&range=1d&interval=1d`;
+    const r = await fetch(`${cleanUrl}/?url=${encodeURIComponent(testUrl)}`);
+    const d = await r.json();
+
+    // אם קיבלנו בחזרה את המבנה המוכר של Yahoo - ה-Worker תקין!
+    if (d.spark && d.spark.result) {
+      $('key-err').style.display = 'none';
+      _proxyUrl = cleanUrl;
+      localStorage.setItem('app_proxy_url', _proxyUrl);
+      init(); // הכל תקין, מעבירים אותו פנימה
+    } else {
+      throw new Error('Invalid response');
+    }
+  } catch (e) {
+    // ה-Worker לא קיים, לא תקין, או שלא מכיל את הקוד הנכון
+    $('key-err').textContent = 'מפתח המערכת שגוי או שהשרת אינו מגיב.';
+    $('key-err').style.display = 'block';
+  } finally {
+    // החזרת הכפתור למצב רגיל
+    btn.textContent = originalText;
+    btn.style.opacity = '1';
+    btn.style.pointerEvents = 'auto';
+  }
 }
 
 function logout() {
-  localStorage.removeItem('app_proxy_url');
-  location.reload();
+  localStorage.removeItem('app_proxy_url'); // מוחק את מפתח הכניסה מהזיכרון
+  location.reload(); // מרענן את הדף (מה שיזרוק אותך למסך הכניסה)
 }
 
 // ── Finnhub API ─────────────────────────────────────
