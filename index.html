@@ -1478,24 +1478,69 @@ function renderSummary(){
 }
 
 function drawChart(){
-  const sorted=SECTORS.map(s=>({name:s.sym,v:(qmap[s.sym]||{}).d1||0})).sort((a,b)=>b.v-a.v);
-  const canvas=$('chart');
-  const n=sorted.length,BAR=18,GAP=4,PT=6;
-  canvas.height=n*(BAR+GAP)+PT+8;
-  const W=canvas.width,H=canvas.height,ctx=canvas.getContext('2d');
-  ctx.clearRect(0,0,W,H);
-  const CW=W-78,maxAbs=Math.max(...sorted.map(s=>Math.abs(s.v)),.5),ZERO=CW*.42;
-  ctx.strokeStyle='#0d1e32';ctx.lineWidth=1;
-  [-3,-2,-1,1,2,3].forEach(v=>{const x=ZERO+(v/maxAbs)*(CW*.55);if(x>0&&x<CW){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}});
-  ctx.strokeStyle='#1e3a56';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(ZERO,0);ctx.lineTo(ZERO,H);ctx.stroke();
-  sorted.forEach((s,i)=>{
-    const y=PT+i*(BAR+GAP),v=s.v,pos=v>=0,bw=Math.min(Math.abs(v)/maxAbs*CW*.55,CW*.55),bx=pos?ZERO:ZERO-bw;
-    ctx.shadowColor=pos?'#00e87a':'#ff3a5c';ctx.shadowBlur=3;
-    ctx.fillStyle=pos?'#003a20':'#3a0010';ctx.fillRect(bx,y,bw||1,BAR);ctx.shadowBlur=0;
-    ctx.strokeStyle=pos?'#00e87a':'#ff3a5c';ctx.lineWidth=1;if(bw>1)ctx.strokeRect(bx,y,bw,BAR);
-    ctx.fillStyle='#5a7090';ctx.font='10px Heebo,Arial';ctx.textAlign='right';ctx.fillText(s.name,W-3,y+BAR-5);
-    ctx.fillStyle=pos?'#00e87a':'#ff3a5c';ctx.font='bold 10px JetBrains Mono,monospace';
-    ctx.textAlign=pos?'left':'right';ctx.fillText(pct(v),pos?ZERO+bw+3:ZERO-bw-3,y+BAR-5);
+  const sorted = SECTORS.map(s => ({name: s.sym, v: (qmap[s.sym]||{}).d1 || 0})).sort((a,b) => b.v - a.v);
+  const canvas = $('chart');
+  const n = sorted.length, BAR = 18, GAP = 4, PT = 6;
+  canvas.height = n * (BAR + GAP) + PT + 8;
+  const W = canvas.width, H = canvas.height, ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  // 1. צבעים עדינים ודינמיים (תמיכה במצב בהיר/כהה ומניעת סנוור)
+  const isL = document.body.classList.contains('light');
+  const greenFill = isL ? 'rgba(0, 144, 74, 0.15)' : 'rgba(0, 232, 122, 0.12)';
+  const greenStroke = isL ? '#00904a' : '#00e87a';
+  const redFill = isL ? 'rgba(204, 26, 58, 0.15)' : 'rgba(255, 58, 92, 0.12)';
+  const redStroke = isL ? '#cc1a3a' : '#ff3a5c';
+  const textColor = isL ? '#0e1e34' : '#ccd8ea';
+  const gridColor = isL ? '#d0daea' : '#1e3550';
+  const zeroColor = isL ? '#7090b0' : '#3d5470';
+
+  // 2. מתמטיקה מדויקת למניעת גלישה!
+  const maxAbs = Math.max(...sorted.map(s => Math.abs(s.v)), 0.5);
+  const ZERO = 120; // קו האפס הוזז ימינה כדי להבטיח מקום לצד השלילי (מינוס)
+  const maxBw = 75; // הגבלת רוחב העמודה כך שתמיד יישאר מקום לטקסט האחוזים בצדדים
+
+  // ציור קווי רקע
+  ctx.strokeStyle = gridColor; ctx.lineWidth = 1;
+  [-3, -2, -1, 1, 2, 3].forEach(v => {
+    const x = ZERO + (v / maxAbs) * maxBw;
+    if(x > 10 && x < W - 40) { 
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+  });
+  
+  // ציור קו האפס במרכז היחסי
+  ctx.strokeStyle = zeroColor; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(ZERO, 0); ctx.lineTo(ZERO, H); ctx.stroke();
+
+  // ציור העמודות והטקסטים
+  sorted.forEach((s, i) => {
+    const y = PT + i * (BAR + GAP);
+    const v = s.v;
+    const pos = v >= 0;
+    
+    // חישוב רוחב ומיקום מדויק
+    const bw = (Math.abs(v) / maxAbs) * maxBw;
+    const bx = pos ? ZERO : ZERO - bw;
+
+    // מילוי וגבול העמודה (חצי שקוף ומודרני, ללא צללים)
+    ctx.fillStyle = pos ? greenFill : redFill;
+    ctx.fillRect(bx, y, bw || 1, BAR);
+    ctx.strokeStyle = pos ? greenStroke : redStroke;
+    ctx.lineWidth = 1;
+    if(bw > 1) ctx.strokeRect(bx, y, bw, BAR);
+
+    // טקסט: שם הסקטור (צד ימין)
+    ctx.fillStyle = textColor;
+    ctx.font = '11px Rubik, Assistant, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(s.name, W - 4, y + BAR - 4);
+
+    // טקסט: אחוזים ממוקמים בטוח (צמוד לעמודה מבחוץ)
+    ctx.fillStyle = pos ? greenStroke : redStroke;
+    ctx.font = 'bold 11px "JetBrains Mono", monospace';
+    ctx.textAlign = pos ? 'left' : 'right';
+    ctx.fillText(pct(v), pos ? ZERO + bw + 5 : ZERO - bw - 5, y + BAR - 4);
   });
 }
 
