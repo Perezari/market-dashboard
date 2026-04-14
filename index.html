@@ -844,6 +844,71 @@ body.light .lo52{color:#cc1a3a}
 .corr-table td:last-child{border-right:none}
 .corr-table tr:last-child td{border-bottom:none}
 .corr-table td:first-child{text-align:right;font-family:var(--sans);font-size:10px;color:var(--dim);background:var(--bg2)!important;padding:4px 10px;position:sticky;right:0;z-index:1;white-space:nowrap;border-left:1px solid var(--border)}
+/* ══════════════════════════════════════
+   5 NEW FEATURES CSS
+══════════════════════════════════════ */
+
+/* ── MACRO PANEL ── */
+.macro-bar{
+  display:flex;align-items:center;justify-content:center;
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  padding:0 16px;overflow-x:auto;white-space:nowrap;scrollbar-width:none;
+  gap:0;
+}
+.macro-bar::-webkit-scrollbar{display:none}
+.macro-item{
+  display:flex;align-items:center;gap:7px;
+  padding:7px 16px;
+  flex-shrink:0;
+  position:relative;
+}
+.macro-item+.macro-item::before{
+  content:'';position:absolute;right:0;top:25%;height:50%;
+  width:1px;background:var(--border);
+}
+.macro-name{font-size:9px;color:var(--dim);font-weight:700;text-transform:uppercase;letter-spacing:.6px}
+.macro-price{font-family:var(--mono);font-size:12px;font-weight:800;color:var(--text)}
+.macro-chg{font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px}
+.macro-chg.up{color:var(--green);background:var(--gd)}
+.macro-chg.down{color:var(--red);background:var(--rd)}
+.macro-chg.flat{color:var(--dim)}
+body.light .macro-chg.up{background:rgba(0,144,74,.1)}
+body.light .macro-chg.down{background:rgba(204,26,58,.1)}
+@media(max-width:768px){.macro-item{padding:6px 12px}.macro-price{font-size:11px}}
+@media(max-width:480px){.macro-name{display:none}.macro-item{padding:5px 10px}}
+
+/* ── VOLUME COL ── */
+.vol-high{color:#f59e0b;font-size:9px;font-weight:700}
+.vol-low{color:var(--dim);font-size:9px}
+.vol-norm{color:var(--dim);font-size:9px}
+
+
+
+/* ── MARKET INTERNALS ── */
+.pc-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px 12px 10px}
+.mi-row{display:flex;align-items:stretch;gap:0;margin-bottom:10px}
+.mi-item{flex:1;text-align:center;padding:4px 6px}
+.mi-divider{width:1px;background:var(--border);margin:2px 0;flex-shrink:0}
+.mi-label{font-size:8px;color:var(--dim);text-transform:uppercase;letter-spacing:.7px;margin-bottom:3px}
+.mi-val{font-family:var(--mono);font-size:16px;font-weight:800;line-height:1}
+.mi-sub{font-size:8px;color:var(--dim);margin-top:2px}
+.mi-bar-wrap{height:5px;background:var(--bg4);border-radius:3px;overflow:hidden;margin-bottom:7px}
+.mi-bar-fill{height:100%;border-radius:3px;transition:width .8s ease}
+.mi-mood{font-size:10px;color:var(--dim);text-align:center;font-weight:600}
+
+/* ── EARNINGS CALENDAR ── */
+.earnings-section{padding:12px 16px;border-top:1px solid var(--border);background:var(--bg)}
+.earnings-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:8px}
+.earn-card{background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;transition:border-color .15s}
+.earn-card:hover{border-color:var(--blue)}
+.earn-card.today{border-color:var(--blue);background:rgba(0,180,255,.04)}
+.earn-card.tomorrow{border-color:rgba(0,180,255,.35)}
+.earn-sym{font-family:var(--mono);font-size:13px;font-weight:800;color:var(--text)}
+.earn-name{font-size:10px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.earn-date{font-size:9px;font-family:var(--mono);font-weight:700;margin-top:2px}
+.earn-date.today{color:var(--blue)}.earn-date.soon{color:#f59e0b}
+.earn-eps{font-size:9px;color:var(--dim)}
+@media(max-width:480px){.earnings-grid{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body class="light">
@@ -941,6 +1006,16 @@ body.light .lo52{color:#cc1a3a}
     <div class="market-countdown" id="market-countdown"></div>
     <div class="market-times">NYSE: 09:30–16:00 ET</div>
   </div>
+
+  <!-- מאקרו -->
+  <div class="macro-bar" id="macro-bar">
+    <div class="macro-item"><span class="macro-name">EUR/USD</span><span class="macro-price lc" id="mp-EURUSD">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="macro-chg lc" id="mc-EURUSD">&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+    <div class="macro-item"><span class="macro-name">USD/ILS</span><span class="macro-price lc" id="mp-USDILS">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="macro-chg lc" id="mc-USDILS">&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+    <div class="macro-item"><span class="macro-name">נפט גולמי</span><span class="macro-price lc" id="mp-OIL">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="macro-chg lc" id="mc-OIL">&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+    <div class="macro-item"><span class="macro-name">גז טבעי</span><span class="macro-price lc" id="mp-GAS">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="macro-chg lc" id="mc-GAS">&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+    <div class="macro-item"><span class="macro-name">זהב</span><span class="macro-price lc" id="mp-GOLD">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="macro-chg lc" id="mc-GOLD">&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+    <div class="macro-item"><span class="macro-name">10Y Treasury</span><span class="macro-price lc" id="mp-TNX">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="macro-chg lc" id="mc-TNX">&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+  </div>
   <div class="mobile-menu" id="mobile-menu">
     <button class="mob-menu-item" onclick="openLabModal();closeMobileMenu()">🛠️ מעבדת תיקים</button>
     <button class="mob-menu-item" onclick="logout()">🚪 התנתק</button>
@@ -961,7 +1036,7 @@ body.light .lo52{color:#cc1a3a}
 	<div class="tbl-wrap">
         <table class="t">
           <thead>
-            <tr><th>סקטור</th><th>יום %</th><th>שבוע</th><th>חודש</th><th>3 חד׳</th><th>6 חד׳</th><th>שנה</th><th>שיא 52W</th><th>שפל 52W</th><th>ממוצע</th></tr>
+            <tr><th>סקטור</th><th>יום %</th><th>שבוע</th><th>חודש</th><th>3 חד׳</th><th>6 חד׳</th><th>שנה</th><th>שיא 52W</th><th>שפל 52W</th><th>נפח</th><th>ממוצע</th></tr>
           </thead>
           <tbody id="sector-tbody"></tbody>
         </table>
@@ -995,6 +1070,7 @@ body.light .lo52{color:#cc1a3a}
           </div>
         </div>
       </div>
+
 
 	<div class="modal-overlay" id="lab-overlay" onclick="closeLab(event)">
   <div class="modal" id="lab-modal" style="max-width: 800px;">
@@ -1124,9 +1200,44 @@ body.light .lo52{color:#cc1a3a}
           <div class="breadth-stats"><span id="breadth-above">–</span><span id="breadth-sub">לחץ סרוק</span><span id="breadth-total">–</span></div>
         </div>
       </div>
+      <!-- Market Internals -->
+      <div>
+        <div class="section-label">פנים השוק (Market Internals)</div>
+        <div class="pc-card" id="pc-card">
+          <div class="mi-row">
+            <div class="mi-item">
+              <div class="mi-label">עולים / יורדים</div>
+              <div class="mi-val" id="mi-adv">–</div>
+              <div class="mi-sub" id="mi-adv-sub">סקטורים</div>
+            </div>
+            <div class="mi-divider"></div>
+            <div class="mi-item">
+              <div class="mi-label">ממוצע יומי</div>
+              <div class="mi-val" id="mi-avg">–</div>
+              <div class="mi-sub">כל הסקטורים</div>
+            </div>
+            <div class="mi-divider"></div>
+            <div class="mi-item">
+              <div class="mi-label">קרבה לשיא 52W</div>
+              <div class="mi-val" id="mi-hi52">–</div>
+              <div class="mi-sub">ממוצע מרחק</div>
+            </div>
+          </div>
+          <div class="mi-bar-wrap">
+            <div class="mi-bar-fill" id="mi-bar" style="width:50%"></div>
+          </div>
+          <div class="mi-mood" id="mi-mood">ממתין לנתונים...</div>
+        </div>
+      </div>
     </div>
   </div>
 
+
+  <!-- לוח רווחים -->
+  <div class="earnings-section" id="earnings-section" style="display:none">
+    <div class="section-label">לוח רווחים — S&P 500 (7 ימים קרובים)</div>
+    <div class="earnings-grid" id="earnings-grid"></div>
+  </div>
 
   <!-- חדשות — בסוף -->
   <div class="news-section">
@@ -1571,7 +1682,10 @@ async function fetchHistoricalReturns(sym) {
     }
     // raw prices for correlation
     const rawPrices = prices;
-    return { w1:getPct(5), m1:getPct(21), m3:getPct(63), m6:getPct(126), y1:getPct(252), fromHi, fromLo, ytd, rawPrices };
+    // חישוב ממוצע נפח 20 יום מהנתונים ההיסטוריים
+    const volumes = result?.indicators?.quote?.[0]?.volume?.filter(v => v != null && v > 0) || [];
+    const avgVol = volumes.length >= 5 ? Math.round(volumes.slice(-20).reduce((a,b)=>a+b,0) / Math.min(20, volumes.slice(-20).length)) : null;
+    return { w1:getPct(5), m1:getPct(21), m3:getPct(63), m6:getPct(126), y1:getPct(252), fromHi, fromLo, ytd, rawPrices, avgVol };
   } catch (e) {
     console.error("Error fetching history for " + sym, e);
     return {};
@@ -1622,7 +1736,9 @@ async function fetchYahooQuotesBatch(symbolsArray) {
         allQuotes[originalSym] = {
           price: price,
           d1: d1,
-          prev: prev
+          prev: prev,
+          vol: meta.regularMarketVolume || null,
+          avgVol: meta.averageDailyVolume3Month || meta.averageDailyVolume10Day || null,
         };
       }
     } catch (e) {
@@ -1809,7 +1925,7 @@ function renderSectorsWithSkeleton(){
   const rows=SECTORS.map(s=>{
     return`<tr>
       <td><span class="sym">${s.sym}</span>${s.name}</td>
-      ${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}
+      ${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}
     </tr>`;
   });
   rows.push(`<tr class="avgrow"><td>ממוצע סקטורים</td>
@@ -1827,9 +1943,19 @@ function renderSectors(){
     const td=(v,cls='')=>`<td class="${cellCls(v)}${cls?' '+cls:''}">${pct(v)}</td>`;
     const hiTd = h.fromHi!=null ? `<td class="hi52">${pct(h.fromHi)}</td>` : '<td style="color:var(--dim)">–</td>';
     const loTd = h.fromLo!=null ? `<td class="lo52">${pct(h.fromLo)}</td>` : '<td style="color:var(--dim)">–</td>';
+    // Volume indicator — vol from qmap (today), avgVol from histMap (20d avg)
+    let volTd = '<td style="color:var(--dim)">–</td>';
+    const todayVol = d.vol;
+    const avgVol20 = h.avgVol;
+    if (todayVol && avgVol20 && avgVol20 > 0) {
+      const vr = todayVol / avgVol20;
+      const vi = vr > 1.5 ? '🔥' : vr > 1.1 ? '▲' : vr < 0.6 ? '💤' : vr < 0.9 ? '▼' : '●';
+      const vc = vr > 1.5 ? 'vol-high' : vr < 0.7 ? 'vol-low' : 'vol-norm';
+      volTd = `<td class="${vc}" title="${(vr*100).toFixed(0)}% מהממוצע">${vi} ${(vr*100).toFixed(0)}%</td>`;
+    }
     return`<tr onclick="openSectorModal('${s.sym}','${s.name}')" title="לחץ לראות אחזקות">
       <td><span class="sym">${s.sym}</span>${s.name}</td>
-      ${td(d.d1)}${td(h.w1)}${td(h.m1)}${td(h.m3)}${td(h.m6)}${td(h.y1)}${hiTd}${loTd}
+      ${td(d.d1)}${td(h.w1)}${td(h.m1)}${td(h.m3)}${td(h.m6)}${td(h.y1)}${hiTd}${loTd}${volTd}
       <td class="${cellCls(a)}">${pct(a)}</td>
     </tr>`;
   });
@@ -1839,7 +1965,7 @@ function renderSectors(){
   })));
   const ov=avg(periodAvgs);
   rows.push(`<tr class="avgrow"><td>ממוצע סקטורים</td>
-    ${periodAvgs.map((v)=>`<td class="${cellCls(v)}">${pct(v)}</td>`).join('')}<td></td><td></td>
+    ${periodAvgs.map((v)=>`<td class="${cellCls(v)}">${pct(v)}</td>`).join('')}<td></td><td></td><td></td>
     <td class="${cellCls(ov)}"><b>${pct(ov)}</b></td>
   </tr>`);
   $('sector-tbody').innerHTML=rows.join('');
@@ -2145,12 +2271,17 @@ async function init(){
     $('corr-table-wrap').innerHTML=`<div style="text-align:center;color:var(--dim);font-size:11px;padding:20px;font-family:var(--mono)"><div class="mini-ring" style="margin:0 auto 8px"></div>מחשב מתאמים...</div>`;
     showScreen('app');
 
+    // Macro panel + P/C + Earnings (parallel, non-blocking)
+    fetchMacro();
+    renderMarketInternals();
+    fetchEarningsCalendar();
+
     // Background: skeleton + parallel fetch → single render
     $('footer').textContent='טוען נתונים היסטוריים...';
     renderSectorsWithSkeleton(); // מציג skeleton מיידי
 
     // מביא את כל הסקטורים במקביל
-    await sleep(1000); // המתנה קצרה לאנימציית הטעינה
+    await sleep(2000); // המתנה קצרה לאנימציית הטעינה
     await Promise.all(SECTORS.map(async s => {
       try { histMap[s.sym] = await fetchHistoricalReturns(s.sym); }
       catch (e) { histMap[s.sym] = {}; }
@@ -2161,6 +2292,7 @@ async function init(){
     renderFearGreed();
     renderYTDChart();
     renderCorrelationMatrix();
+    renderMarketInternals();
     const pos=SECTORS.filter(s=>(qmap[s.sym]||{}).d1>0).length;
     $('footer').textContent=`${pos}/${SECTORS.length} סקטורים חיוביים • Yahoo Finance • ${now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}`;
 
@@ -2431,6 +2563,215 @@ async function runBreadth() {
   $('breadth-above').textContent = `${above} מניות מעל`;
   $('breadth-total').textContent = `מתוך ${total}`;
   $('breadth-sub').textContent = pct >= 60 ? '📈 שוק בריא' : pct >= 40 ? '⚖️ מעורב' : '📉 שוק חלש';
+}
+
+// ══════════════════════════════════════
+// 5 NEW FEATURES
+// ══════════════════════════════════════
+
+// ── MACRO PANEL ──────────────────────
+const MACRO_SYMS = [
+  {sym:'EURUSD=X', id:'EURUSD', name:'EUR/USD', dec:4},
+  {sym:'USDILS=X', id:'USDILS', name:'USD/ILS', dec:3},
+  {sym:'CL=F',     id:'OIL',   name:'נפט',     dec:2},
+  {sym:'NG=F',     id:'GAS',   name:'גז',       dec:3},
+  {sym:'GC=F',     id:'GOLD',  name:'זהב',      dec:1},
+  {sym:'^TNX',     id:'TNX',   name:'10Y',      dec:3},
+];
+async function fetchMacro() {
+  try {
+    const quotes = await fetchYahooQuotesBatch(MACRO_SYMS.map(m=>m.sym));
+    MACRO_SYMS.forEach(m => {
+      const d = quotes[m.sym] || {};
+      const priceEl = $(`mp-${m.id}`), chgEl = $(`mc-${m.id}`);
+      if (!priceEl || !chgEl) return;
+      priceEl.className = 'macro-price';
+      chgEl.className = 'macro-chg';
+      if (d.price == null) { priceEl.textContent='–'; chgEl.textContent=''; return; }
+      priceEl.textContent = Number(d.price).toFixed(m.dec);
+      const c = d.d1;
+      if (c == null) { chgEl.textContent=''; return; }
+      chgEl.textContent = (c>0?'+':'')+c.toFixed(2)+'%';
+      chgEl.classList.add(c>0.05?'up':c<-0.05?'down':'flat');
+    });
+  } catch(e) { console.error('macro fetch error',e); }
+}
+
+// ── VOLUME in fetchYahooQuotesBatch & renderSectors ──
+// (volume added to qmap via existing batch — see update below)
+
+// ── SECTOR ROTATION CHART ────────────
+function renderRotationChart() {
+  const data = SECTORS.map(s => ({
+    sym: s.sym, name: s.name,
+    x: histMap[s.sym]?.m1,  // 1-month return = X axis
+    y: histMap[s.sym]?.w1,  // 1-week return  = Y axis
+  })).filter(s => s.x != null && s.y != null);
+  if (data.length < 4) return;
+
+  const sec = $('rotation-section');
+  if (sec) sec.style.display = 'block';
+
+  const W=360, H=280, PAD=40;
+  const cx=W/2, cy=H/2;
+  const isL = document.body.classList.contains('light');
+
+  // Scales
+  const xs = data.map(d=>d.x), ys = data.map(d=>d.y);
+  const xRange = Math.max(Math.abs(Math.min(...xs)), Math.abs(Math.max(...xs)), 2) * 1.3;
+  const yRange = Math.max(Math.abs(Math.min(...ys)), Math.abs(Math.max(...ys)), 1) * 1.3;
+  const scX = v => cx + (v/xRange) * (W/2-PAD);
+  const scY = v => cy - (v/yRange) * (H/2-PAD);
+
+  const colors = {
+    'מוביל':  isL ? 'rgba(0,144,74,.12)' : 'rgba(0,232,122,.08)',
+    'מחלש':   isL ? 'rgba(245,158,11,.12)' : 'rgba(245,158,11,.08)',
+    'פיגור':  isL ? 'rgba(204,26,58,.12)' : 'rgba(255,58,92,.08)',
+    'משפר':   isL ? 'rgba(0,112,192,.12)' : 'rgba(0,180,255,.08)',
+  };
+  const dotColors = ['#00e87a','#f59e0b','#ff3a5c','#00b4ff','#a78bfa','#fb923c','#34d399','#60a5fa','#f472b6','#facc15','#94a3b8'];
+  const axisColor = isL ? '#b8c8de' : '#1e3550';
+  const textColor = isL ? '#4070a0' : '#3d5470';
+
+  let svg = `
+    <!-- quadrant backgrounds -->
+    <rect x="${cx}" y="${PAD}" width="${W/2-PAD}" height="${H/2-PAD}" fill="${colors['מוביל']}" rx="4"/>
+    <rect x="${PAD}" y="${PAD}" width="${W/2-PAD}" height="${H/2-PAD}" fill="${colors['משפר']}" rx="4"/>
+    <rect x="${cx}" y="${cy}" width="${W/2-PAD}" height="${H/2-PAD}" fill="${colors['מחלש']}" rx="4"/>
+    <rect x="${PAD}" y="${cy}" width="${W/2-PAD}" height="${H/2-PAD}" fill="${colors['פיגור']}" rx="4"/>
+    <!-- quadrant labels -->
+    <text x="${W-PAD-6}" y="${PAD+14}" text-anchor="end" class="rq-label" fill="${isL?'#00904a':'#00e87a'}">מוביל ↗</text>
+    <text x="${PAD+6}" y="${PAD+14}" text-anchor="start" class="rq-label" fill="${isL?'#0070c0':'#00b4ff'}">משפר ↑</text>
+    <text x="${W-PAD-6}" y="${H-PAD-6}" text-anchor="end" class="rq-label" fill="${isL?'#b45309':'#f59e0b'}">מחלש ↘</text>
+    <text x="${PAD+6}" y="${H-PAD-6}" text-anchor="start" class="rq-label" fill="${isL?'#cc1a3a':'#ff3a5c'}">פיגור ↙</text>
+    <!-- axes -->
+    <line x1="${PAD}" y1="${cy}" x2="${W-PAD}" y2="${cy}" stroke="${axisColor}" stroke-width="1"/>
+    <line x1="${cx}" y1="${PAD}" x2="${cx}" y2="${H-PAD}" stroke="${axisColor}" stroke-width="1"/>
+    <text x="${W-PAD+2}" y="${cy+4}" font-size="8" fill="${textColor}" font-family="var(--mono)">חודש+</text>
+    <text x="${PAD-2}" y="${cy+4}" font-size="8" fill="${textColor}" font-family="var(--mono)" text-anchor="end">חודש-</text>
+    <text x="${cx}" y="${PAD-4}" font-size="8" fill="${textColor}" font-family="var(--mono)" text-anchor="middle">שבוע+</text>
+    <text x="${cx}" y="${H-PAD+10}" font-size="8" fill="${textColor}" font-family="var(--mono)" text-anchor="middle">שבוע-</text>`;
+
+  data.forEach((s,i) => {
+    const px = scX(s.x), py = scY(s.y);
+    const col = dotColors[i % dotColors.length];
+    svg += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="7" fill="${col}" fill-opacity=".85" class="r-dot">
+      <title>${s.sym}: חודש ${s.x>0?'+':''}${s.x.toFixed(1)}% | שבוע ${s.y>0?'+':''}${s.y.toFixed(1)}%</title></circle>
+    <text x="${px.toFixed(1)}" y="${(py-10).toFixed(1)}" font-size="9" font-weight="700" fill="${col}" text-anchor="middle" font-family="var(--mono)">${s.sym}</text>`;
+  });
+
+  svg += '</svg>';  // will be set as innerHTML, no need for closing
+  $('rotation-svg').innerHTML = svg;
+}
+
+// ── MARKET INTERNALS ─────────────────
+function renderMarketInternals() {
+  const sectorData = SECTORS.map(s => ({
+    sym: s.sym,
+    d1: (qmap[s.sym]||{}).d1,
+    fromHi: (histMap[s.sym]||{}).fromHi,
+  })).filter(s => s.d1 != null && !isNaN(s.d1));
+
+  if (!sectorData.length) return;
+
+  const up = sectorData.filter(s => s.d1 > 0).length;
+  const dn = sectorData.filter(s => s.d1 < 0).length;
+  const avgD1 = sectorData.reduce((a,s) => a+s.d1, 0) / sectorData.length;
+  const hiData = sectorData.filter(s => s.fromHi != null);
+  const avgHi = hiData.length ? hiData.reduce((a,s) => a+s.fromHi, 0) / hiData.length : null;
+  const pctUp = up / sectorData.length;
+
+  const upColor = up >= dn ? 'var(--green)' : 'var(--red)';
+  const avgColor = avgD1 >= 0 ? 'var(--green)' : 'var(--red)';
+
+  $('mi-adv').textContent = `${up}/${dn}`;
+  $('mi-adv').style.color = upColor;
+  $('mi-adv-sub').textContent = `מתוך ${sectorData.length}`;
+
+  $('mi-avg').textContent = (avgD1>0?'+':'')+avgD1.toFixed(2)+'%';
+  $('mi-avg').style.color = avgColor;
+
+  if (avgHi != null) {
+    $('mi-hi52').textContent = avgHi.toFixed(1)+'%';
+    $('mi-hi52').style.color = avgHi > -5 ? 'var(--green)' : avgHi > -15 ? '#f59e0b' : 'var(--red)';
+  }
+
+  $('mi-bar').style.width = (pctUp * 100) + '%';
+  $('mi-bar').style.background = pctUp >= 0.7 ? 'var(--green)' : pctUp >= 0.5 ? '#5bc27f' : pctUp >= 0.3 ? '#f59e0b' : 'var(--red)';
+
+  const mood = pctUp >= 0.7 ? '📈 שוק חיובי מאוד' : pctUp >= 0.5 ? '↗ מעורב-חיובי' : pctUp >= 0.3 ? '↘ מעורב-שלילי' : '📉 שוק שלילי';
+  $('mi-mood').textContent = mood;
+}
+
+// ── EARNINGS CALENDAR (via spark earningsTimestamp) ─
+const TOP_EARN_SYMS = ['AAPL','MSFT','NVDA','AMZN','GOOGL','META','TSLA','JPM','V','WMT',
+  'JNJ','PFE','XOM','BAC','KO','NFLX','AMD','INTC','GS','DIS','COST','UNH','CVX','CRM','ADBE'];
+const EARN_NAMES = {
+  AAPL:'Apple',MSFT:'Microsoft',NVDA:'NVIDIA',AMZN:'Amazon',GOOGL:'Alphabet',
+  META:'Meta',TSLA:'Tesla',JPM:'JPMorgan',V:'Visa',WMT:'Walmart',
+  JNJ:'Johnson & Johnson',PFE:'Pfizer',XOM:'ExxonMobil',BAC:'Bank of America',
+  KO:'Coca-Cola',NFLX:'Netflix',AMD:'AMD',INTC:'Intel',GS:'Goldman Sachs',
+  DIS:'Disney',COST:'Costco',UNH:'UnitedHealth',CVX:'Chevron',CRM:'Salesforce',ADBE:'Adobe'
+};
+
+async function fetchEarningsCalendar() {
+  try {
+    const chunkSize = 10;
+    const allMeta = {};
+    // Batch fetch via spark (same endpoint we use for prices — no 401)
+    for (let i = 0; i < TOP_EARN_SYMS.length; i += chunkSize) {
+      const chunk = TOP_EARN_SYMS.slice(i, i + chunkSize);
+      const symbolsStr = chunk.join(',');
+      const cb = Math.floor(Date.now() / 10000);
+      const url = `https://query1.finance.yahoo.com/v7/finance/spark?symbols=${symbolsStr}&range=1d&interval=1d&cb=${cb}`;
+      const r = await fetch(`${_proxyUrl}/?url=${encodeURIComponent(url)}`);
+      if (!r.ok) continue;
+      const d = await r.json();
+      (d.spark?.result || []).forEach(res => {
+        const meta = res.response?.[0]?.meta;
+        if (meta?.earningsTimestamp) allMeta[res.symbol] = meta;
+      });
+    }
+
+    const now = new Date();
+    const in14days = new Date(now.getTime() + 14*24*3600*1000);
+
+    const upcoming = Object.entries(allMeta)
+      .map(([sym, meta]) => {
+        const ts = meta.earningsTimestamp;
+        const date = new Date(ts * 1000);
+        return { sym, date, ts };
+      })
+      .filter(e => e.date >= now && e.date <= in14days)
+      .sort((a,b) => a.ts - b.ts);
+
+    if (!upcoming.length) return;
+
+    const sec = $('earnings-section');
+    if (sec) sec.style.display = 'block';
+
+    const today = now.toDateString();
+    const tomorrow = new Date(now.getTime() + 86400000).toDateString();
+
+    $('earnings-grid').innerHTML = upcoming.map(e => {
+      const isToday = e.date.toDateString() === today;
+      const isTom   = e.date.toDateString() === tomorrow;
+      const dateStr = isToday ? 'היום' : isTom ? 'מחר' :
+        e.date.toLocaleDateString('he-IL', {weekday:'short', month:'short', day:'numeric'});
+      const cls = isToday ? 'today' : isTom ? 'tomorrow' : '';
+      const dateCls = isToday ? 'today' : (isTom ? 'soon' : '');
+      const q = qmap[e.sym] || {};
+      const priceStr = q.price ? `$${Number(q.price).toFixed(2)}  ${q.d1!=null?(q.d1>0?'▲':'▼')+(Math.abs(q.d1).toFixed(1))+'%':''}` : '';
+      return `<div class="earn-card ${cls}">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="earn-sym">${e.sym}</span>
+          <span class="earn-date ${dateCls}">${dateStr}</span>
+        </div>
+        <div class="earn-name">${EARN_NAMES[e.sym]||e.sym}</div>
+        ${priceStr?`<div class="earn-eps" style="font-family:var(--mono)">${priceStr}</div>`:''}
+      </div>`;
+    }).join('');
+  } catch(e) { console.error('earnings error', e); }
 }
 
 // Auto-start if key saved
