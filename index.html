@@ -867,7 +867,7 @@ body.light .lo52{color:#cc1a3a}
 <div id="screen-loading">
   <div class="loader-ring"></div>
   <div class="loader-text">מביא נתוני שוק חיים...</div>
-  <div class="loader-sub" id="progress">Finnhub • ללא proxy</div>
+  <div class="loader-sub" id="progress">Yahoo Finance • מתחבר...</div>
 </div>
 
 <!-- ERROR -->
@@ -969,7 +969,7 @@ body.light .lo52{color:#cc1a3a}
 
       <!-- YTD + Correlation — inline below sectors table -->
       <div id="ytd-section" style="display:none;margin-top:10px">
-        <div class="section-label">תשואה שנתית לפי סקטור (1Y)</div>
+        <div class="section-label">תשואה מתחילת השנה (YTD)</div>
         <div class="ytd-card">
           <div class="ytd-bars" id="ytd-bars"></div>
         </div>
@@ -1160,7 +1160,7 @@ body.light .lo52{color:#cc1a3a}
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 
-let _key = localStorage.getItem('fh_key') || '';
+
 let _proxyUrl = localStorage.getItem('app_proxy_url') || '';
 
 const INDICES = [
@@ -1440,31 +1440,7 @@ document.addEventListener('click',e=>{
   }
 });
 
-// ── Finnhub API ─────────────────────────────────────
-// Quote: current price + day change
-async function fhQuote(sym){
-  const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${_key}`);
-  if(!r.ok)throw new Error(`Finnhub quote ${sym}: HTTP ${r.status}`);
-  const d=await r.json();
-  if(d.error)throw new Error(d.error);
-  // d = {c: current, d: change, dp: change%, h, l, o, pc}
-  return{price:d.c, d1:d.dp, prev:d.pc};
-}
-
-// Fetch historical returns via basic-financials (free tier)
-async function fetchBasicFinancials(sym){
-  const r=await fetch(`https://finnhub.io/api/v1/stock/basic-financials?symbol=${sym}&metric=all&token=${_key}`);
-  if(!r.ok)return{};
-  const j=await r.json();
-  const m=j.metric||{};
-  return{
-    w1: m['5DayPriceReturnDaily']??null,
-    m1: m['4WeekPriceReturnDaily']??null,
-    m3: m['13WeekPriceReturnDaily']??null,
-    m6: m['26WeekPriceReturnDaily']??null,
-    y1: m['52WeekPriceReturnDaily']??null,
-  };
-}
+// ── Yahoo Finance API only (Finnhub removed) ─────────
 
 async function fetchMarketNews() {
   // נשתמש בנקודת החיפוש של יאהו כדי להביא 5 כתבות על שוק המניות
@@ -2142,9 +2118,12 @@ async function init(){
     renderSectors();
     renderSummary();
     renderFearGreed();
-	fetchMarketNews();
-	fetchAndRenderMovers();
+    fetchMarketNews();
+    fetchAndRenderMovers();
     drawChart();
+    // הצג סקשנים מיד עם מצב טעינה
+    showLoadingState('ytd-section','ytd-bars','טוען נתונים היסטוריים...');
+    showLoadingState('corr-section','corr-table-wrap','ממתין לנתוני כל הסקטורים...');
     showScreen('app');
 
     // Background: fetch historical data via basic-financials (free tier)
@@ -2153,6 +2132,8 @@ async function init(){
       try { 
         histMap[s.sym] = await fetchHistoricalReturns(s.sym); 
         renderSectors();
+        renderYTDChart();
+        renderCorrelationMatrix();
         await sleep(400); // חשוב להשאיר את המרווח הזה
       } catch (e) { 
         histMap[s.sym] = {}; 
@@ -2315,12 +2296,20 @@ function drawFGGauge(score, activeColor) {
 }
 
 // ── 3. YTD BAR CHART ─────────────────────────
+function showLoadingState(sectionId, contentId, msg) {
+  const sec = $(sectionId);
+  if (sec) sec.style.display = 'block';
+  const el = $(contentId);
+  if (el) el.innerHTML = `<div style="text-align:center;color:var(--dim);font-size:11px;padding:16px;font-family:var(--mono)">
+    <div class="mini-ring" style="margin:0 auto 8px"></div>${msg}</div>`;
+}
+
 function renderYTDChart() {
   const data = SECTORS.map(s => ({ sym: s.sym, name: s.name, ytd: (histMap[s.sym]||{}).ytd }))
     .filter(s => s.ytd != null).sort((a,b) => b.ytd - a.ytd);
-  if (!data.length) return;
-  const ytdSec = $('ytd-section');
-  if (ytdSec) ytdSec.style.display = 'block';
+  const sec = $('ytd-section');
+  if (sec) sec.style.display = 'block';
+  if (!data.length) return; // keep loading state
   const maxAbs = Math.max(...data.map(s => Math.abs(s.ytd)), 1);
   const isL = document.body.classList.contains('light');
   $('ytd-bars').innerHTML = data.map(s => {
@@ -2352,9 +2341,9 @@ function pearson(a, b) {
 }
 function renderCorrelationMatrix() {
   const syms = SECTORS.filter(s => histMap[s.sym]?.rawPrices?.length > 20);
-  if (syms.length < 3) return;
-  const corrSec = $('corr-section');
-  if (corrSec) corrSec.style.display = 'block';
+  const sec = $('corr-section');
+  if (sec) sec.style.display = 'block';
+  if (syms.length < 3) return; // keep loading state until enough data
   const isL = document.body.classList.contains('light');
   // header row
   let html = `<table class="corr-table"><thead><tr><th>סקטור</th>${syms.map(s=>`<th>${s.sym}</th>`).join('')}</tr></thead><tbody>`;
