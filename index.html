@@ -1805,18 +1805,15 @@ async function runScreener() {
 }
 
 function renderSectorsWithSkeleton(){
-  // מציג את כל השורות מיד עם יום% אמיתי + shimmer לשאר
-  const sk='<td class="lc">–</td>'; // shimmer cell
+  const sk='<td class="lc">&nbsp;</td>';
   const rows=SECTORS.map(s=>{
-    const d=qmap[s.sym]||{};
-    const d1Td=`<td class="${cellCls(d.d1)}">${pct(d.d1)}</td>`;
-    return`<tr onclick="openSectorModal('${s.sym}','${s.name}')">
+    return`<tr>
       <td><span class="sym">${s.sym}</span>${s.name}</td>
-      ${d1Td}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}
+      ${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}
     </tr>`;
   });
   rows.push(`<tr class="avgrow"><td>ממוצע סקטורים</td>
-    ${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}<td class="cz">–</td>
+    ${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}<td class="lc">&nbsp;</td>
   </tr>`);
   $('sector-tbody').innerHTML=rows.join('');
 }
@@ -2153,6 +2150,7 @@ async function init(){
     renderSectorsWithSkeleton(); // מציג skeleton מיידי
 
     // מביא את כל הסקטורים במקביל
+    await sleep(1000); // המתנה קצרה לאנימציית הטעינה
     await Promise.all(SECTORS.map(async s => {
       try { histMap[s.sym] = await fetchHistoricalReturns(s.sym); }
       catch (e) { histMap[s.sym] = {}; }
