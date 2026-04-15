@@ -296,9 +296,9 @@ body.light .tbl-frozen-row{background:#fff}
 body.light .tbl-frozen-avg{background:var(--bg3)!important}
 .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;flex:1;min-width:0;will-change:scroll-position}
 table.t{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;min-width:520px}
-.t th{background:var(--bg);color:var(--dim);font-weight:600;padding:0 6px;height:26px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);font-size:9px;text-align:center;white-space:nowrap;text-transform:uppercase;letter-spacing:.8px}
+.t th{background:var(--bg);color:var(--dim);font-weight:600;padding:0 6px;height:26px;max-height:26px;line-height:26px;overflow:hidden;white-space:nowrap;border-bottom:1px solid var(--border);border-right:1px solid var(--border);font-size:9px;text-align:center;text-transform:uppercase;letter-spacing:.8px}
 .t th:last-child{border-right:none}
-.t td{padding:0 6px;height:24px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);text-align:center;font-family:var(--mono);font-size:11px}
+.t td{padding:0 6px;height:24px;max-height:24px;line-height:24px;overflow:hidden;white-space:nowrap;border-bottom:1px solid var(--border);border-right:1px solid var(--border);text-align:center;font-family:var(--mono);font-size:11px}
 .t td:last-child{border-right:none}
 .t tr:last-child td{border-bottom:none}
 
@@ -1343,7 +1343,7 @@ body.light .macro-chg.down{background:rgba(204,26,58,.1)}
         <div class="tbl-wrap">
         <table class="t">
           <thead>
-            <tr><th>יום %</th><th>שבוע</th><th>חודש</th><th>3 חד׳</th><th>6 חד׳</th><th>שנה</th><th>שיא 52W</th><th>שפל 52W</th><th>נפח</th><th>ממוצע</th></tr>
+            <tr><th>יום %</th><th>שבוע</th><th>חודש</th><th>3 חד׳</th><th>6 חד׳</th><th>שנה</th><th>שיא 52W</th><th>שפל 52W</th><th>נפח</th><th style="border-left:2px solid var(--border2)">מאקרו</th><th>ממוצע</th></tr>
           </thead>
           <tbody id="sector-tbody"></tbody>
         </table>
@@ -2287,24 +2287,33 @@ function renderSectorsWithSkeleton(){
 
   // כל התאים skeleton — נתונים מגיעים יחד בסוף
   const rows = SECTORS.map(() =>
-    `<tr>${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}</tr>`
+    `<tr>${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}</tr>`
   );
-  rows.push(`<tr class="avgrow">${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}<td class="lc">&nbsp;</td></tr>`);
+  rows.push(`<tr class="avgrow">${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}<td class="lc">&nbsp;</td><td class="lc">&nbsp;</td></tr>`);
   $('sector-tbody').innerHTML = rows.join('');
-  requestAnimationFrame(syncFrozenRows);
+  syncFrozenRows();
 }
 
+let _syncTimer = null;
 function syncFrozenRows() {
+  if (_syncTimer) clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(_doSyncFrozenRows, 30);
+}
+function _doSyncFrozenRows() {
   const rows = document.querySelectorAll('#sector-tbody tr');
   const frozenRows = document.querySelectorAll('#sector-frozen .tbl-frozen-row');
-  // Sync header
   const th = document.querySelector('.t th');
   const fh = document.querySelector('.tbl-frozen-hdr');
   if (th && fh) fh.style.height = th.offsetHeight + 'px';
-  // Sync data rows
   rows.forEach((tr, i) => {
     if (frozenRows[i]) frozenRows[i].style.height = tr.offsetHeight + 'px';
   });
+}
+// ResizeObserver fires whenever table re-layouts — works on all devices
+function initSyncObserver() {
+  const tbody = document.getElementById('sector-tbody');
+  if (!tbody || !window.ResizeObserver) return;
+  new ResizeObserver(() => syncFrozenRows()).observe(tbody);
 }
 
 function renderSectors(){
@@ -2333,6 +2342,7 @@ function renderSectors(){
     }
     return`<tr onclick="openSectorModal('${s.sym}','${s.name}')" title="לחץ לראות אחזקות">
       ${td(d.d1)}${td(h.w1)}${td(h.m1)}${td(h.m3)}${td(h.m6)}${td(h.y1)}${hiTd}${loTd}${volTd}
+      ${getSectorMacroTd(s.sym)}
       <td class="${cellCls(a)}">${pct(a)}</td>
     </tr>`;
   });
@@ -2342,11 +2352,11 @@ function renderSectors(){
   })));
   const ov=avg(periodAvgs);
   rows.push(`<tr class="avgrow">
-    ${periodAvgs.map((v)=>`<td class="${cellCls(v)}">${pct(v)}</td>`).join('')}<td></td><td></td><td></td>
+    ${periodAvgs.map((v)=>`<td class="${cellCls(v)}">${pct(v)}</td>`).join('')}<td></td><td></td><td></td><td></td>
     <td class="${cellCls(ov)}"><b>${pct(ov)}</b></td>
   </tr>`);
   $('sector-tbody').innerHTML=rows.join('');
-  requestAnimationFrame(syncFrozenRows);
+  syncFrozenRows();
 }
 
 function renderSummary(){
@@ -2841,7 +2851,8 @@ async function init(){
     }
 
     renderPositivity();
-    renderSectorsWithSkeleton(); // skeleton מיידי עם יום% אמיתי
+    renderSectorsWithSkeleton();
+    initSyncObserver(); // observe table for automatic height sync // skeleton מיידי עם יום% אמיתי
     renderSummary();
     renderFearGreed();
     fetchMarketNews();
@@ -2873,7 +2884,10 @@ async function init(){
     }));
 
     // רנדור אחד אחרי שהכל מוכן
+    await fetchFredColData();
     renderSectors();
+    // Double RAF ensures DOM is fully painted before measuring row heights
+    syncFrozenRows();
     renderFearGreed();
     renderYTDChart();
     renderCorrelationMatrix();
@@ -3193,6 +3207,8 @@ const MACRO_SYMS = [
 async function fetchMacro() {
   try {
     const quotes = await fetchYahooQuotesBatch(MACRO_SYMS.map(m=>m.sym));
+    // Store macro data in qmap so getSectorMacroTd can use it
+    Object.assign(qmap, quotes);
     MACRO_SYMS.forEach(m => {
       const d = quotes[m.sym] || {};
       const priceEl = $(`mp-${m.id}`), chgEl = $(`mc-${m.id}`);
@@ -3815,6 +3831,50 @@ async function renderEconCalendar() {
       <div class="econ-time">${e.time}</div>
     </div>`;
   }).join('') + '<div style="padding:6px 12px 8px;text-align:left;font-size:9px;color:var(--dim);opacity:.6">מקור: FRED — Federal Reserve Bank of St. Louis</div>';
+}
+
+// ── SECTOR MACRO COLUMN (uses existing qmap data — no extra fetch) ──
+const FRED_COL_KEY = 'aa7f8d740d367d9ff2354194b5329fbe';
+const fredColData = {}; // {seriesId: {cur, prev}}
+
+const SECTOR_MACRO_COL = {
+  XLK:  {id:'DGS10',        label:'10Y',    fmt:v=>`${v.toFixed(2)}%`},
+  XLF:  {id:'DGS10',        label:'10Y',    fmt:v=>`${v.toFixed(2)}%`},
+  XLE:  {id:'DCOILWTICO',   label:'נפט',   fmt:v=>`$${v.toFixed(1)}`},
+  XLRE: {id:'DGS10',        label:'10Y',    fmt:v=>`${v.toFixed(2)}%`},
+  XLY:  {id:'DCOILWTICO',   label:'נפט',   fmt:v=>`$${v.toFixed(1)}`},
+  XLP:  {id:'DGS10',        label:'10Y',    fmt:v=>`${v.toFixed(2)}%`},
+  XLC:  {id:'DGS10',        label:'10Y',    fmt:v=>`${v.toFixed(2)}%`},
+  XLI:  {id:'DCOILWTICO',   label:'נפט',   fmt:v=>`$${v.toFixed(1)}`},
+  XLB:  {id:'DCOILWTICO',   label:'נפט',   fmt:v=>`$${v.toFixed(1)}`},
+  XLU:  {id:'DGS10',        label:'10Y',    fmt:v=>`${v.toFixed(2)}%`},
+  XLV:  {id:'DGS10',        label:'10Y',    fmt:v=>`${v.toFixed(2)}%`},
+};
+
+async function fetchFredColData() {
+  const needed = [...new Set(Object.values(SECTOR_MACRO_COL).map(v=>v.id))];
+  await Promise.allSettled(needed.map(async id => {
+    try {
+      const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${id}&api_key=${FRED_COL_KEY}&file_type=json&sort_order=desc&limit=3&observation_start=2020-01-01`;
+      const r = await fetch(_proxyUrl+'/?url='+encodeURIComponent(url));
+      if (!r.ok) return;
+      const d = await r.json();
+      const obs = (d.observations||[]).filter(o=>o.value!='.');
+      if (obs.length) fredColData[id] = {cur:parseFloat(obs[0].value), prev:obs.length>1?parseFloat(obs[1].value):null};
+    } catch(e){}
+  }));
+}
+
+function getSectorMacroTd(sym) {
+  const conf = SECTOR_MACRO_COL[sym];
+  if (!conf) return '<td style="border-left:2px solid var(--border2)"></td>';
+  const obs = fredColData[conf.id];
+  if (!obs) return '<td style="color:var(--dim);font-size:9px;border-left:2px solid var(--border2)">–</td>';
+  const val = conf.fmt(obs.cur);
+  const noChg = obs.prev==null || Math.abs(obs.cur-obs.prev)<0.001;
+  const arrow = noChg ? '' : obs.cur>obs.prev ? ' ▲' : ' ▼';
+  const clr = noChg ? 'var(--dim)' : obs.cur>obs.prev ? 'var(--red)' : 'var(--green)';
+  return `<td style="font-family:var(--mono);font-size:9px;white-space:nowrap;border-left:2px solid var(--border2);color:${clr}" title="${conf.label}: ${val}">${val}${arrow}</td>`;
 }
 
 // Auto-start if key saved
