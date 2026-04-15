@@ -288,22 +288,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMobileMenu();c
 
 // ── Yahoo Finance API only (Finnhub removed) ─────────
 
-// ── NEWS SECTION — tabs: עברית | English ────────────
-
-const HEBREW_NEWS_FEEDS = [
-  { name: 'וואלה כסף',      url: 'https://rss.walla.co.il/feed/557'   },
-  { name: 'כסף עולמי',      url: 'https://rss.walla.co.il/feed/112'   },
-  { name: 'קריפטו',         url: 'https://rss.walla.co.il/feed/13373' },
-  { name: 'וואלה TECH',     url: 'https://rss.walla.co.il/feed/4000'  },
-  { name: 'חדשות בעולם',    url: 'https://rss.walla.co.il/feed/2'     },
-  { name: 'דעות כסף',       url: 'https://rss.walla.co.il/feed/4997'  },
-  { name: 'רשתות חברתיות',  url: 'https://rss.walla.co.il/feed/13019' },
-];
-
-const EN_NEWS_FEEDS = [
-  { name: 'Benzinga Markets',  url: 'https://rss.app/feeds/6xoFWSgjRpOcDBAX.xml' },
-  { name: 'Benzinga Financial', url: 'https://rss.app/feeds/GlMwezZhdiLNXGNT.xml' },
-];
+// ── NEWS ENGINE — מקורות מוגדרים ב-news-sources.js ──────────
 
 function _parseRSSItems(text, sourceName) {
   const items = [];
@@ -324,32 +309,26 @@ function _parseRSSItems(text, sourceName) {
   return items;
 }
 
-async function fetchHebrewNews() {
-  const grid = $('news-grid');
-  grid.innerHTML = '<div class="modal-loading" style="color:var(--dim);font-size:12px"><div class="mini-ring" style="margin:0 auto 8px"></div>טוען חדשות...</div>';
+async function _fetchFeeds(feeds) {
   const allItems = [];
-  await Promise.allSettled(HEBREW_NEWS_FEEDS.map(async feed => {
+  await Promise.allSettled(feeds.map(async feed => {
     try {
       const r = await fetch(`${_proxyUrl}/?url=${encodeURIComponent(feed.url)}`);
       if (!r.ok) return;
       _parseRSSItems(await r.text(), feed.name).forEach(i => allItems.push(i));
     } catch(e) {}
   }));
-  _renderNewsGrid(allItems, 'he');
+  return allItems;
+}
+
+async function fetchHebrewNews() {
+  $('news-grid').innerHTML = '<div class="modal-loading" style="color:var(--dim);font-size:12px"><div class="mini-ring" style="margin:0 auto 8px"></div>טוען חדשות...</div>';
+  _renderNewsGrid(await _fetchFeeds(HEBREW_NEWS_FEEDS), 'he');
 }
 
 async function fetchEnglishNews() {
-  const grid = $('news-grid');
-  grid.innerHTML = '<div class="modal-loading" style="color:var(--dim);font-size:12px"><div class="mini-ring" style="margin:0 auto 8px"></div>Loading...</div>';
-  const allItems = [];
-  await Promise.allSettled(EN_NEWS_FEEDS.map(async feed => {
-    try {
-      const r = await fetch(`${_proxyUrl}/?url=${encodeURIComponent(feed.url)}`);
-      if (!r.ok) return;
-      _parseRSSItems(await r.text(), feed.name).forEach(i => allItems.push(i));
-    } catch(e) {}
-  }));
-  _renderNewsGrid(allItems, 'en');
+  $('news-grid').innerHTML = '<div class="modal-loading" style="color:var(--dim);font-size:12px"><div class="mini-ring" style="margin:0 auto 8px"></div>Loading...</div>';
+  _renderNewsGrid(await _fetchFeeds(EN_NEWS_FEEDS), 'en');
 }
 
 function _renderNewsGrid(items, lang) {
