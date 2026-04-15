@@ -1136,9 +1136,10 @@ body.light .macro-chg.down{background:rgba(204,26,58,.1)}
 /* ── ECONOMIC CALENDAR ── */
 .econ-section{padding:12px 16px;border-top:1px solid var(--border);background:var(--bg)}
 .econ-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:8px;overflow:hidden}
-.econ-row{display:flex;align-items:flex-start;gap:12px;padding:11px 14px;border-bottom:1px solid var(--border);transition:background .12s}
+.econ-row{display:flex;align-items:flex-start;gap:12px;padding:11px 14px;border-bottom:1px solid var(--border);transition:background .12s;cursor:pointer}
 .econ-row:last-child{border-bottom:none}
 .econ-row:hover{background:var(--bg3)}
+.econ-row:hover .econ-name::after{content:' ↗';font-size:9px;color:var(--blue);opacity:.7}
 .econ-date-col{flex-shrink:0;width:48px;text-align:center}
 .econ-day{font-family:var(--mono);font-size:17px;font-weight:800;color:var(--text);line-height:1}
 .econ-mon{font-size:8px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-top:1px}
@@ -3885,13 +3886,13 @@ const FOMC_DATES = {
 };
 
 const FRED_RELEASES = [
-  {id:10,  name:'CPI Report',              he:'מדד המחירים לצרכן — מודד אינפלציה. גבוה מהצפוי = שוק יורד (חשש מריבית גבוהה).', impact:'high',   time:'08:30 ET'},
-  {id:50,  name:'NFP — Non-Farm Payrolls', he:'שכר חוץ-חקלאי — כמה משרות נוצרו. מדד עבודה חזק = כלכלה חזקה (לפעמים שוק יורד מחשש לריבית).', impact:'high',   time:'08:30 ET'},
-  {id:54,  name:'PCE Price Index',         he:'הוצאות צריכה אישית — מדד האינפלציה המועדף על הפד. משפיע ישירות על החלטות ריבית.',  impact:'high',   time:'08:30 ET'},
-  {id:53,  name:'GDP (Advance)',           he:'תוצר מקומי גולמי — גודל הכלכלה האמריקאית. שני רבעונים שליליים = מיתון.',           impact:'high',   time:'08:30 ET'},
-  {id:31,  name:'PPI Report',             he:'מדד מחירי יצרנים — אינפלציה מצד ההיצע. מקדים לעיתים את ה-CPI.',                   impact:'medium', time:'08:30 ET'},
-  {id:84,  name:'Retail Sales',           he:'מכירות קמעונאיות — כוח הצרכן. 70% מהכלכלה האמריקאית מבוססת על צריכה.',            impact:'medium', time:'08:30 ET'},
-  {id:180, name:'Initial Jobless Claims', he:'תביעות אבטלה שבועיות — בריאות שוק העבודה. עלייה = התרופפות.',                      impact:'medium', time:'08:30 ET'},
+  {id:10,  name:'CPI Report',              he:'מדד המחירים לצרכן — מודד אינפלציה. גבוה מהצפוי = שוק יורד (חשש מריבית גבוהה).', impact:'high',   time:'08:30 ET', url:'https://www.bls.gov/cpi/'},
+  {id:50,  name:'NFP — Non-Farm Payrolls', he:'שכר חוץ-חקלאי — כמה משרות נוצרו. מדד עבודה חזק = כלכלה חזקה (לפעמים שוק יורד מחשש לריבית).', impact:'high',   time:'08:30 ET', url:'https://www.bls.gov/news.release/empsit.toc.htm'},
+  {id:54,  name:'PCE Price Index',         he:'הוצאות צריכה אישית — מדד האינפלציה המועדף על הפד. משפיע ישירות על החלטות ריבית.',  impact:'high',   time:'08:30 ET', url:'https://www.bea.gov/data/personal-consumption-expenditures-price-index'},
+  {id:53,  name:'GDP (Advance)',           he:'תוצר מקומי גולמי — גודל הכלכלה האמריקאית. שני רבעונים שליליים = מיתון.',           impact:'high',   time:'08:30 ET', url:'https://www.bea.gov/data/gdp/gross-domestic-product'},
+  {id:31,  name:'PPI Report',             he:'מדד מחירי יצרנים — אינפלציה מצד ההיצע. מקדים לעיתים את ה-CPI.',                   impact:'medium', time:'08:30 ET', url:'https://www.bls.gov/ppi/'},
+  {id:84,  name:'Retail Sales',           he:'מכירות קמעונאיות — כוח הצרכן. 70% מהכלכלה האמריקאית מבוססת על צריכה.',            impact:'medium', time:'08:30 ET', url:'https://www.census.gov/retail/index.html'},
+  {id:180, name:'Initial Jobless Claims', he:'תביעות אבטלה שבועיות — בריאות שוק העבודה. עלייה = התרופפות.',                      impact:'medium', time:'08:30 ET', url:'https://www.dol.gov/ui/data.pdf'},
 ];
 
 async function fetchEconCalendarFRED() {
@@ -3908,7 +3909,7 @@ async function fetchEconCalendarFRED() {
       const d = await r.json();
       (d.release_dates||[]).forEach(rd => {
         if (rd.date >= start && rd.date <= end)
-          events.push({date:rd.date, name:rel.name, he:rel.he, impact:rel.impact, time:rel.time, d:new Date(rd.date+'T12:00:00')});
+          events.push({date:rd.date, name:rel.name, he:rel.he, impact:rel.impact, time:rel.time, url:rel.url, d:new Date(rd.date+'T12:00:00')});
       });
     } catch(e) {}
   }));
@@ -3917,7 +3918,7 @@ async function fetchEconCalendarFRED() {
   const y = today.getFullYear();
   [...(FOMC_DATES[y]||[]), ...(FOMC_DATES[y+1]||[])].forEach(date => {
     if (date >= start && date <= end)
-      events.push({date, name:'FOMC Decision', he:'ועדת הריבית (פד) — קובעת את שיעור הריבית. עלייה=לחץ על מניות, ירידה=דחיפה לשוק.', impact:'high', time:'14:00 ET', d:new Date(date+'T12:00:00')});
+      events.push({date, name:'FOMC Decision', he:'ועדת הריבית (פד) — קובעת את שיעור הריבית. עלייה=לחץ על מניות, ירידה=דחיפה לשוק.', impact:'high', time:'14:00 ET', url:'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm', d:new Date(date+'T12:00:00')});
   });
 
   return events.sort((a,b) => a.date.localeCompare(b.date));
@@ -3946,7 +3947,7 @@ async function renderEconCalendar() {
     const isToday = e.d.toDateString() === todayD.toDateString();
     const isPast  = e.d < todayD;
     const cls = isPast ? 'econ-past' : isToday ? 'econ-today-row' : '';
-    return `<div class="econ-row ${cls}">
+    return `<a class="econ-row ${cls}" href="${e.url||'#'}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:flex;cursor:pointer">
       <div class="econ-date-col">
         <div class="econ-day">${e.d.getDate()}</div>
         <div class="econ-mon">${MONTHS_EN[e.d.getMonth()]}</div>
@@ -3961,7 +3962,7 @@ async function renderEconCalendar() {
         </div>
       </div>
       <div class="econ-time">${e.time}</div>
-    </div>`;
+    </a>`;
   }).join('') + '<div style="padding:6px 12px 8px;text-align:left;font-size:9px;color:var(--dim);opacity:.6">מקור: FRED — Federal Reserve Bank of St. Louis</div>';
 }
 
