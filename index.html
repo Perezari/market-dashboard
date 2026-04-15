@@ -79,8 +79,7 @@ body.light .idx-name{color:var(--text)}
 body.light .content{background:transparent}
 body.light .t th{background:var(--bg3);color:#4070a0;border-color:var(--border)}
 body.light .t td{border-color:var(--border)}
-body.light .t td:first-child{background:var(--bg2)!important;color:var(--text)}
-body.light .avgrow td{background:var(--bg3)!important}
+body.light body.light .avgrow td{background:var(--bg3)!important}
 body.light .chart-box{background:#fff;border-color:var(--border);box-shadow:0 1px 4px rgba(0,30,80,.08)}
 body.light .sum-card{background:#fff;border-color:var(--border);box-shadow:0 1px 4px rgba(0,30,80,.08)}
 body.light .sum-card-label{color:var(--dim)}
@@ -299,7 +298,6 @@ body.light .tbl-frozen-avg{background:var(--bg3)!important}
 table.t{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;min-width:520px}
 .t th{background:var(--bg);color:var(--dim);font-weight:600;padding:0 6px;height:26px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);font-size:9px;text-align:center;white-space:nowrap;text-transform:uppercase;letter-spacing:.8px}
 .t th:last-child{border-right:none}
-.t th:first-child{text-align:center;background:var(--bg)}
 .t td{padding:0 6px;height:24px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);text-align:center;font-family:var(--mono);font-size:11px}
 .t td:last-child{border-right:none}
 .t tr:last-child td{border-bottom:none}
@@ -313,8 +311,8 @@ table.t{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;min-
 .cz{background:#0a1828;color:#2e4560}
 body.light .c3{background:#c8f0dc;color:#005828}
 body.light .c2{background:#d4f5e4;color:#006830}
-body.light .c1{background:#e0faee;color:#007838}
-body.light .m1{background:#fde4e8;color:#aa1020}
+body.light .c1{background:#c8f5dd;color:#005828}
+body.light .m1{background:#f9c8d0;color:#880018}
 body.light .m2{background:#fcd0d8;color:#b80020}
 body.light .m3{background:#f8b8c4;color:#cc0018}
 body.light .cz{background:#eef2f8;color:#8090a8}
@@ -393,8 +391,6 @@ canvas{display:block;width:100%!important}
   /* Table */
   .t th{font-size:8px;padding:5px 6px}
   .t td{padding:4px 6px;font-size:10px}
-  .t td:first-child{font-size:11px}
-
   /* Summary */
   .sum-card-val{font-size:17px}
   .sum-card-sub{font-size:9px}
@@ -2095,11 +2091,13 @@ function renderSectorsWithSkeleton(){
   ).join('') + '<div class="tbl-frozen-row tbl-frozen-avg">ממוצע</div>';
   $('sector-frozen').innerHTML = '<div class="tbl-frozen-hdr">סקטור</div>' + frozenRows;
 
+  // כל התאים skeleton — נתונים מגיעים יחד בסוף
   const rows = SECTORS.map(() =>
     `<tr>${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}</tr>`
   );
   rows.push(`<tr class="avgrow">${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}<td class="lc">&nbsp;</td></tr>`);
   $('sector-tbody').innerHTML = rows.join('');
+  requestAnimationFrame(syncFrozenRows);
 }
 
 function syncFrozenRows() {
@@ -2441,7 +2439,7 @@ async function init(){
     renderCards('idx-main',  INDICES, ['יום'], ['d1']);
     renderCards('idx-other', OTHER,   ['יום'], ['d1']);
     renderPositivity();
-    renderSectors();
+    renderSectorsWithSkeleton(); // skeleton מיידי עם יום% אמיתי
     renderSummary();
     renderFearGreed();
     fetchMarketNews();
@@ -2461,9 +2459,8 @@ async function init(){
     renderMarketInternals();
     fetchEarningsCalendar();
 
-    // Background: skeleton + parallel fetch → single render
+    // Background: parallel fetch → single render
     $('footer').textContent='טוען נתונים היסטוריים...';
-    renderSectorsWithSkeleton(); // מציג skeleton מיידי
 
     // מביא את כל הסקטורים במקביל
     await sleep(2000); // המתנה קצרה לאנימציית הטעינה
