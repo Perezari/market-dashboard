@@ -338,42 +338,47 @@ async function _fetchFeeds(feeds) {
 
 async function fetchHebrewNews() {
   $('news-grid').innerHTML = '<div class="modal-loading" style="color:var(--dim);font-size:12px"><div class="mini-ring" style="margin:0 auto 8px"></div>טוען חדשות...</div>';
-  _renderNewsGrid(await _fetchFeeds(HEBREW_NEWS_FEEDS), 'he');
+  _renderNewsGrid(await _fetchFeeds(HEBREW_NEWS_FEEDS), 'he', HEBREW_NEWS_FEEDS);
 }
 
 async function fetchEnglishNews() {
   $('news-grid').innerHTML = '<div class="modal-loading" style="color:var(--dim);font-size:12px"><div class="mini-ring" style="margin:0 auto 8px"></div>Loading...</div>';
-  _renderNewsGrid(await _fetchFeeds(EN_NEWS_FEEDS), 'en');
+  _renderNewsGrid(await _fetchFeeds(EN_NEWS_FEEDS), 'en', EN_NEWS_FEEDS);
 }
 
-function _renderNewsGrid(items, lang) {
+function _renderNewsGrid(items, lang, feeds) {
   const grid = $('news-grid');
-  const sorted = [...items].sort((a,b) => new Date(b.pub||0) - new Date(a.pub||0)).slice(0, 20);
-  if (!sorted.length) { grid.innerHTML='<div style="color:var(--dim);font-size:12px;text-align:center;padding:16px">לא נמצאו חדשות.</div>'; return; }
+  if (!items.length) { grid.innerHTML='<div style="color:var(--dim);font-size:12px;text-align:center;padding:16px">לא נמצאו חדשות.</div>'; return; }
   const isHe = lang === 'he';
 
-  // קיבוץ לפי domain ייחודי לצורך כותרות מקור
-  const seenDomains = new Set();
+  // קיבוץ לפי מקור בסדר שהוגדר ב-news-sources.js — כל מקור מקבל בלוק משלו
+  const grouped = new Map();
+  feeds.forEach(feed => grouped.set(feed.name, { feed, items: [] }));
+  items.forEach(item => { if (grouped.has(item.source)) grouped.get(item.source).items.push(item); });
+
   let html = '';
-  sorted.forEach(item => {
-    const isNewDomain = !seenDomains.has(item.domain + item.source);
-    if (isNewDomain) {
-      seenDomains.add(item.domain + item.source);
-      const favicon = item.domain ? `<img src="${_faviconUrl(item.domain)}" class="news-src-favicon" alt="" onerror="this.style.display='none'">` : '';
-      html += `<div class="news-src-header">${favicon}<span>${item.source}</span></div>`;
-    }
-    const time = item.pub ? new Date(item.pub).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}) : '';
-    const imgHtml = item.img ? `<div class="news-thumb"><img src="${item.img}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'"></div>` : '';
-    html += `<a href="${item.link.replace(/"/g,'&quot;')}" target="_blank" rel="noopener noreferrer" class="news-card${item.img?' news-card-img':''}">
-      ${imgHtml}
-      <div class="news-card-text">
-        <div class="news-title"${isHe?'':' style="direction:ltr;text-align:left"'}>${item.title}</div>
-        <div class="news-meta"${isHe?'':' style="direction:ltr;justify-content:flex-start;gap:8px"'}>
-          <span class="news-time"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${time}</span>
-          ${item.domain?`<span class="news-source-badge"><img src="${_faviconUrl(item.domain)}" class="news-badge-favicon" alt="" onerror="this.style.display='none'"><span>${item.source}</span></span>`:`<span class="news-source">${item.source}</span>`}
+  grouped.forEach(({ feed, items: grpItems }) => {
+    if (!grpItems.length) return;
+    const domain = _getDomain(feed);
+    const fav = domain ? `<img src="${_faviconUrl(domain)}" class="news-src-favicon" alt="" onerror="this.style.display='none'">` : '';
+    html += `<div class="news-src-header">${fav}<span>${feed.name}</span></div>`;
+    grpItems.sort((a,b) => new Date(b.pub||0) - new Date(a.pub||0)).slice(0, 6).forEach(item => {
+      const time = item.pub ? new Date(item.pub).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}) : '';
+      const imgHtml = item.img ? `<div class="news-thumb"><img src="${item.img}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'"></div>` : '';
+      const badge = domain
+        ? `<span class="news-source-badge"><img src="${_faviconUrl(domain)}" class="news-badge-favicon" alt="" onerror="this.style.display='none'"><span>${item.source}</span></span>`
+        : `<span class="news-source">${item.source}</span>`;
+      html += `<a href="${item.link.replace(/"/g,'&quot;')}" target="_blank" rel="noopener noreferrer" class="news-card${item.img?' news-card-img':''}">
+        ${imgHtml}
+        <div class="news-card-text">
+          <div class="news-title"${isHe?'':' style="direction:ltr;text-align:left"'}>${item.title}</div>
+          <div class="news-meta"${isHe?'':' style="direction:ltr;justify-content:flex-start;gap:8px"'}>
+            <span class="news-time"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${time}</span>
+            ${badge}
+          </div>
         </div>
-      </div>
-    </a>`;
+      </a>`;
+    });
   });
   grid.innerHTML = html;
 }
