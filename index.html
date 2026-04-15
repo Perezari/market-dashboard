@@ -581,7 +581,17 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 .modal-loading{display:flex;align-items:center;justify-content:center;gap:10px;padding:32px;color:var(--dim);font-size:13px}
 .mini-ring{width:20px;height:20px;border:2px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
 /* holdings table */
-/* ── STOCK DETAIL PANEL ── */
+/* ── MACRO CONTEXT (stock detail) ── */
+.sp-macro{padding:12px 16px;border-top:1px solid var(--border)}
+.sp-macro-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin-bottom:8px;display:flex;align-items:center;gap:5px}
+.sp-macro-title::before{content:'';width:3px;height:11px;border-radius:2px;background:#f59e0b;display:inline-block}
+.sp-macro-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.sp-macro-item{background:var(--bg3);border-radius:6px;padding:8px 10px;border:1px solid var(--border)}
+.sp-macro-item-name{font-size:9px;color:var(--dim);margin-bottom:2px}
+.sp-macro-item-val{font-family:var(--mono);font-size:13px;font-weight:800;color:var(--text)}
+.sp-macro-item-chg{font-size:9px;font-family:var(--mono);font-weight:700;margin-top:1px}
+.sp-macro-item-chg.up{color:var(--green)}.sp-macro-item-chg.down{color:var(--red)}.sp-macro-item-chg.flat{color:var(--dim)}
+.sp-macro-item-he{font-size:8px;color:var(--dim);margin-top:2px;line-height:1.3}
 .stock-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px)}
 .stock-overlay.open{display:flex;animation:fadeIn .15s ease}
 .stock-panel{
@@ -2615,11 +2625,12 @@ async function openStockDetail(sym, name) {
   try {
     const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=1d&interval=5m&includePrePost=true`;
     const newsUrl  = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(sym)}&newsCount=5&quotesCount=0&enableFuzzyQuery=false`;
-    const [cRes, nRes] = await Promise.allSettled([
+    const [cRes, nRes, macroData] = await Promise.allSettled([
       fetch(_proxyUrl+'/?url='+encodeURIComponent(chartUrl)),
       fetch(_proxyUrl+'/?url='+encodeURIComponent(newsUrl)),
+      fetchMacroContext(sym),
     ]);
-    let meta={}, timestamps=[], closes=[], news={}, fundData={};
+    let meta={}, timestamps=[], closes=[], news=[], macro={series:[],results:{},sector:null};
     if (cRes.status==='fulfilled' && cRes.value.ok) {
       const d = await cRes.value.json();
       const r = d.chart?.result?.[0];
@@ -2628,9 +2639,10 @@ async function openStockDetail(sym, name) {
     if (nRes.status==='fulfilled' && nRes.value.ok) {
       const d = await nRes.value.json(); news=d.news||[];
     }
+    if (macroData.status==='fulfilled') macro = macroData.value;
     // Store globally for tab switching
-    window._spData = {sym, name, meta, timestamps, closes, news, dq, fundData};
-    renderStockDetail(sym, name, meta, timestamps, closes, news, dq, fundData);
+    window._spData = {sym, name, meta, timestamps, closes, news, dq, macro};
+    renderStockDetail(sym, name, meta, timestamps, closes, news, dq, {}, macro);
     // Reset tabs
     document.querySelectorAll('.sp-tab').forEach(t=>t.classList.remove('active'));
     $('tab-chart')?.classList.add('active');
@@ -2639,7 +2651,7 @@ async function openStockDetail(sym, name) {
   }
 }
 
-function renderStockDetail(sym, name, meta, timestamps, closes, news, dq, fundData={}) {
+function renderStockDetail(sym, name, meta, timestamps, closes, news, dq, fundData={}, macro={series:[],results:{},sector:null}) {
   const fmt2 = v => v!=null ? Number(v).toFixed(2) : '–';
   const fmtB = v => {
     if (!v) return '–';
@@ -2713,7 +2725,7 @@ function renderStockDetail(sym, name, meta, timestamps, closes, news, dq, fundDa
   </div>` : '';
 
   // Save tab content globally
-  window._spChartHtml = chartHtml + statsHtml + '<div style="height:max(env(safe-area-inset-bottom),20px)"></div>';
+  window._spChartHtml = chartHtml + statsHtml + renderMacroContext(macro) + '<div style="height:max(env(safe-area-inset-bottom),20px)"></div>';
 
   window._spNewsHtml = news.length
     ? news.slice(0,6).map(n=>{
@@ -3629,6 +3641,90 @@ tr:nth-child(even) td{background:#fafafa}
 
   const doc = iframe.contentWindow.document;
   doc.open(); doc.write(html); doc.close();
+}
+
+// ── MACRO CONTEXT (FRED) ──────────────
+const MACRO_SERIES = {
+  DGS10:      {name:'10Y Treasury',    he:'תשואת אג"ח 10 שנים — ריבית בסיס לכל נכסי הסיכון',     suffix:'%'},
+  FEDFUNDS:   {name:'Fed Funds Rate',  he:'ריבית הפד — עולה=לחץ על מכפילים, יורדת=תמיכה בשוק',  suffix:'%'},
+  T10Y2Y:     {name:'Yield Curve',     he:'פרש תשואות 10Y-2Y — שלילי=אזהרת מיתון, חיובי=נורמלי', suffix:'%'},
+  DCOILWTICO: {name:'WTI Crude Oil',   he:'נפט גולמי — משפיע על עלויות ואינפלציה',               suffix:'$'},
+  MORTGAGE30US:{name:'Mortgage 30Y',  he:'ריבית משכנתא 30 שנה — לחץ על שוק הנדל"ן',             suffix:'%'},
+  UMCSENT:    {name:'Consumer Sentiment',he:'סנטימנט צרכני — מחזק את הצריכה הפרטית',             suffix:''},
+  VIXCLS:     {name:'VIX',            he:'מדד פחד — מעל 25=תנודתיות גבוהה, מתחת 15=שקט',        suffix:''},
+};
+
+// Map sector ETF → relevant FRED series
+const SECTOR_MACRO = {
+  XLK:  ['DGS10','FEDFUNDS','VIXCLS'],
+  XLF:  ['T10Y2Y','FEDFUNDS','DGS10'],
+  XLE:  ['DCOILWTICO','FEDFUNDS','DGS10'],
+  XLRE: ['MORTGAGE30US','DGS10','FEDFUNDS'],
+  XLY:  ['UMCSENT','FEDFUNDS','DGS10'],
+  XLP:  ['UMCSENT','FEDFUNDS','DGS10'],
+  XLC:  ['DGS10','FEDFUNDS','VIXCLS'],
+  XLI:  ['DGS10','FEDFUNDS','DCOILWTICO'],
+  XLB:  ['DCOILWTICO','DGS10','FEDFUNDS'],
+  XLU:  ['DGS10','FEDFUNDS','MORTGAGE30US'],
+  XLV:  ['DGS10','FEDFUNDS','VIXCLS'],
+};
+const DEFAULT_MACRO = ['DGS10','FEDFUNDS','VIXCLS'];
+
+function getStockSector(sym) {
+  for (const [etf, holdings] of Object.entries(ETF_HOLDINGS)) {
+    if (holdings.some(h => h.s === sym)) return etf;
+  }
+  return null;
+}
+
+async function fetchMacroContext(sym) {
+  const sector  = getStockSector(sym);
+  const series  = SECTOR_MACRO[sector] || DEFAULT_MACRO;
+  const results = {};
+  await Promise.allSettled(series.map(async id => {
+    try {
+      const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${id}&api_key=${FRED_KEY}&file_type=json&sort_order=desc&limit=3&observation_start=2020-01-01`;
+      const r = await fetch(_proxyUrl + '/?url=' + encodeURIComponent(url));
+      if (!r.ok) return;
+      const d = await r.json();
+      const obs = (d.observations || []).filter(o => o.value !== '.');
+      if (obs.length >= 1) {
+        const cur  = parseFloat(obs[0].value);
+        const prev = obs.length >= 2 ? parseFloat(obs[1].value) : null;
+        results[id] = {cur, prev, date: obs[0].date};
+      }
+    } catch(e) {}
+  }));
+  return {series, results, sector};
+}
+
+function renderMacroContext(macroData) {
+  const {series, results, sector} = macroData;
+  const items = series.map(id => {
+    const info = MACRO_SERIES[id];
+    const obs  = results[id];
+    if (!obs) return null;
+    const valStr = (info.suffix === '$' ? '$' : '') + obs.cur.toFixed(info.suffix==='%'?2:1) + (info.suffix==='%'?' %':'');
+    let chgHtml = '';
+    if (obs.prev != null) {
+      const diff = obs.cur - obs.prev;
+      const cls  = Math.abs(diff) < 0.01 ? 'flat' : diff > 0 ? 'up' : 'down';
+      chgHtml = `<div class="sp-macro-item-chg ${cls}">${diff>0?'+':''}${diff.toFixed(2)} מהפרסום הקודם</div>`;
+    }
+    return `<div class="sp-macro-item">
+      <div class="sp-macro-item-name">${info.name}</div>
+      <div class="sp-macro-item-val">${valStr}</div>
+      ${chgHtml}
+      <div class="sp-macro-item-he">${info.he}</div>
+    </div>`;
+  }).filter(Boolean).join('');
+
+  if (!items) return '';
+  const sectorLabel = sector ? ` · סקטור ${sector}` : '';
+  return `<div class="sp-macro">
+    <div class="sp-macro-title">הקשר מאקרו${sectorLabel}</div>
+    <div class="sp-macro-grid">${items}</div>
+  </div>`;
 }
 
 // ── ECONOMIC CALENDAR — FRED API (Federal Reserve St. Louis) ──
