@@ -1,0 +1,2390 @@
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+
+
+let _proxyUrl = localStorage.getItem('app_proxy_url') || '';
+
+const INDICES = [
+  {sym:'SPY',  name:'S&P 500'},
+  {sym:'QQQ',  name:'נאסד״ק 100'},
+  {sym:'DIA',  name:'דאו ג׳ונס'},
+  {sym:'IWM',  name:'ראסל 2000'},
+];
+const OTHER = [
+  {sym:'GLD',  name:'זהב'},
+  {sym:'IBIT', name:'Bitcoin ETF'},
+  {sym:'VIXY', name:'VIX (VIXY)'},
+  {sym:'TLT',  name:'אג״ח 20Y'},
+  {sym:'UUP',  name:'דולר (UUP)'},
+];
+const SECTORS = [
+  {sym:'XLK',  name:'טכנולוגיה'},
+  {sym:'XLF',  name:'פיננסים'},
+  {sym:'XLE',  name:'אנרגיה'},
+  {sym:'XLV',  name:'בריאות'},
+  {sym:'XLC',  name:'תקשורת'},
+  {sym:'XLI',  name:'תעשייה'},
+  {sym:'XLB',  name:'חומרים'},
+  {sym:'XLRE', name:'נדל״ן'},
+  {sym:'XLU',  name:'תשתיות'},
+  {sym:'XLP',  name:'צריכה בסיסית'},
+  {sym:'XLY',  name:'צריכה שיקולית'},
+];
+const ALL = [...INDICES,...OTHER,...SECTORS];
+
+// ── helpers ────────────────────────────────────────
+function pct(v){if(v==null||isNaN(v))return'–';return(v>0?'+':'')+Number(v).toFixed(1)+'%'}
+function cellCls(v){
+  if(v==null||isNaN(v))return'cz';
+  if(v>5)return'c3';if(v>2)return'c2';if(v>0)return'c1';
+  if(v<-5)return'm3';if(v<-2)return'm2';if(v<0)return'm1';return'cz';
+}
+function badgeCls(v){
+  if(v==null||isNaN(v))return'z';
+  if(v>5)return'p3';if(v>2)return'p2';if(v>0)return'p1';
+  if(v<-5)return'n3';if(v<-2)return'n2';if(v<0)return'n1';return'z';
+}
+function avg(arr){const v=arr.filter(x=>x!=null&&!isNaN(x));return v.length?v.reduce((a,b)=>a+b,0)/v.length:null}
+function fmtPrice(p,sym){
+  if(p==null)return'–';
+  if(sym==='BTCUSD')return Math.round(p).toLocaleString('en-US');
+  if(p>1000)return p.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  return Number(p).toFixed(2);
+}
+
+function showScreen(name){
+  ['screen-key','screen-loading','screen-error','app'].forEach(id=>{
+    const el=$(id);if(!el)return;
+    el.style.display=id===name?(id==='app'?'flex':'flex'):'none';
+  });
+}
+function showKey(){showScreen('screen-key')}
+
+async function startWithKey() {
+  const k = $('key-input').value.trim();
+  if (!k || !k.startsWith('http')) {
+    $('key-err').textContent = 'אנא הזן כתובת חוקית שמתחילה ב-http';
+    $('key-err').style.display = 'block';
+    return;
+  }
+
+  const cleanUrl = k.endsWith('/') ? k.slice(0, -1) : k;
+  
+  // הפיכת הכפתור למצב טעינה
+  const btn = document.querySelector('.key-btn');
+  const originalText = btn.textContent;
+  btn.textContent = 'מוודא הרשאות...';
+  btn.style.opacity = '0.7';
+  btn.style.pointerEvents = 'none';
+
+  try {
+    // שליחת בדיקת "פינג" מהירה למשיכת נתון אחד (SPY)
+    const testUrl = `https://query1.finance.yahoo.com/v7/finance/spark?symbols=SPY&range=1d&interval=1d`;
+    const r = await fetch(`${cleanUrl}/?url=${encodeURIComponent(testUrl)}`);
+    const d = await r.json();
+
+    // אם קיבלנו בחזרה את המבנה המוכר של Yahoo - ה-Worker תקין!
+    if (d.spark && d.spark.result) {
+      $('key-err').style.display = 'none';
+      _proxyUrl = cleanUrl;
+      localStorage.setItem('app_proxy_url', _proxyUrl);
+      init(); // הכל תקין, מעבירים אותו פנימה
+    } else {
+      throw new Error('Invalid response');
+    }
+  } catch (e) {
+    // ה-Worker לא קיים, לא תקין, או שלא מכיל את הקוד הנכון
+    $('key-err').textContent = 'מפתח המערכת שגוי או שהשרת אינו מגיב.';
+    $('key-err').style.display = 'block';
+  } finally {
+    // החזרת הכפתור למצב רגיל
+    btn.textContent = originalText;
+    btn.style.opacity = '1';
+    btn.style.pointerEvents = 'auto';
+  }
+}
+
+// --- 3. Heatmap ---
+function renderHeatmap() {
+  const container = $('heatmap-container');
+  container.innerHTML = '';
+  
+  // אוספים את כל המניות ומסדרים לפי משקל כדי להציג את ה-60 המשפיעות ביותר
+  let uniqueHoldings = {};
+  Object.values(ETF_HOLDINGS).forEach(sector => {
+    sector.forEach(h => {
+      if(!uniqueHoldings[h.s] || uniqueHoldings[h.s] < h.w) uniqueHoldings[h.s] = h.w;
+    });
+  });
+  
+  let sortedSyms = Object.keys(uniqueHoldings).sort((a,b) => uniqueHoldings[b] - uniqueHoldings[a]).slice(0, 60);
+  
+  let html = '';
+  sortedSyms.forEach(sym => {
+    const quote = qmap[sym];
+    if(quote && quote.d1 !== undefined) {
+      const d1 = quote.d1;
+      let colorClass = 'hm-gray';
+      
+      // סולם הצבעים בהתאם לאחוז השינוי
+      if (d1 >= 2) colorClass = 'hm-green-3';
+      else if (d1 >= 0.7) colorClass = 'hm-green-2';
+      else if (d1 > 0) colorClass = 'hm-green-1';
+      else if (d1 <= -2) colorClass = 'hm-red-3';
+      else if (d1 <= -0.7) colorClass = 'hm-red-2';
+      else if (d1 < 0) colorClass = 'hm-red-1';
+
+      html += `<div class="hm-box ${colorClass}" title="${sym} \n שינוי: ${d1.toFixed(2)}%">${sym}</div>`;
+    }
+  });
+  
+  if(!html) html = '<div style="color:var(--dim); font-size:11px;">ממתין לנתוני שוק...</div>';
+  container.innerHTML = html;
+}
+
+// --- 4. Technical Momentum Screener (RSI) ---
+async function runTechScreener() {
+  $('tech-results').innerHTML = '<div class="mini-ring" style="margin: 20px auto;"></div><div style="text-align:center; color:var(--dim); font-size:11px;">מחשב מדד כוח יחסי (RSI) ל-40 מניות מובילות...</div>';
+
+  const holdingsSet = new Set();
+  Object.values(ETF_HOLDINGS).forEach(sector => sector.forEach(stock => holdingsSet.add(stock.s)));
+  const symbolsArray = Array.from(holdingsSet).slice(0, 40); // מדגם המניות
+
+  const signals = [];
+
+  await Promise.all(symbolsArray.map(async (sym) => {
+    const cleanSym = sym.replace('/', '-').replace('.', '-');
+    const cb = Math.floor(Date.now() / 10000);
+    // מושכים גרף יומי של 3 חודשים אחרונים לחישוב טכני
+    const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${cleanSym}?interval=1d&range=3mo&cb=${cb}`;
+    const proxyUrl = `${_proxyUrl}/?url=${encodeURIComponent(yahooUrl)}`;
+
+    try {
+      const r = await fetch(proxyUrl);
+      if (!r.ok) return;
+      const d = await r.json();
+      const result = d.chart?.result?.[0];
+      if (!result) return;
+
+      const closes = result.indicators?.quote?.[0]?.close || [];
+      const validCloses = closes.filter(c => c !== null);
+
+      if (validCloses.length > 20) {
+        // --- מתמטיקה של RSI (14 יום) לפי תקן Wilder ---
+        let avgGain = 0, avgLoss = 0;
+        
+        // ממוצע ראשוני (14 ימים ראשונים)
+        for(let i = 1; i <= 14; i++) {
+          let diff = validCloses[i] - validCloses[i-1];
+          if(diff > 0) avgGain += diff;
+          else avgLoss += Math.abs(diff);
+        }
+        avgGain /= 14;
+        avgLoss /= 14;
+        
+        // החלקת הממוצע (Smoothing) לשאר הימים
+        for(let i = 15; i < validCloses.length; i++) {
+          let diff = validCloses[i] - validCloses[i-1];
+          let gain = diff > 0 ? diff : 0;
+          let loss = diff < 0 ? Math.abs(diff) : 0;
+          avgGain = ((avgGain * 13) + gain) / 14;
+          avgLoss = ((avgLoss * 13) + loss) / 14;
+        }
+        
+        let rsi = 100;
+        if (avgLoss > 0) {
+          rsi = 100 - (100 / (1 + (avgGain / avgLoss)));
+        }
+
+        // חישוב ממוצע נע 20 (SMA) ומחיר נוכחי
+        const sma20 = validCloses.slice(-20).reduce((a,b)=>a+b,0) / 20;
+        const currentPrice = validCloses[validCloses.length - 1];
+        const vsSma = ((currentPrice - sma20) / sma20) * 100;
+
+        // שומרים רק מניות שיש להן איתות טכני מובהק
+        if (rsi < 40 || rsi > 65) {
+          signals.push({ sym, rsi, vsSma, price: currentPrice });
+        }
+      }
+    } catch (e) { }
+  }));
+
+  if (signals.length === 0) {
+    $('tech-results').innerHTML = '<div style="text-align:center; color:var(--dim); padding:10px;">לא נמצאו איתותי מומנטום חריגים כרגע.</div>';
+    return;
+  }
+
+  // ממיינים מה-RSI הנמוך ביותר (הכי Oversold) ומעלה
+  signals.sort((a,b) => a.rsi - b.rsi);
+
+  // יצירת ה-HTML של התוצאות
+// יצירת ה-HTML של התוצאות מרווח ומיושר
+  $('tech-results').innerHTML = signals.map((s, i) => {
+    // 1. הגדרות המומנטום (RSI)
+    const isOversold = s.rsi < 40;
+    const rsiText = isOversold ? 'מכירת יתר' : 'קניית יתר';
+    const rsiIcon = isOversold ? '🟢' : '🔴';
+    const badgeClass = isOversold ? 'oversold' : 'overbought';
+
+    // 2. הגדרות המגמה (ממוצע 20)
+    const isUp = s.vsSma > 0;
+    const trendColor = isUp ? 'var(--green)' : 'var(--red)';
+    const trendText = isUp ? 'מעל ממוצע 20' : 'מתחת ממוצע 20';
+    const sign = isUp ? '+' : '';
+
+    return `
+    <div class="screener-row" style="align-items:center; padding: 12px 10px; direction: rtl;">
+      
+      <div style="width: 50px; font-size:14px; font-weight:400; direction:ltr; text-align:right;">${s.sym}</div>
+
+      <div style="flex:1; display:flex; justify-content:space-evenly; align-items:center; padding: 0 10px;">
+        
+        <div style="display:flex; align-items:center; gap:6px; color:${trendColor}; font-size:12px; font-weight:400;">
+          <span>${trendText}</span>
+          <span style="direction:ltr; font-family:var(--mono); font-weight:400;">${sign}${s.vsSma.toFixed(1)}%</span>
+        </div>
+
+        <div class="tech-badge ${badgeClass}" style="display:flex; align-items:center; gap:4px; margin:0; padding:4px 8px; font-size:11px;">
+          <span>${rsiIcon}</span>
+          <span>${rsiText}</span>
+          <span style="direction:ltr; font-family:var(--mono); font-weight:400;">(RSI: ${s.rsi.toFixed(1)})</span>
+        </div>
+
+      </div>
+
+      <div style="width: 60px; font-family:var(--mono); font-size:14px; direction:ltr; font-weight:400; text-align:left;">$${s.price.toFixed(2)}</div>
+
+    </div>
+    `;
+  }).join('');
+}
+
+function logout() {
+  localStorage.removeItem('app_proxy_url');
+  location.reload();
+}
+
+function toggleMobileMenu(){
+  const m=$('mobile-menu');
+  const o=$('mob-overlay');
+  const isOpen = m.classList.contains('open');
+  if(isOpen){ closeMobileMenu(); return; }
+  m.classList.add('open');
+  if(o) o.classList.add('open');
+  const now=new Date();
+  const mobTs=$('mob-ts');
+  if(mobTs) mobTs.textContent=now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})+' · '+now.toLocaleDateString('he-IL');
+  const themeLbl=$('mob-theme-label');
+  if(themeLbl) themeLbl.textContent=document.body.classList.contains('light')?'מצב כהה':'מצב בהיר';
+}
+function closeMobileMenu(){
+  const m=$('mobile-menu');
+  const o=$('mob-overlay');
+  if(m) m.classList.remove('open');
+  if(o) o.classList.remove('open');
+}
+
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMobileMenu();closeModalDirect();}});
+
+// ── Yahoo Finance API only (Finnhub removed) ─────────
+
+async function fetchMarketNews() {
+  // נשתמש בנקודת החיפוש של יאהו כדי להביא 5 כתבות על שוק המניות
+  const cb = Math.floor(Date.now() / 10000);
+  const yahooUrl = `https://query2.finance.yahoo.com/v1/finance/search?q=stock+market&newsCount=5&cb=${cb}`;
+  const proxyUrl = `${_proxyUrl}/?url=${encodeURIComponent(yahooUrl)}`;  
+  
+  try {
+    const r = await fetch(proxyUrl);
+    if (!r.ok) return;
+    const d = await r.json();
+    const news = d.news || [];
+    
+    if (news.length === 0) {
+      $('news-grid').innerHTML = '<div style="color:var(--dim); font-size:12px;">לא נמצאו חדשות כרגע.</div>';
+      return;
+    }
+
+	$('news-grid').innerHTML = news.map(item => {
+      const date = new Date(item.providerPublishTime * 1000).toLocaleTimeString('he-IL', {hour: '2-digit', minute: '2-digit'});
+      return `
+        <a href="${item.link}" target="_blank" class="news-card">
+          <div class="news-title">${item.title}</div>
+          <div class="news-meta">
+            <span class="news-time">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              ${date}
+            </span>
+            <span class="news-source">${item.publisher}</span>
+          </div>
+        </a>
+      `;
+    }).join('');
+  } catch (e) {
+    console.error("Error fetching news", e);
+    $('news-grid').innerHTML = '<div style="color:var(--red); font-size:12px;">שגיאה בטעינת חדשות.</div>';
+  }
+}
+
+async function fetchAndRenderMovers() {
+  // 1. אוספים את כל הסמלים הייחודיים מתוך המילון של הסקטורים (220 מניות)
+  const holdingsSet = new Set();
+  Object.values(ETF_HOLDINGS).forEach(sector => {
+    sector.forEach(stock => holdingsSet.add(stock.s));
+  });
+  const holdingSymbols = Array.from(holdingsSet);
+
+  // 2. מושכים את כל ה-220 מניות בבקשה מרוכזת אחת מ-Yahoo!
+  const newQuotes = await fetchYahooQuotesBatch(holdingSymbols);
+  Object.assign(qmap, newQuotes); // מעדכנים את מילון המחירים הראשי
+
+  // 3. מרנדרים את הפאנל
+  renderMovers(holdingsSet);
+}
+
+function renderMovers(holdingsSet) {
+  const validMovers = [];
+  
+  // מסננים החוצה מניות שאין להן נתונים
+  holdingsSet.forEach(sym => {
+    const d = qmap[sym];
+    if (d && d.d1 != null && !isNaN(d.d1)) {
+      validMovers.push({ sym: sym, d1: d.d1 });
+    }
+  });
+
+  if (validMovers.length === 0) {
+    $('movers-grid').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--dim);">אין נתונים זמינים כרגע</div>';
+    return;
+  }
+
+  // ממיינים מהגבוה לנמוך
+  validMovers.sort((a, b) => b.d1 - a.d1);
+
+  // לוקחים את 5 העולות הכי הרבה ואת 5 היורדות הכי הרבה
+  const topGainers = validMovers.slice(0, 5);
+  const topLosers = validMovers.slice(-5).reverse();
+
+  // פונקציית עזר ליצירת שורות
+  const buildRows = (items, isUp) => items.map(item => `
+    <div class="mover-row">
+      <span class="mover-sym">${item.sym}</span>
+      <span class="mover-val ${isUp ? 'up' : 'down'}">${item.d1 > 0 ? '+' : ''}${item.d1.toFixed(2)}%</span>
+    </div>
+  `).join('');
+
+  $('movers-grid').innerHTML = `
+    <div>
+      <div class="mover-col-title green">🚀 מזנקות</div>
+      <div class="mover-col-inner">${buildRows(topGainers, true)}</div>
+    </div>
+    <div>
+      <div class="mover-col-title red">📉 צוללות</div>
+      <div class="mover-col-inner">${buildRows(topLosers, false)}</div>
+    </div>
+  `;
+}
+
+async function fetchHistoricalReturns(sym) {
+  const cb = Math.floor(Date.now() / 10000);
+  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=1y&interval=1d&cb=${cb}`;
+  const proxyUrl = `${_proxyUrl}/?url=${encodeURIComponent(yahooUrl)}`;  
+  try {
+    const r = await fetch(proxyUrl);
+    if (!r.ok) return {};
+    const d = await r.json();
+    const result = d.chart?.result?.[0];
+    const prices = result?.indicators?.quote?.[0]?.close?.filter(p => p != null);
+    const timestamps = result?.timestamp;
+    if (!prices || prices.length === 0) return {};
+    const current = prices[prices.length - 1];
+    const getPct = (daysBack) => {
+      const idx = Math.max(0, prices.length - 1 - daysBack);
+      if (!prices[idx]) return null;
+      return ((current - prices[idx]) / prices[idx]) * 100;
+    };
+    // 52w high/low
+    const hi52 = Math.max(...prices);
+    const lo52 = Math.min(...prices);
+    const fromHi = ((current - hi52) / hi52) * 100; // שלילי
+    const fromLo = ((current - lo52) / lo52) * 100; // חיובי
+    // YTD — מוצאים את מחיר פתיחת השנה
+    let ytd = null;
+    if (timestamps) {
+      const yearStart = new Date(new Date().getFullYear(), 0, 1).getTime() / 1000;
+      const ytdIdx = timestamps.findIndex(t => t >= yearStart);
+      if (ytdIdx >= 0 && prices[ytdIdx]) ytd = ((current - prices[ytdIdx]) / prices[ytdIdx]) * 100;
+    }
+    // raw prices for correlation
+    const rawPrices = prices;
+    // חישוב ממוצע נפח 20 יום מהנתונים ההיסטוריים
+    const volumes = result?.indicators?.quote?.[0]?.volume?.filter(v => v != null && v > 0) || [];
+    const avgVol = volumes.length >= 5 ? Math.round(volumes.slice(-20).reduce((a,b)=>a+b,0) / Math.min(20, volumes.slice(-20).length)) : null;
+    return { w1:getPct(5), m1:getPct(21), m3:getPct(63), m6:getPct(126), y1:getPct(252), fromHi, fromLo, ytd, rawPrices, avgVol };
+  } catch (e) {
+    console.error("Error fetching history for " + sym, e);
+    return {};
+  }
+}
+
+async function fetchYahooQuotesBatch(symbolsArray) {
+  if (!symbolsArray || symbolsArray.length === 0) return {};
+  
+  const chunkSize = 20; // נחלק את הבקשה לקבוצות של 40 מניות כדי לא להכעיס את יאהו
+  const allQuotes = {};
+  
+  // פיצול המערך הגדול לתת-מערכים קטנים
+  const chunks = [];
+  for (let i = 0; i < symbolsArray.length; i += chunkSize) {
+    chunks.push(symbolsArray.slice(i, i + chunkSize));
+  }
+
+  // שולחים את כל הבקשות במקביל (Parallel) כדי לשמור על מהירות שיא
+  await Promise.all(chunks.map(async (chunk) => {
+    const yahooSymbols = chunk.map(s => s.replace('/', '-').replace('.', '-'));
+    const symbolsStr = yahooSymbols.join(',');
+    const cb = Math.floor(Date.now() / 10000); 
+    
+    const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/spark?symbols=${symbolsStr}&range=1d&interval=1d&cb=${cb}`;
+    const proxyUrl = `${_proxyUrl}/?url=${encodeURIComponent(yahooUrl)}`;
+	
+    try {
+      const r = await fetch(proxyUrl);
+      if (!r.ok) return;
+      const d = await r.json();
+      const results = d.spark?.result || [];
+
+      for (const res of results) {
+        const meta = res.response?.[0]?.meta;
+        if (!meta) continue;
+
+        const price = meta.regularMarketPrice;
+        const prev = meta.chartPreviousClose || meta.previousClose;
+        
+        let d1 = 0;
+        if (price && prev) {
+          d1 = ((price - prev) / prev) * 100;
+        }
+
+        const originalSym = chunk.find(s => s.replace('/', '-').replace('.', '-') === res.symbol) || res.symbol;
+        
+        allQuotes[originalSym] = {
+          price: price,
+          d1: d1,
+          prev: prev,
+          vol: meta.regularMarketVolume || null,
+          avgVol: meta.averageDailyVolume3Month || meta.averageDailyVolume10Day || null,
+        };
+      }
+    } catch (e) {
+      console.error("Error fetching Yahoo chunk", e);
+    }
+  }));
+
+  return allQuotes; // מחזירים את כל הנתונים שאספנו מכל המנות
+}
+
+// ── Render helpers ──────────────────────────────────
+let qmap={};
+const histMap={};
+
+function renderTicker(){
+  const items=[...INDICES,...OTHER].map(s=>{
+    const d=qmap[s.sym]||{};
+    const col=(d.d1||0)>0?'#00e87a':(d.d1||0)<0?'#ff3a5c':'#4a6480';
+    const arrow=(d.d1||0)>0?'▲':(d.d1||0)<0?'▼':'–';
+    return`<span class="tick-item"><span class="tick-sym">${s.sym}</span><span class="tick-price">${fmtPrice(d.price,s.sym)}</span><span class="tick-chg" style="color:${col}">${arrow} ${pct(d.d1)}</span></span><div class="tick-sep"></div>`;
+  }).join('');
+  $('ticker').innerHTML=items+items;
+}
+
+function renderCards(elId,items,labels,keys){
+  $(elId).innerHTML=items.map(s=>{
+    const d=qmap[s.sym]||{};
+    const col=(d.d1||0)>0?'var(--green)':(d.d1||0)<0?'var(--red)':'var(--text)';
+    const badges=labels.map((l,i)=>{
+      const v=d[keys[i]];
+      return`<div class="b ${badgeCls(v)}"><span class="bl">${l}</span>${pct(v)}</div>`;
+    }).join('');
+    return`<div class="idx"><div class="idx-sym">${s.sym}</div><div class="idx-name">${s.name}</div><div class="idx-price" style="color:${col}">${fmtPrice(d.price,s.sym)}</div><div class="badges">${badges}</div></div>`;
+  }).join('');
+}
+
+function renderPositivity(){
+  const vals=ALL.map(s=>(qmap[s.sym]||{}).d1).filter(v=>v!=null&&!isNaN(v));
+  const pos=vals.filter(v=>v>0).length;
+  const p=Math.round(pos/vals.length*100);
+  $('pos-fill').style.cssText=`width:${p}%;background:${p>=50?'var(--green)':'var(--red)'}`;
+  $('pos-pct').style.color=p>=50?'var(--green)':'var(--red)';
+  $('pos-pct').textContent=p+'%';
+  $('pos-mood').textContent=`(${pos}/${vals.length}) — ${p>=70?'יום חיובי מאוד':p>=50?'מעורב-חיובי':p>=30?'מעורב-שלילי':'שלילי חזק'}`;
+}
+
+// --- LAB LOGIC ---
+
+function openLabModal() {
+  $('lab-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  
+  // אכלוס רשימות הבחירה בסימולטור
+  const allOptions = ALL.map(s => `<option value="${s.sym}">${s.sym} - ${s.name}</option>`).join('');
+  ['sim-sel-1', 'sim-sel-2', 'sim-sel-3'].forEach(id => {
+    const el = $(id);
+    if(el.innerHTML === '') {
+      el.innerHTML = '<option value="">-- בחר נכס --</option>' + allOptions;
+    }
+  });
+}
+
+function closeLab(e) { if(e.target === $('lab-overlay')) closeLabDirect(); }
+function closeLabDirect() {
+  $('lab-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// 1. Simulator & Risk
+function runSimulator() {
+  let totalW = 0;
+  let dayReturn = 0;
+  let yearReturn = 0;
+  let techCount = 0; // לזיהוי חפיפת טכנולוגיה
+  
+  for(let i=1; i<=3; i++) {
+    const sym = $(`sim-sel-${i}`).value;
+    const w = parseFloat($(`sim-w-${i}`).value) || 0;
+    
+    if (sym && w > 0) {
+      totalW += w;
+      const liveData = qmap[sym] || {};
+      const histData = histMap[sym] || {};
+      
+      if (liveData.d1) dayReturn += (liveData.d1 * (w / 100));
+      if (histData.y1) yearReturn += (histData.y1 * (w / 100));
+      
+      if (['XLK', 'XLC', 'QQQ'].includes(sym)) techCount++;
+    }
+  }
+
+  if (totalW === 0 || totalW > 100) {
+    alert("נא לוודא שהמשקלים תקינים ומסתכמים לעד 100%");
+    return;
+  }
+
+  const dEl = $('sim-res-day');
+  dEl.textContent = dayReturn > 0 ? '+' + dayReturn.toFixed(2) + '%' : dayReturn.toFixed(2) + '%';
+  dEl.className = 'lab-result ' + (dayReturn >= 0 ? 'green' : 'red');
+
+  const yEl = $('sim-res-year');
+  yEl.textContent = yearReturn > 0 ? '+' + yearReturn.toFixed(2) + '%' : yearReturn.toFixed(2) + '%';
+  yEl.className = 'lab-result ' + (yearReturn >= 0 ? 'green' : 'red');
+
+  // פסיכולוגיה של פיזור
+  let riskMsg = "🛡️ פיזור טוב: התיק שלך משלב נכסים שונים.";
+  if (techCount >= 2) riskMsg = "⚠️ סכנת חפיפה: בחרת נכסים עם קורלציה גבוהה (הטיית טכנולוגיה). התנודתיות תהיה חזקה.";
+  if (totalW < 100) riskMsg += ` (נשאר במזומן: ${100 - totalW}%)`;
+  $('sim-risk').textContent = riskMsg;
+}
+
+// 2. Dividend Screener
+async function runScreener() {
+  $('screener-results').innerHTML = '<div class="mini-ring" style="margin: 20px auto;"></div><div style="text-align:center; color:var(--dim); font-size:11px;">מחשב תשואות דיבידנד מתוך היסטוריית הגרפים (עוקף חסימות)...</div>';
+  
+  // אוספים את כל המניות מהאחזקות שלנו
+  const holdingsSet = new Set();
+  Object.values(ETF_HOLDINGS).forEach(sector => sector.forEach(stock => holdingsSet.add(stock.s)));
+  
+  // לוקחים מדגם של 40 חברות גדולות כדי שהסריקה תהיה חלקה ומהירה
+  const symbolsArray = Array.from(holdingsSet).slice(0, 40); 
+  
+  const dividendStocks = [];
+
+  // סורקים כל מניה מול נקודת הקצה של הגרפים שאינה חסומה (v8/chart)
+  await Promise.all(symbolsArray.map(async (sym) => {
+    const cleanSym = sym.replace('/', '-').replace('.', '-');
+    const cb = Math.floor(Date.now() / 10000);
+    
+    // אנו מבקשים טווח של שנה אחרונה (1y) ורק אירועי דיבידנד (events=div)
+    const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${cleanSym}?interval=1mo&range=1y&events=div&cb=${cb}`;
+    const proxyUrl = `${_proxyUrl}/?url=${encodeURIComponent(yahooUrl)}`;
+    
+    try {
+      const r = await fetch(proxyUrl);
+      if (!r.ok) return;
+      const d = await r.json();
+      
+      const result = d.chart?.result?.[0];
+      if (!result) return;
+
+      const price = result.meta?.regularMarketPrice;
+      const dividends = result.events?.dividends; // מילון של כל הדיבידנדים שחולקו בשנה האחרונה
+      
+      if (price && dividends) {
+        let totalDivCash = 0;
+        
+        // סוכמים את כל המזומן שחולק בפועל למניה בשנה האחרונה
+        Object.values(dividends).forEach(div => {
+          totalDivCash += (div.amount || 0);
+        });
+        
+        // חישוב התשואה השנתית באחוזים (סך המזומן חלקי מחיר המניה הנוכחי)
+        if (totalDivCash > 0) {
+          const yieldPct = (totalDivCash / price) * 100;
+          dividendStocks.push({ sym: sym, yield: yieldPct });
+        }
+      }
+    } catch (e) {
+      // אם מניה נכשלה או שאין לה נתונים, פשוט נדלג עליה בשקט
+    }
+  }));
+
+  // ממיינים מהתשואה הגדולה לקטנה
+  dividendStocks.sort((a, b) => b.yield - a.yield);
+  const top10 = dividendStocks.slice(0, 10);
+      
+  if (top10.length === 0) {
+    $('screener-results').innerHTML = '<div style="text-align:center; color:var(--red); padding:10px;">לא נמצאו נתוני דיבידנד זמינים.</div>';
+    return;
+  }
+
+  // מציגים את 10 החברות המובילות
+  $('screener-results').innerHTML = top10.map((s, i) => `
+    <div class="screener-row">
+      <span>${i+1}. <b>${s.sym}</b></span>
+      <span style="color:var(--green)">${s.yield.toFixed(2)}% תשואה שנתית</span>
+    </div>
+  `).join('');
+}
+
+function renderSectorsWithSkeleton(){
+  const sk='<td class="lc">&nbsp;</td>';
+  const frozenRows = SECTORS.map(s =>
+    `<div class="tbl-frozen-row"><span class="sym">${s.sym}</span>${s.name}</div>`
+  ).join('') + '<div class="tbl-frozen-row tbl-frozen-avg">ממוצע</div>';
+  $('sector-frozen').innerHTML = '<div class="tbl-frozen-hdr">סקטור</div>' + frozenRows;
+
+  // כל התאים skeleton — נתונים מגיעים יחד בסוף
+  const rows = SECTORS.map(() =>
+    `<tr>${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}</tr>`
+  );
+  rows.push(`<tr class="avgrow">${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}<td class="lc">&nbsp;</td><td class="lc">&nbsp;</td></tr>`);
+  $('sector-tbody').innerHTML = rows.join('');
+  syncFrozenRows();
+}
+
+let _syncTimer = null;
+function syncFrozenRows() {
+  if (_syncTimer) clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(_doSyncFrozenRows, 30);
+}
+function _doSyncFrozenRows() {
+  const rows = document.querySelectorAll('#sector-tbody tr');
+  const frozenRows = document.querySelectorAll('#sector-frozen .tbl-frozen-row');
+  const th = document.querySelector('.t th');
+  const fh = document.querySelector('.tbl-frozen-hdr');
+  if (th && fh) fh.style.height = th.offsetHeight + 'px';
+  rows.forEach((tr, i) => {
+    if (frozenRows[i]) frozenRows[i].style.height = tr.offsetHeight + 'px';
+  });
+}
+// ResizeObserver fires whenever table re-layouts — works on all devices
+function initSyncObserver() {
+  const tbody = document.getElementById('sector-tbody');
+  if (!tbody || !window.ResizeObserver) return;
+  new ResizeObserver(() => syncFrozenRows()).observe(tbody);
+}
+
+function renderSectors(){
+  // עמודת שמות קפואה (לא sticky — אין ריצוד)
+  const frozen = $('sector-frozen');
+  if(frozen) frozen.innerHTML = '<div class="tbl-frozen-hdr">סקטור</div>'
+    + SECTORS.map(s=>`<div class="tbl-frozen-row" onclick="openSectorModal('${s.sym}','${s.name}')" style="cursor:pointer"><span class="sym">${s.sym}</span>${s.name}</div>`).join('')
+    + '<div class="tbl-frozen-row tbl-frozen-avg">ממוצע סקטורים</div>';
+
+  // טבלת נתונים (ללא עמודת שמות)
+  const rows=SECTORS.map(s=>{
+    const d=qmap[s.sym]||{};
+    const h=histMap[s.sym]||{};
+    const vals=[d.d1,h.w1,h.m1,h.m3,h.m6,h.y1];
+    const a=avg(vals);
+    const td=(v,cls='')=>`<td class="${cellCls(v)}${cls?' '+cls:''}">${pct(v)}</td>`;
+    const hiTd = h.fromHi!=null ? `<td class="hi52">${pct(h.fromHi)}</td>` : '<td style="color:var(--dim)">–</td>';
+    const loTd = h.fromLo!=null ? `<td class="lo52">${pct(h.fromLo)}</td>` : '<td style="color:var(--dim)">–</td>';
+    let volTd = '<td style="color:var(--dim)">–</td>';
+    const todayVol = d.vol, avgVol20 = h.avgVol;
+    if (todayVol && avgVol20 && avgVol20 > 0) {
+      const vr = todayVol / avgVol20;
+      const vi = vr > 1.5 ? '🔥' : vr > 1.1 ? '▲' : vr < 0.6 ? '💤' : vr < 0.9 ? '▼' : '●';
+      const vc = vr > 1.5 ? 'vol-high' : vr < 0.7 ? 'vol-low' : 'vol-norm';
+      volTd = `<td class="${vc}" title="${(vr*100).toFixed(0)}% מהממוצע">${vi} ${(vr*100).toFixed(0)}%</td>`;
+    }
+    return`<tr onclick="openSectorModal('${s.sym}','${s.name}')" title="לחץ לראות אחזקות">
+      ${td(d.d1)}${td(h.w1)}${td(h.m1)}${td(h.m3)}${td(h.m6)}${td(h.y1)}${hiTd}${loTd}${volTd}
+      ${getSectorMacroTd(s.sym)}
+      <td class="${cellCls(a)}">${pct(a)}</td>
+    </tr>`;
+  });
+  const periodAvgs=[0,1,2,3,4,5].map(pi=>avg(SECTORS.map(s=>{
+    const d=qmap[s.sym]||{},h=histMap[s.sym]||{};
+    return[d.d1,h.w1,h.m1,h.m3,h.m6,h.y1][pi];
+  })));
+  const ov=avg(periodAvgs);
+  rows.push(`<tr class="avgrow">
+    ${periodAvgs.map((v)=>`<td class="${cellCls(v)}">${pct(v)}</td>`).join('')}<td></td><td></td><td></td><td></td>
+    <td class="${cellCls(ov)}"><b>${pct(ov)}</b></td>
+  </tr>`);
+  $('sector-tbody').innerHTML=rows.join('');
+  syncFrozenRows();
+}
+
+function renderSummary(){
+  const dv=SECTORS.map(s=>({s,v:(qmap[s.sym]||{}).d1})).filter(x=>x.v!=null&&!isNaN(x.v)).sort((a,b)=>b.v-a.v);
+  if(!dv.length)return;
+  const pos=dv.filter(x=>x.v>0).length;
+  const a=avg(dv.map(x=>x.v));
+  const best=dv[0],worst=dv[dv.length-1];
+  $('summary').innerHTML=`
+    <div class="sum-card"><div class="sum-card-label">חיוביים</div><div class="sum-card-val" style="color:${pos>0?'var(--green)':'var(--red)'}">${pos}</div><div class="sum-card-sub">מתוך ${SECTORS.length} סקטורים</div></div>
+    <div class="sum-card"><div class="sum-card-label">ממוצע יומי</div><div class="sum-card-val" style="color:${(a||0)>=0?'var(--green)':'var(--red)'}">${pct(a)}</div><div class="sum-card-sub">כל הסקטורים</div></div>
+    <div class="sum-card"><div class="sum-card-label">הכי חזק</div><div class="sum-card-val" style="color:var(--green);font-size:15px">${best?.s?.sym||'–'}</div><div class="sum-card-sub" style="color:var(--green)">${pct(best?.v)} ${best?.s?.name||''}</div></div>
+    <div class="sum-card"><div class="sum-card-label">הכי חלש</div><div class="sum-card-val" style="color:var(--red);font-size:15px">${worst?.s?.sym||'–'}</div><div class="sum-card-sub" style="color:var(--red)">${pct(worst?.v)} ${worst?.s?.name||''}</div></div>`;
+}
+
+function drawChart(){
+  const sorted = SECTORS.map(s => ({name: s.sym, v: (qmap[s.sym]||{}).d1 || 0})).sort((a,b) => b.v - a.v);
+  const canvas = $('chart');
+  const n = sorted.length, BAR = 18, GAP = 4, PT = 6;
+  canvas.height = n * (BAR + GAP) + PT + 8;
+  const W = canvas.width, H = canvas.height, ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  // 1. צבעים עדינים ודינמיים (תמיכה במצב בהיר/כהה ומניעת סנוור)
+  const isL = document.body.classList.contains('light');
+  const greenFill = isL ? 'rgba(0, 144, 74, 0.15)' : 'rgba(0, 232, 122, 0.12)';
+  const greenStroke = isL ? '#00904a' : '#00e87a';
+  const redFill = isL ? 'rgba(204, 26, 58, 0.15)' : 'rgba(255, 58, 92, 0.12)';
+  const redStroke = isL ? '#cc1a3a' : '#ff3a5c';
+  const textColor = isL ? '#0e1e34' : '#ccd8ea';
+  const gridColor = isL ? '#d0daea' : '#1e3550';
+  const zeroColor = isL ? '#7090b0' : '#3d5470';
+
+  // 2. מתמטיקה מדויקת למניעת גלישה!
+  const maxAbs = Math.max(...sorted.map(s => Math.abs(s.v)), 0.5);
+  const ZERO = 120; // קו האפס הוזז ימינה כדי להבטיח מקום לצד השלילי (מינוס)
+  const maxBw = 75; // הגבלת רוחב העמודה כך שתמיד יישאר מקום לטקסט האחוזים בצדדים
+
+  // ציור קווי רקע
+  ctx.strokeStyle = gridColor; ctx.lineWidth = 1;
+  [-3, -2, -1, 1, 2, 3].forEach(v => {
+    const x = ZERO + (v / maxAbs) * maxBw;
+    if(x > 10 && x < W - 40) { 
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+  });
+  
+  // ציור קו האפס במרכז היחסי
+  ctx.strokeStyle = zeroColor; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(ZERO, 0); ctx.lineTo(ZERO, H); ctx.stroke();
+
+  // ציור העמודות והטקסטים
+  sorted.forEach((s, i) => {
+    const y = PT + i * (BAR + GAP);
+    const v = s.v;
+    const pos = v >= 0;
+    
+    // חישוב רוחב ומיקום מדויק
+    const bw = (Math.abs(v) / maxAbs) * maxBw;
+    const bx = pos ? ZERO : ZERO - bw;
+
+    // מילוי וגבול העמודה (חצי שקוף ומודרני, ללא צללים)
+    ctx.fillStyle = pos ? greenFill : redFill;
+    ctx.fillRect(bx, y, bw || 1, BAR);
+    ctx.strokeStyle = pos ? greenStroke : redStroke;
+    ctx.lineWidth = 1;
+    if(bw > 1) ctx.strokeRect(bx, y, bw, BAR);
+
+    // טקסט: שם הסקטור (צד ימין)
+    ctx.fillStyle = textColor;
+    ctx.font = '11px Rubik, Assistant, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(s.name, W - 4, y + BAR - 4);
+
+    // טקסט: אחוזים ממוקמים בטוח (צמוד לעמודה מבחוץ)
+    ctx.fillStyle = pos ? greenStroke : redStroke;
+    ctx.font = 'bold 11px "JetBrains Mono", monospace';
+    ctx.textAlign = pos ? 'left' : 'right';
+    ctx.fillText(pct(v), pos ? ZERO + bw + 5 : ZERO - bw - 5, y + BAR - 4);
+  });
+}
+
+
+// ── THEME ──────────────────────────────────────────
+let isDark = !document.body.classList.contains('light');
+const moonSVG=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+const sunSVG=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+function toggleTheme(){
+  isDark=!isDark;
+  document.body.classList.toggle('light',!isDark);
+  $('theme-btn').innerHTML=isDark?moonSVG:sunSVG;
+  drawChart();
+}
+
+// ── SECTOR HOLDINGS (hardcoded, SPDR Q1 2025) ─────
+const ETF_HOLDINGS={
+  XLK:[
+    {s:'NVDA',n:'NVIDIA',w:23.1},{s:'MSFT',n:'Microsoft',w:20.8},{s:'AAPL',n:'Apple',w:18.4},
+    {s:'AVGO',n:'Broadcom',w:4.9},{s:'ORCL',n:'Oracle',w:3.6},{s:'AMD',n:'AMD',w:2.4},
+    {s:'NOW',n:'ServiceNow',w:2.1},{s:'PLTR',n:'Palantir',w:1.9},{s:'CRM',n:'Salesforce',w:1.7},
+    {s:'CSCO',n:'Cisco',w:1.5},{s:'ACN',n:'Accenture',w:1.4},{s:'IBM',n:'IBM',w:1.2},
+    {s:'ADBE',n:'Adobe',w:1.1},{s:'QCOM',n:'Qualcomm',w:1.0},{s:'TXN',n:'Texas Instruments',w:0.9},
+    {s:'INTU',n:'Intuit',w:0.8},{s:'MU',n:'Micron',w:0.7},{s:'AMAT',n:'Applied Materials',w:0.7},
+    {s:'LRCX',n:'Lam Research',w:0.6},{s:'ADI',n:'Analog Devices',w:0.5}
+  ],
+  XLF:[
+    {s:'BRK/B',n:'Berkshire Hathaway',w:13.2},{s:'JPM',n:'JPMorgan Chase',w:12.8},{s:'V',n:'Visa',w:8.4},
+    {s:'MA',n:'Mastercard',w:6.9},{s:'BAC',n:'Bank of America',w:4.1},{s:'WFC',n:'Wells Fargo',w:3.8},
+    {s:'GS',n:'Goldman Sachs',w:3.2},{s:'MS',n:'Morgan Stanley',w:2.9},{s:'SPGI',n:'S&P Global',w:2.7},
+    {s:'BLK',n:'BlackRock',w:2.5},{s:'AXP',n:'American Express',w:2.3},{s:'C',n:'Citigroup',w:2.0},
+    {s:'PGR',n:'Progressive',w:1.9},{s:'COF',n:'Capital One',w:1.7},{s:'ICE',n:'ICE',w:1.5},
+    {s:'CME',n:'CME Group',w:1.4},{s:'CB',n:'Chubb',w:1.3},{s:'MMC',n:'Marsh & McLennan',w:1.1},
+    {s:'SCHW',n:'Charles Schwab',w:1.0},{s:'USB',n:'U.S. Bancorp',w:0.9}
+  ],
+  XLE:[
+    {s:'XOM',n:'ExxonMobil',w:23.4},{s:'CVX',n:'Chevron',w:15.2},{s:'COP',n:'ConocoPhillips',w:8.1},
+    {s:'EOG',n:'EOG Resources',w:5.3},{s:'SLB',n:'Schlumberger',w:4.2},{s:'MPC',n:'Marathon Petroleum',w:3.8},
+    {s:'PSX',n:'Phillips 66',w:3.4},{s:'VLO',n:'Valero Energy',w:3.1},{s:'OXY',n:'Occidental',w:2.8},
+    {s:'HAL',n:'Halliburton',w:2.5},{s:'DVN',n:'Devon Energy',w:2.2},{s:'FANG',n:'Diamondback Energy',w:2.0},
+    {s:'HES',n:'Hess',w:1.9},{s:'BKR',n:'Baker Hughes',w:1.7},{s:'TRGP',n:'Targa Resources',w:1.5},
+    {s:'WMB',n:'Williams Companies',w:1.4},{s:'KMI',n:'Kinder Morgan',w:1.2},{s:'OKE',n:'ONEOK',w:1.1},
+    {s:'EQT',n:'EQT Corp',w:0.9},{s:'MRO',n:'Marathon Oil',w:0.8}
+  ],
+  XLV:[
+    {s:'UNH',n:'UnitedHealth',w:12.5},{s:'LLY',n:'Eli Lilly',w:11.8},{s:'ABBV',n:'AbbVie',w:8.2},
+    {s:'JNJ',n:'Johnson & Johnson',w:7.4},{s:'MRK',n:'Merck',w:6.1},{s:'TMO',n:'Thermo Fisher',w:4.3},
+    {s:'ABT',n:'Abbott Labs',w:3.9},{s:'DHR',n:'Danaher',w:3.5},{s:'ISRG',n:'Intuitive Surgical',w:3.2},
+    {s:'BSX',n:'Boston Scientific',w:2.8},{s:'SYK',n:'Stryker',w:2.6},{s:'VRTX',n:'Vertex Pharma',w:2.3},
+    {s:'REGN',n:'Regeneron',w:2.1},{s:'CI',n:'Cigna',w:1.9},{s:'ELV',n:'Elevance Health',w:1.7},
+    {s:'HUM',n:'Humana',w:1.5},{s:'ZTS',n:'Zoetis',w:1.4},{s:'MRNA',n:'Moderna',w:1.2},
+    {s:'MCK',n:'McKesson',w:1.1},{s:'A',n:'Agilent',w:0.9}
+  ],
+  XLC:[
+    {s:'META',n:'Meta Platforms',w:22.6},{s:'GOOGL',n:'Alphabet A',w:15.3},{s:'GOOG',n:'Alphabet C',w:13.1},
+    {s:'NFLX',n:'Netflix',w:7.8},{s:'T',n:'AT&T',w:4.2},{s:'VZ',n:'Verizon',w:3.8},
+    {s:'CHTR',n:'Charter Comm',w:3.1},{s:'TMUS',n:'T-Mobile',w:2.9},{s:'EA',n:'Electronic Arts',w:2.4},
+    {s:'TTWO',n:'Take-Two Interactive',w:1.8},{s:'LYV',n:'Live Nation',w:1.6},{s:'IPG',n:'Interpublic',w:1.4},
+    {s:'OMC',n:'Omnicom',w:1.3},{s:'MTCH',n:'Match Group',w:1.1},{s:'PARA',n:'Paramount',w:0.9},
+    {s:'WBD',n:'Warner Bros Discovery',w:0.8},{s:'FOXA',n:'Fox Corp A',w:0.7},{s:'DIS',n:'Disney',w:0.6}
+  ],
+  XLI:[
+    {s:'RTX',n:'RTX Corp (Raytheon)',w:6.8},{s:'HON',n:'Honeywell',w:6.2},{s:'CAT',n:'Caterpillar',w:5.9},
+    {s:'GE',n:'GE Aerospace',w:5.4},{s:'UNP',n:'Union Pacific',w:4.8},{s:'DE',n:'John Deere',w:4.3},
+    {s:'ETN',n:'Eaton',w:4.0},{s:'LMT',n:'Lockheed Martin',w:3.7},{s:'UPS',n:'UPS',w:3.4},
+    {s:'PH',n:'Parker Hannifin',w:3.1},{s:'ITW',n:'Illinois Tool Works',w:2.9},{s:'WM',n:'Waste Management',w:2.7},
+    {s:'EMR',n:'Emerson Electric',w:2.5},{s:'NOC',n:'Northrop Grumman',w:2.3},{s:'GD',n:'General Dynamics',w:2.1},
+    {s:'CSX',n:'CSX',w:2.0},{s:'NSC',n:'Norfolk Southern',w:1.9},{s:'FDX',n:'FedEx',w:1.7},
+    {s:'AXON',n:'Axon Enterprise',w:1.5},{s:'VRSK',n:'Verisk',w:1.3}
+  ],
+  XLB:[
+    {s:'LIN',n:'Linde',w:17.8},{s:'SHW',n:'Sherwin-Williams',w:8.4},{s:'FCX',n:'Freeport-McMoRan',w:7.2},
+    {s:'APD',n:'Air Products',w:6.1},{s:'ECL',n:'Ecolab',w:5.3},{s:'NEM',n:'Newmont',w:4.8},
+    {s:'NUE',n:'Nucor',w:4.2},{s:'ALB',n:'Albemarle',w:3.6},{s:'PPG',n:'PPG Industries',w:3.3},
+    {s:'DD',n:'DuPont',w:3.0},{s:'VMC',n:'Vulcan Materials',w:2.8},{s:'MLM',n:'Martin Marietta',w:2.6},
+    {s:'CE',n:'Celanese',w:2.3},{s:'MOS',n:'Mosaic',w:2.1},{s:'IFF',n:'Intl Flavors',w:1.9},
+    {s:'BALL',n:'Ball Corp',w:1.7},{s:'AVY',n:'Avery Dennison',w:1.5},{s:'FMC',n:'FMC Corp',w:1.3},
+    {s:'CF',n:'CF Industries',w:1.2},{s:'CTVA',n:'Corteva',w:1.0}
+  ],
+  XLRE:[
+    {s:'AMT',n:'American Tower',w:11.2},{s:'PLD',n:'Prologis',w:10.5},{s:'CCI',n:'Crown Castle',w:7.8},
+    {s:'EQIX',n:'Equinix',w:7.3},{s:'PSA',n:'Public Storage',w:5.9},{s:'SBAC',n:'SBA Comm',w:4.8},
+    {s:'O',n:'Realty Income',w:4.5},{s:'DLR',n:'Digital Realty',w:4.2},{s:'WY',n:'Weyerhaeuser',w:3.9},
+    {s:'EXR',n:'Extra Space Storage',w:3.6},{s:'SPG',n:'Simon Property',w:3.3},{s:'AVB',n:'AvalonBay',w:3.0},
+    {s:'EQR',n:'Equity Residential',w:2.8},{s:'VTR',n:'Ventas',w:2.6},{s:'ARE',n:'Alexandria RE',w:2.4},
+    {s:'ESS',n:'Essex Property',w:2.2},{s:'MAA',n:'Mid-America Apt',w:2.0},{s:'INVH',n:'Invitation Homes',w:1.8},
+    {s:'VICI',n:'VICI Properties',w:1.6},{s:'HST',n:'Host Hotels',w:1.4}
+  ],
+  XLU:[
+    {s:'NEE',n:'NextEra Energy',w:16.4},{s:'SO',n:'Southern Company',w:7.8},{s:'DUK',n:'Duke Energy',w:7.2},
+    {s:'SRE',n:'Sempra',w:5.9},{s:'AEP',n:'American Electric Power',w:5.4},{s:'EXC',n:'Exelon',w:5.1},
+    {s:'XEL',n:'Xcel Energy',w:4.8},{s:'ED',n:'Consolidated Edison',w:4.3},{s:'ETR',n:'Entergy',w:3.9},
+    {s:'ES',n:'Eversource',w:3.6},{s:'WEC',n:'WEC Energy',w:3.3},{s:'AWK',n:'American Water Works',w:3.0},
+    {s:'CMS',n:'CMS Energy',w:2.8},{s:'DTE',n:'DTE Energy',w:2.6},{s:'AES',n:'AES Corp',w:2.4},
+    {s:'NI',n:'NiSource',w:2.2},{s:'AEE',n:'Ameren',w:2.0},{s:'LNT',n:'Alliant Energy',w:1.8},
+    {s:'EVRG',n:'Evergy',w:1.6},{s:'PNW',n:'Pinnacle West',w:1.4}
+  ],
+  XLP:[
+    {s:'PG',n:'Procter & Gamble',w:16.2},{s:'KO',n:'Coca-Cola',w:11.8},{s:'PEP',n:'PepsiCo',w:11.4},
+    {s:'COST',n:'Costco',w:10.9},{s:'PM',n:'Philip Morris',w:6.3},{s:'MO',n:'Altria',w:4.8},
+    {s:'MDLZ',n:'Mondelez',w:4.2},{s:'CL',n:'Colgate',w:3.7},{s:'KMB',n:'Kimberly-Clark',w:3.3},
+    {s:'STZ',n:'Constellation Brands',w:3.0},{s:'GIS',n:'General Mills',w:2.8},{s:'SYY',n:'Sysco',w:2.6},
+    {s:'CAG',n:'Conagra Brands',w:2.4},{s:'HRL',n:'Hormel Foods',w:2.2},{s:'KHC',n:'Kraft Heinz',w:2.0},
+    {s:'TSN',n:'Tyson Foods',w:1.8},{s:'K',n:'Kellanova',w:1.6},{s:'CPB',n:'Campbell Soup',w:1.4},
+    {s:'CHD',n:'Church & Dwight',w:1.2},{s:'CLX',n:'Clorox',w:1.0}
+  ],
+  XLY:[
+    {s:'AMZN',n:'Amazon',w:24.8},{s:'TSLA',n:'Tesla',w:17.2},{s:'HD',n:'Home Depot',w:8.6},
+    {s:'MCD',n:"McDonald's",w:5.4},{s:'NKE',n:'Nike',w:4.1},{s:'LOW',n:"Lowe's",w:3.8},
+    {s:'SBUX',n:'Starbucks',w:3.5},{s:'TJX',n:'TJX Companies',w:3.2},{s:'BKNG',n:'Booking Holdings',w:2.9},
+    {s:'F',n:'Ford Motor',w:2.6},{s:'GM',n:'General Motors',w:2.4},{s:'YUM',n:'Yum! Brands',w:2.2},
+    {s:'ORLY',n:"O'Reilly Auto",w:2.0},{s:'AZO',n:'AutoZone',w:1.8},{s:'APTV',n:'Aptiv',w:1.6},
+    {s:'DHI',n:'D.R. Horton',w:1.4},{s:'LEN',n:'Lennar',w:1.3},{s:'PHM',n:'PulteGroup',w:1.2},
+    {s:'CCL',n:'Carnival',w:1.1},{s:'RCL',n:'Royal Caribbean',w:1.0}
+  ]
+};
+
+async function openSectorModal(sym,name){
+  $('modal-title').textContent='אחזקות '+name+' ('+sym+')';
+  $('modal-sub').textContent='טוען נתוני יום בזמן אמת...';
+  $('modal-body').innerHTML='<div class="modal-loading"><div class="mini-ring"></div>מביא מחירים חיים מ-Yahoo...</div>';
+  $('modal-overlay').classList.add('open');
+  document.body.style.overflow='hidden';
+
+  const data=ETF_HOLDINGS[sym]||[];
+  if(!data.length){renderHoldings(sym,name,data);return;}
+
+  // מסננים רק מניות שעדיין אין לנו את המחיר שלהן
+  const missingSymbols = data.map(h => h.s).filter(s => !qmap[s] || qmap[s].price == null);
+  
+  if (missingSymbols.length > 0) {
+    // מביאים את כל המניות החסרות בבקשה *אחת* בלבד!
+    const newQuotes = await fetchYahooQuotesBatch(missingSymbols);
+    Object.assign(qmap, newQuotes); // שומרים את התוצאות לזיכרון
+  }
+  
+  renderHoldings(sym,name,data);
+}
+
+function renderHoldings(sym, name, data) {
+  if (!data || !data.length) {
+    $('modal-body').innerHTML = '<div class="modal-loading">אין נתוני אחזקות זמינים</div>';
+    return;
+  }
+  const sorted = [...data].sort((a, b) => (b.w||0) - (a.w||0));
+  const maxW = sorted[0]?.w || 1;
+  const total = sorted.reduce((acc, h) => acc + (h.w||0), 0);
+  $('modal-sub').textContent = sorted.length + ' מניות • חשיפה: ' + total.toFixed(1) + '%';
+  $('modal-footer').textContent = sorted.length + ' מניות • SPDR ' + sym + ' • Q1 2025';
+
+  const rows = sorted.map((h, i) => {
+    const w = h.w || 0;
+    const barW = Math.round((w / maxW) * 100);
+    const dq = qmap[h.s] || {};
+    const hasDay = dq.d1 != null && !isNaN(dq.d1);
+    const chgCls = !hasDay ? 'flat' : dq.d1 > 0 ? 'up' : 'down';
+    const chgStr = hasDay ? (dq.d1>0?'+':'') + dq.d1.toFixed(2)+'%' : '–';
+    const priceStr = dq.price ? '$'+Number(dq.price).toFixed(2) : '';
+    return `<tr><td>
+      <div class="hrow" onclick="openStockDetail('${h.s}','${(h.n||h.s).replace(/'/g,"\'")}')">
+        <span class="hrow-rank">${i+1}</span>
+        <div class="hrow-info">
+          <div class="hrow-sym">${h.s}</div>
+          <div class="hrow-name">${h.n||''}</div>
+        </div>
+        <div class="hrow-price">
+          <span class="hrow-price-val">${priceStr}</span>
+          <span class="hrow-chg ${chgCls}">${chgStr}</span>
+        </div>
+        <div class="hrow-weight">
+          <div class="hrow-wbar"><div class="hrow-wbar-fill" style="width:${barW}%"></div></div>
+          <span class="hrow-wpct">${w.toFixed(1)}%</span>
+        </div>
+      </div>
+    </td></tr>`;
+  }).join('');
+
+  $('modal-body').innerHTML = `<table class="htbl"><tbody>${rows}</tbody></table>`;
+}
+
+// ── STOCK DETAIL PANEL ────────────────
+async function openStockDetail(sym, name) {
+  const overlay = $('stock-overlay');
+  $('sp-sym').textContent = sym;
+  $('sp-name').textContent = name;
+  const dq = qmap[sym] || {};
+  $('sp-price').textContent = dq.price ? '$'+Number(dq.price).toFixed(2) : '–';
+  const chgEl = $('sp-chg');
+  if (dq.d1 != null) {
+    chgEl.textContent = (dq.d1>0?'+':'')+dq.d1.toFixed(2)+'%';
+    chgEl.className = 'sp-chg '+(dq.d1>0?'up':dq.d1<0?'down':'flat');
+  }
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  $('sp-body').innerHTML = '<div class="modal-loading" style="padding:40px"><div class="mini-ring" style="margin:0 auto 10px"></div>טוען '+sym+'...</div>';
+
+  try {
+    const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=1d&interval=5m&includePrePost=true`;
+    const newsUrl  = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(sym)}&newsCount=5&quotesCount=0&enableFuzzyQuery=false`;
+    const histUrl  = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=1mo&interval=1d`;
+    const [cRes, nRes, macroData, hRes] = await Promise.allSettled([
+      fetch(_proxyUrl+'/?url='+encodeURIComponent(chartUrl)),
+      fetch(_proxyUrl+'/?url='+encodeURIComponent(newsUrl)),
+      fetchMacroContext(sym),
+      fetch(_proxyUrl+'/?url='+encodeURIComponent(histUrl)),
+    ]);
+    // --- meta + stats from 1d intraday ---
+    let meta={}, news=[], macro={series:[],results:{},sector:null};
+    if (cRes.status==='fulfilled' && cRes.value.ok) {
+      const d = await cRes.value.json();
+      const r = d.chart?.result?.[0];
+      if (r) { meta=r.meta||{}; }
+    }
+    // --- chart data: 1mo daily (reuse hRes) ---
+    let chartTs=[], chartCl=[], chartVol=[];
+    if (hRes.status==='fulfilled' && hRes.value.ok) {
+      const hd = await hRes.value.json();
+      const hr = hd.chart?.result?.[0];
+      if (hr) {
+        if (!meta.regularMarketPrice) meta={...hr.meta,...meta};
+        chartTs  = hr.timestamp||[];
+        chartCl  = hr.indicators?.quote?.[0]?.close||[];
+        chartVol = hr.indicators?.quote?.[0]?.volume||[];
+        // avgVol from daily volumes
+        if (!meta.averageDailyVolume3Month && !meta.averageDailyVolume10Day) {
+          const dvols = chartVol.filter(v=>v!=null&&v>0);
+          if (dvols.length >= 2) meta.averageDailyVolume3Month = Math.round(dvols.reduce((a,b)=>a+b,0)/dvols.length);
+        }
+      }
+    }
+    if (nRes.status==='fulfilled' && nRes.value.ok) {
+      const d = await nRes.value.json(); news=d.news||[];
+    }
+    if (macroData.status==='fulfilled') macro = macroData.value;
+    // Store globally for tab switching
+    window._spData = {sym, name, meta, chartTs, chartCl, chartVol, news, dq, macro};
+    renderStockDetail(sym, name, meta, chartTs, chartCl, chartVol, news, dq, {}, macro);
+    // Reset tabs
+    document.querySelectorAll('.sp-tab').forEach(t=>t.classList.remove('active'));
+    $('tab-chart')?.classList.add('active');
+  } catch(e) {
+    $('sp-body').innerHTML = '<div class="modal-loading" style="padding:30px;color:var(--dim)">שגיאה בטעינה</div>';
+  }
+}
+
+// ── CHART RANGE CONFIG ──────────────────────────
+const CHART_RANGE_CFG = {
+  '1D': {range:'1d',  interval:'5m',  prepost:true,  isIntraday:true},
+  '1W': {range:'5d',  interval:'30m', prepost:false, isIntraday:true},
+  '1M': {range:'1mo', interval:'1d',  prepost:false, isIntraday:false},
+  '3M': {range:'3mo', interval:'1d',  prepost:false, isIntraday:false},
+  '6M': {range:'6mo', interval:'1d',  prepost:false, isIntraday:false},
+  '1Y': {range:'1y',  interval:'1d',  prepost:false, isIntraday:false},
+};
+
+function buildChartSvg(sym, meta, timestamps, closes, volumes, rangeKey) {
+  const cfg = CHART_RANGE_CFG[rangeKey] || CHART_RANGE_CFG['1M'];
+  const pts = closes.map((c,i)=>({c,t:timestamps[i],v:volumes[i]||0})).filter(p=>p.c!=null);
+  if (pts.length < 2) return '';
+
+  const W=600, CHART_H=130, VOL_H=30, PAD_T=10, PAD_B=2;
+  const cA = CHART_H - PAD_T - PAD_B;
+  const minC = Math.min(...pts.map(p=>p.c));
+  const maxC = Math.max(...pts.map(p=>p.c));
+  const rng  = (maxC-minC)||maxC*0.01||1;
+  const padV = rng*0.12;
+  const lo = minC-padV, hi = maxC+padV, vRng = hi-lo;
+  const lastC  = pts[pts.length-1].c;
+  const firstC = pts[0].c;
+  const isUp = lastC >= firstC;
+  const col    = isUp ? '#00e87a' : '#ff3a5c';
+  const colDim = isUp ? 'rgba(0,232,122,.15)' : 'rgba(255,58,92,.15)';
+
+  const tx = i => (i/(pts.length-1))*W;
+  const ty = v => PAD_T + cA - ((v-lo)/vRng)*cA;
+
+  const linePts = pts.map((p,i)=>`${tx(i).toFixed(1)},${ty(p.c).toFixed(1)}`).join(' ');
+  const areaD   = `M0,${(PAD_T+cA).toFixed(1)} `+pts.map((p,i)=>`L${tx(i).toFixed(1)},${ty(p.c).toFixed(1)}`).join(' ')+` L${W},${(PAD_T+cA).toFixed(1)} Z`;
+  const maxVol  = Math.max(...pts.map(p=>p.v),1);
+  const volBars = pts.map((p,i)=>{
+    const bw=Math.max(2,(W/pts.length)*0.68), bh=Math.max(1,(p.v/maxVol)*VOL_H);
+    return `<rect x="${(tx(i)-bw/2).toFixed(1)}" y="${(VOL_H-bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" fill="${col}" opacity=".32"/>`;
+  }).join('');
+  const gridSvg = [0,0.33,0.66,1].map(f=>`<line x1="0" y1="${(PAD_T+cA*(1-f)).toFixed(1)}" x2="${W}" y2="${(PAD_T+cA*(1-f)).toFixed(1)}" stroke="rgba(255,255,255,.045)" stroke-width="1"/>`).join('');
+
+  // Price labels (% positioning in the chart+vol container — 130+30=160px)
+  const tyPct = v => ((PAD_T+cA-((v-lo)/vRng)*cA)/(CHART_H+VOL_H)*100).toFixed(1);
+  const priceLbls = [maxC,(maxC+minC)/2,minC].map(v=>
+    `<div style="position:absolute;top:${tyPct(v)}%;right:4px;transform:translateY(-50%);font-size:8px;color:rgba(204,216,234,.38);font-family:var(--mono);line-height:1;pointer-events:none">${v.toFixed(2)}</div>`
+  ).join('');
+  const curBadge = `<div style="position:absolute;top:${tyPct(lastC)}%;right:0;transform:translateY(-50%);background:${col};color:#000;font-size:8px;font-weight:800;font-family:var(--mono);padding:2px 5px;border-radius:2px 0 0 2px;line-height:1.4;pointer-events:none">${lastC.toFixed(2)}</div>`;
+
+  // Change badge top-left
+  const chgPct = ((lastC-firstC)/firstC*100);
+  const chgBadge = `<div style="position:absolute;top:7px;left:8px;font-size:9px;font-weight:700;font-family:var(--mono);color:${col};background:${colDim};padding:2px 7px;border-radius:3px;line-height:1.4;pointer-events:none">${chgPct>=0?'+':''}${chgPct.toFixed(2)}%</div>`;
+
+  // Axis labels (time or date)
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const axPts  = [0, Math.floor(pts.length*0.25), Math.floor(pts.length*0.5), Math.floor(pts.length*0.75), pts.length-1];
+  const axLabels = axPts.map((i,j)=>{
+    const ts = pts[i]?.t; if (!ts) return '';
+    const d  = new Date(ts*1000);
+    let lbl;
+    if (cfg.isIntraday) {
+      if (rangeKey==='1W') {
+        lbl = DAYS[d.getDay()];
+      } else {
+        const h=d.getUTCHours()-4, m=d.getUTCMinutes();
+        const hh=(h+24)%24, h12=hh%12||12, sfx=hh<12?'AM':'PM';
+        lbl = `${h12}${m?':'+String(m).padStart(2,'0'):''}${sfx}`;
+      }
+    } else {
+      lbl = `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+    }
+    const pct = (i/(pts.length-1)*100).toFixed(1);
+    const xf  = j===0?'translateX(0)':j===axPts.length-1?'translateX(-100%)':'translateX(-50%)';
+    return `<span style="position:absolute;left:${pct}%;transform:${xf};font-size:8px;color:rgba(204,216,234,.35);font-family:var(--sans);white-space:nowrap">${lbl}</span>`;
+  }).join('');
+
+  // Range selector bar
+  const rangeBar = `<div class="sp-chart-ranges">${
+    Object.keys(CHART_RANGE_CFG).map(k=>
+      `<button class="sp-rng-btn${k===rangeKey?' active':''}" onclick="switchChartRange('${k}')">${k}</button>`
+    ).join('')
+  }</div>`;
+
+  return `<div class="sp-chart-wrap">
+    ${rangeBar}
+    <div style="position:relative">
+      <svg width="100%" viewBox="0 0 ${W} ${CHART_H}" preserveAspectRatio="none" style="display:block;height:128px">
+        <defs><linearGradient id="spg${sym}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${col}" stop-opacity=".2"/><stop offset="88%" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+        ${gridSvg}
+        <path d="${areaD}" fill="url(#spg${sym})"/>
+        <polyline points="${linePts}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <svg width="100%" viewBox="0 0 ${W} ${VOL_H}" preserveAspectRatio="none" style="display:block;height:28px">${volBars}</svg>
+      ${priceLbls}${curBadge}${chgBadge}
+      <div style="position:relative;height:18px;margin:2px 4px 0">${axLabels}</div>
+    </div>
+  </div>`;
+}
+
+async function switchChartRange(rangeKey) {
+  const d = window._spData; if (!d) return;
+  const cfg = CHART_RANGE_CFG[rangeKey]; if (!cfg) return;
+  // optimistic button highlight
+  document.querySelectorAll('.sp-rng-btn').forEach(b=>b.classList.toggle('active', b.textContent===rangeKey));
+  // dim chart
+  const wrap = document.querySelector('.sp-chart-wrap');
+  if (wrap) wrap.style.opacity='.45';
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${d.sym}?range=${cfg.range}&interval=${cfg.interval}${cfg.prepost?'&includePrePost=true':''}`;
+    const r   = await fetch(_proxyUrl+'/?url='+encodeURIComponent(url));
+    if (!r.ok) throw new Error();
+    const json = await r.json();
+    const res  = json.chart?.result?.[0];
+    if (!res) throw new Error();
+    const ts  = res.timestamp||[];
+    const cl  = res.indicators?.quote?.[0]?.close||[];
+    const vol = res.indicators?.quote?.[0]?.volume||[];
+    const newChart = buildChartSvg(d.sym, d.meta, ts, cl, vol, rangeKey);
+    window._spChartHtml = newChart + (window._spStatsHtml||'');
+    $('sp-body').innerHTML = window._spChartHtml;
+  } catch(e) {
+    if (wrap) wrap.style.opacity='1';
+  }
+}
+
+function renderStockDetail(sym, name, meta, timestamps, closes, volumes, news, dq, fundData={}, macro={series:[],results:{},sector:null}) {
+  const fmt2 = v => v!=null ? Number(v).toFixed(2) : '–';
+  const fmtB = v => {
+    if (!v) return '–';
+    if (v>=1e12) return (v/1e12).toFixed(2)+'T';
+    if (v>=1e9)  return (v/1e9).toFixed(1)+'B';
+    if (v>=1e6)  return (v/1e6).toFixed(1)+'M';
+    return v.toLocaleString();
+  };
+  const price = meta.regularMarketPrice || dq.price || 0;
+  if (price) $('sp-price').textContent = '$'+Number(price).toFixed(2);
+  if (meta.longName || meta.shortName) $('sp-name').textContent = meta.longName||meta.shortName;
+
+  // Ranges
+  const dayLo=meta.regularMarketDayLow, dayHi=meta.regularMarketDayHigh;
+  const wLo=meta.fiftyTwoWeekLow, wHi=meta.fiftyTwoWeekHigh;
+  const dot = (lo,hi) => (lo&&hi&&hi>lo) ? ((price-lo)/(hi-lo)*100).toFixed(0) : 50;
+  const rangeBar = (lo,hi) => lo ? `
+    <div class="sp-range-bar"><div class="sp-range-dot" style="left:${dot(lo,hi)}%;margin-left:-4px;right:auto"></div></div>
+    <div class="sp-range-labels"><span>${fmt2(lo)}</span><span>${fmt2(hi)}</span></div>` : '';
+
+  const statsHtml = `<div class="sp-stats">
+    <div class="sp-stat"><div class="sp-stat-label">Day Range</div>
+      <div class="sp-stat-val">${dayLo?fmt2(dayLo)+'–'+fmt2(dayHi):'–'}</div>${rangeBar(dayLo,dayHi)}</div>
+    <div class="sp-stat"><div class="sp-stat-label">52W Range</div>
+      <div class="sp-stat-val">${wLo?fmt2(wLo)+'–'+fmt2(wHi):'–'}</div>${rangeBar(wLo,wHi)}</div>
+    <div class="sp-stat"><div class="sp-stat-label">Volume</div>
+      <div class="sp-stat-val">${fmtB(meta.regularMarketVolume||dq.vol)}</div></div>
+    <div class="sp-stat"><div class="sp-stat-label">Avg Volume</div>
+      <div class="sp-stat-val">${fmtB(meta.averageDailyVolume3Month||meta.averageDailyVolume10Day||dq.avgVol)}</div></div>
+    <div class="sp-stat"><div class="sp-stat-label">Prev Close</div>
+      <div class="sp-stat-val">${meta.chartPreviousClose?'$'+fmt2(meta.chartPreviousClose):'–'}</div></div>
+    <div class="sp-stat"><div class="sp-stat-label">Exchange</div>
+      <div class="sp-stat-val" style="font-size:10px">${meta.exchangeName||'–'}</div></div>
+  </div>`;
+
+  // ── CHART — delegate to buildChartSvg ──
+  const chartHtml = buildChartSvg(sym, meta, timestamps, closes, volumes, '1M');
+
+  // Save tab content globally
+  window._spStatsHtml = statsHtml + renderMacroContext(macro) + '<div style="height:max(env(safe-area-inset-bottom),20px)"></div>';
+  window._spChartHtml = chartHtml + window._spStatsHtml;
+
+
+
+  window._spNewsHtml = news.length
+    ? news.slice(0,6).map(n=>{
+        const ago=n.providerPublishTime?Math.round((Date.now()/1000-n.providerPublishTime)/3600):null;
+        const t=(n.title||'').toLowerCase();
+        const pos=['surge','soar','beat','gain','growth','strong','record','upgrade','rally','rise','profit','exceed','jumps','climbs'];
+        const neg=['fall','drop','miss','loss','weak','cut','crash','decline','plunge','slump','disappoint','warning','concern','below','down'];
+        const p=pos.filter(w=>t.includes(w)).length, ng=neg.filter(w=>t.includes(w)).length;
+        const sent=p>ng?'positive':ng>p?'negative':'neutral';
+        const badge=sent==='positive'?'<span style="display:inline-flex;align-items:center;font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:var(--gd);color:var(--green);text-transform:uppercase">▲ חיובי</span>'
+          :sent==='negative'?'<span style="display:inline-flex;align-items:center;font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:var(--rd);color:var(--red);text-transform:uppercase">▼ שלילי</span>'
+          :'<span style="display:inline-flex;align-items:center;font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:var(--bg4);color:var(--dim);text-transform:uppercase">● ניטרלי</span>';
+        return `<a class="sp-news-item" href="${n.link||'#'}" target="_blank" rel="noopener" style="display:flex;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);text-decoration:none;color:inherit">
+          <div style="flex:1">
+            <div class="sp-news-title">${n.title||''}</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:5px">
+              ${badge}
+              <span class="sp-news-meta">${n.publisher||''} ${ago!=null?'· '+(ago<1?'עכשיו':ago+'h ago'):''}</span>
+            </div>
+          </div>
+        </a>`;
+      }).join('') + '<div style="height:max(env(safe-area-inset-bottom),20px)"></div>'
+    : '<div style="padding:30px;text-align:center;color:var(--dim);font-size:12px">אין חדשות זמינות</div>';
+
+  // Fundamentals
+  // Fundamentals from meta (v8/chart) — available fields only
+  const f2 = v => v!=null ? Number(v).toFixed(2) : '–';
+  const fmtB2 = v => { if(!v&&v!==0)return'–'; if(v>=1e12)return(v/1e12).toFixed(2)+'T'; if(v>=1e9)return(v/1e9).toFixed(1)+'B'; if(v>=1e6)return(v/1e6).toFixed(1)+'M'; return v.toLocaleString(); };
+  const fundItems = [
+    {label:'52W High',     he:'שיא 52 שבועות',          val: meta.fiftyTwoWeekHigh ? '$'+f2(meta.fiftyTwoWeekHigh) : '–'},
+    {label:'52W Low',      he:'שפל 52 שבועות',          val: meta.fiftyTwoWeekLow  ? '$'+f2(meta.fiftyTwoWeekLow)  : '–'},
+    {label:'Prev Close',   he:'סגירה אתמול',             val: meta.chartPreviousClose ? '$'+f2(meta.chartPreviousClose) : '–'},
+    {label:'Day High',     he:'שיא יומי',                val: meta.regularMarketDayHigh ? '$'+f2(meta.regularMarketDayHigh) : '–'},
+    {label:'Day Low',      he:'שפל יומי',                val: meta.regularMarketDayLow  ? '$'+f2(meta.regularMarketDayLow)  : '–'},
+    {label:'Volume',       he:'נפח מסחר היום',          val: fmtB2(meta.regularMarketVolume || dq.vol)},
+    {label:'Avg Volume',   he:'ממוצע נפח יומי (20י)',   val: fmtB2(dq.avgVol)},
+    {label:'Exchange',     he:'בורסה',                   val: meta.exchangeName || '–'},
+  ];
+  window._spFundHtml = `
+    <div class="sp-fund-grid">${fundItems.map(f=>`
+      <div class="sp-fund-item">
+        <div class="sp-fund-label">${f.label}</div>
+        <div class="sp-fund-val">${f.val}</div>
+        <div class="sp-fund-sub">${f.he}</div>
+      </div>`).join('')}
+    </div>
+    <div style="padding:14px 16px;border-top:1px solid var(--border)">
+      <div style="font-size:10px;color:var(--dim);margin-bottom:10px">לנתוני פונדמנטלס מלאים (P/E, EPS, הכנסות, מאזן):</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <a href="https://finance.yahoo.com/quote/${sym}/financials" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:5px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:9px;text-decoration:none;color:var(--text);font-size:11px;font-weight:700">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 7 13.5 15.5 8.5 10.5 1 18"/><polyline points="16 7 22 7 22 13"/></svg>
+          Yahoo Finance
+        </a>
+        <a href="https://stockanalysis.com/stocks/${sym.toLowerCase()}/financials/" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:5px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:9px;text-decoration:none;color:var(--text);font-size:11px;font-weight:700">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Stock Analysis
+        </a>
+      </div>
+    </div>
+    <div style="height:max(env(safe-area-inset-bottom),20px)"></div>`;
+
+  $('sp-body').innerHTML = window._spChartHtml;
+}
+
+function switchStockTab(tab) {
+  document.querySelectorAll('.sp-tab').forEach(t=>t.classList.remove('active'));
+  $('tab-'+tab)?.classList.add('active');
+  $('sp-body').innerHTML = (tab==='fundamentals'?window._spFundHtml:tab==='news'?window._spNewsHtml:window._spChartHtml)
+    || '<div style="padding:30px;text-align:center;color:var(--dim)">טוען...</div>';
+}
+
+function closeStockDetail(e) {
+  if (e && e.target !== $('stock-overlay')) return;
+  $('stock-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function closeModal(e){
+  if(e.target===$('modal-overlay'))closeModalDirect();
+}
+function closeModalDirect(){
+  $('modal-overlay').classList.remove('open');
+  document.body.style.overflow='';
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModalDirect()});
+
+// ── MAIN ─────────────────────────────────────────────
+async function init(){
+  showScreen('screen-loading');
+  const btn=$('refresh-btn');if(btn)btn.classList.add('loading');
+
+  try{
+    // Step 1: quotes for all symbols via Yahoo Finance proxy
+    $('progress').textContent=`מביא מחירים — ${ALL.length} סמלים...`;
+    const allSymbols = ALL.map(s => s.sym);
+    const allQuotes = await fetchYahooQuotesBatch(allSymbols);
+    Object.assign(qmap, allQuotes);
+
+    // Check if proxy works (all data empty = bad proxy URL)
+    const gotData = Object.values(allQuotes).filter(d => d.price).length;
+    if(gotData===0){
+      $('key-err').style.display='block';
+      $('key-err').textContent='שגיאה בחיבור לשרת — בדוק את ה-Worker URL';
+      showKey();return;
+    }
+
+    // Render with day data
+    const now=new Date();
+    const tsBadge=$('ts-badge'),tsDate=$('ts-date'),tsTime=$('ts-time');
+    if(tsBadge){
+      tsDate.textContent=now.toLocaleDateString('he-IL');
+      tsTime.textContent=now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+      tsBadge.style.display='flex';
+    }
+    renderTicker();
+    renderCards('idx-main',  INDICES, ['יום'], ['d1']);
+    renderCards('idx-other', OTHER,   ['יום'], ['d1']);
+    // כרטיסיית שעון שוק מקווקוות
+    if(!$('market-clock-card')){
+      const mc=document.createElement('div');
+      mc.id='market-clock-card'; mc.className='market-clock-card';
+      mc.innerHTML='<div class="mc-status-row"><div class="market-dot closed" id="market-dot"></div><span class="market-label closed" id="market-label">טוען...</span></div>'
+        +'<div class="market-countdown" id="market-countdown"></div>'
+        +'<div class="mc-bottom">NYSE 09:30–16:00 ET</div>';
+      $('idx-other').appendChild(mc);
+    }
+
+    renderPositivity();
+    renderSectorsWithSkeleton();
+    initSyncObserver(); // observe table for automatic height sync // skeleton מיידי עם יום% אמיתי
+    renderSummary();
+    renderFearGreed();
+    fetchMarketNews();
+    fetchAndRenderMovers();
+    drawChart();
+    // הצג skeleton ל-YTD ו-Correlation מיד
+    const ytdSec=$('ytd-section'); if(ytdSec) ytdSec.style.display='block';
+    $('ytd-bars').innerHTML=`<div style="display:flex;flex-direction:column;gap:5px">${SECTORS.map(()=>`
+      <div class="ytd-row"><span class="ytd-sym lc" style="width:36px;height:12px;border-radius:3px">&nbsp;</span>
+      <div class="ytd-bar-track"><div class="lc" style="width:60%;height:100%"></div></div>
+      <span style="width:40px;height:12px" class="lc">&nbsp;</span></div>`).join('')}</div>`;
+    const corrSec=$('corr-section'); if(corrSec) corrSec.style.display='block';
+    $('corr-table-wrap').innerHTML=`<div style="text-align:center;color:var(--dim);font-size:11px;padding:20px;font-family:var(--mono)"><div class="mini-ring" style="margin:0 auto 8px"></div>מחשב מתאמים...</div>`;
+    showScreen('app');
+    // Macro panel + P/C + Earnings (parallel, non-blocking)
+    fetchMacro();
+    renderMarketInternals();
+    fetchEarningsCalendar();
+    renderEconCalendar(); // async — runs in background
+
+    // Background: parallel fetch → single render
+    $('footer').textContent='טוען נתונים היסטוריים...';
+
+    // מביא את כל הסקטורים במקביל
+    await sleep(1000); // המתנה קצרה לאנימציית הטעינה
+    await Promise.all(SECTORS.map(async s => {
+      try { histMap[s.sym] = await fetchHistoricalReturns(s.sym); }
+      catch (e) { histMap[s.sym] = {}; }
+    }));
+
+    // רנדור אחד אחרי שהכל מוכן
+    await fetchFredColData();
+    renderSectors();
+    // Double RAF ensures DOM is fully painted before measuring row heights
+    syncFrozenRows();
+    renderFearGreed();
+    renderYTDChart();
+    renderCorrelationMatrix();
+    renderMarketInternals();
+    runInsights();
+    const pos=SECTORS.filter(s=>(qmap[s.sym]||{}).d1>0).length;
+    $('footer').textContent=`${pos}/${SECTORS.length} סקטורים חיוביים • Yahoo Finance • ${now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}`;
+
+  }catch(e){
+    console.error(e);
+    $('err-msg').textContent='שגיאה בטעינת נתונים.';
+    $('err-code').textContent=e.message;$('err-code').style.display='block';
+    showScreen('screen-error');
+  }finally{
+    if(btn)btn.classList.remove('loading');
+  }
+}
+
+// ══════════════════════════════════════════════
+// 6 NEW FEATURES — JS
+// ══════════════════════════════════════════════
+
+// ── 1. MARKET CLOCK ──────────────────────────
+function getETHour() {
+  // מחשב שעה בET תוך כדי תמיכה ב-DST אמריקאי
+  const now = new Date();
+  const etStr = now.toLocaleString('en-US', { timeZone: 'America/New_York' });
+  return new Date(etStr);
+}
+function startMarketClock() {
+  function tick() {
+    const et = getETHour();
+    const day = et.getDay(); // 0=ראשון,6=שבת
+    const h = et.getHours(), m = et.getMinutes(), s = et.getSeconds();
+    const totalMin = h * 60 + m;
+    const dotEl = $('market-dot'), lblEl = $('market-label'), cntEl = $('market-countdown');
+    if (!dotEl) return;
+    const isWeekend = day === 0 || day === 6;
+    let status, cls, countdownText = '';
+    // שעון ישראל (ET + 7 בקיץ, +8 בחורף — DST אמריקאי)
+    const ilDate = new Date(et.getTime());
+    // מחשב הפרש: ישראל היא UTC+3 (קיץ) או UTC+2 (חורף)
+    // ET היא UTC-4 (קיץ) או UTC-5 (חורף) — ההפרש הוא תמיד 7 שעות בקיץ אמריקאי, 8 בחורף
+    const nowUTC = new Date();
+    const ilStr = nowUTC.toLocaleTimeString('he-IL', {timeZone:'Asia/Jerusalem', hour:'2-digit', minute:'2-digit'});
+    const formatIL = (etH, etM) => {
+      const target = new Date(et);
+      target.setHours(etH, etM, 0, 0);
+      const diffMs = target - et;
+      const future = new Date(nowUTC.getTime() + diffMs);
+      return future.toLocaleTimeString('he-IL', {timeZone:'Asia/Jerusalem', hour:'2-digit', minute:'2-digit'});
+    };
+
+    if (isWeekend) {
+      status = 'סגור (סוף שבוע)'; cls = 'closed';
+      const daysTo = day === 6 ? 2 : 1;
+      countdownText = `נפתח בעוד ${daysTo} ימים`;
+    } else if (totalMin < 4*60) {
+      status = 'סגור'; cls = 'closed';
+      const rem = 4*60 - totalMin;
+      const remS = (60 - s) % 60;
+      const remM = remS > 0 ? rem - 1 : rem;
+      countdownText = `פרי-מרקט בעוד <b>${String(Math.floor(remM/60)).padStart(2,'0')}:${String(remM%60).padStart(2,'0')}:${String(remS).padStart(2,'0')}</b><br><span style="font-size:9px;opacity:.7">ישראל ${formatIL(4,0)}</span>`;
+    } else if (totalMin < 9*60+30) {
+      status = 'פרי-מרקט'; cls = 'pre';
+      const rem = 9*60+30 - totalMin;
+      const remS = (60 - s) % 60;
+      const remM = remS > 0 ? rem - 1 : rem;
+      countdownText = `פתיחה בעוד <b>${String(Math.floor(remM/60)).padStart(2,'0')}:${String(remM%60).padStart(2,'0')}:${String(remS).padStart(2,'0')}</b><br><span style="font-size:9px;opacity:.7">ישראל ${formatIL(9,30)}</span>`;
+    } else if (totalMin < 16*60) {
+      status = 'שוק פתוח'; cls = 'open';
+      const rem = 16*60 - totalMin;
+      const remS = (60 - s) % 60;
+      const remM = remS > 0 ? rem - 1 : rem;
+      countdownText = `סגירה בעוד <b>${String(Math.floor(remM/60)).padStart(2,'0')}:${String(remM%60).padStart(2,'0')}:${String(remS).padStart(2,'0')}</b><br><span style="font-size:9px;opacity:.7">ישראל ${formatIL(16,0)}</span>`;
+    } else if (totalMin < 20*60) {
+      status = 'אפטר-אוורס'; cls = 'after';
+      const rem = 20*60 - totalMin;
+      const remS = (60 - s) % 60;
+      const remM = remS > 0 ? rem - 1 : rem;
+      countdownText = `נסגר בעוד <b>${String(Math.floor(remM/60)).padStart(2,'0')}:${String(remM%60).padStart(2,'0')}:${String(remS).padStart(2,'0')}</b>`;
+    } else {
+      status = 'סגור'; cls = 'closed';
+      countdownText = `פרי-מרקט מחר<br><span style="font-size:9px;opacity:.7">ישראל ${formatIL(4,0)}</span>`;
+    }
+    dotEl.className = `market-dot ${cls}`;
+    lblEl.className = `market-label ${cls}`;
+    lblEl.textContent = status;
+    cntEl.innerHTML = countdownText;
+    // עדכון צבע גבול הכרטיסייה לפי מצב השוק
+    const card = $('market-clock-card');
+    if (card) {
+      const borderColor = cls==='open' ? 'rgba(0,232,122,.5)'
+                        : cls==='pre'||cls==='after' ? 'rgba(245,158,11,.5)'
+                        : 'var(--border2)';
+      card.style.borderColor = borderColor;
+    }
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+// ── 2. FEAR & GREED INDEX ────────────────────
+function calcFearGreed() {
+  const vixData = qmap['VIXY'] || {};
+  const vixD1 = vixData.d1 || 0;
+  // VIX proxy: VIXY d1 — עלייה ב-VIX = פחד
+  // נמיר ל-score: VIXY +5% ומעלה = פחד קיצוני (0), VIXY -5% ומטה = חמדנות קיצונית (100)
+  const vixScore = Math.min(100, Math.max(0, 50 - vixD1 * 7));
+
+  // מומנטום שוק — ממוצע d1 של כל הסקטורים
+  const sectorD1 = SECTORS.map(s => (qmap[s.sym]||{}).d1).filter(v => v!=null&&!isNaN(v));
+  const momentum = sectorD1.length ? sectorD1.reduce((a,b)=>a+b,0)/sectorD1.length : 0;
+  const momScore = Math.min(100, Math.max(0, 50 + momentum * 12));
+
+  // חיוביות — כמה סקטורים חיוביים
+  const posCount = sectorD1.filter(v => v > 0).length;
+  const posScore = (posCount / Math.max(sectorD1.length, 1)) * 100;
+
+  const total = Math.round(vixScore * 0.35 + momScore * 0.40 + posScore * 0.25);
+  return { total, vixScore: Math.round(vixScore), momScore: Math.round(momScore), posScore: Math.round(posScore), momentum: momentum.toFixed(2) };
+}
+
+function renderFearGreed() {
+  const fg = calcFearGreed();
+  const score = fg.total;
+  // ציבע ותווית
+  const getLabelAndColor = (s) => {
+    if (s >= 75) return { lbl: 'חמדנות קיצונית', color: '#00e87a' };
+    if (s >= 55) return { lbl: 'חמדנות', color: '#5bc27f' };
+    if (s >= 45) return { lbl: 'ניטרלי', color: '#f59e0b' };
+    if (s >= 25) return { lbl: 'פחד', color: '#f97316' };
+    return { lbl: 'פחד קיצוני', color: '#ff3a5c' };
+  };
+  const { lbl, color } = getLabelAndColor(score);
+  $('fg-num').textContent = score;
+  $('fg-num').style.color = color;
+  $('fg-lbl').textContent = lbl;
+  // מצייר את הגאוג'
+  drawFGGauge(score, color);
+  // קומפוננטים
+  $('fg-components').innerHTML = `
+    <div class="fg-comp"><div class="fg-comp-val" style="color:${score>=50?'var(--green)':'var(--red)'}">VIX ${fg.vixScore}</div><div class="fg-comp-lbl">תנודתיות</div></div>
+    <div class="fg-comp"><div class="fg-comp-val" style="color:${fg.momentum>=0?'var(--green)':'var(--red)'}">${fg.momentum}%</div><div class="fg-comp-lbl">מומנטום</div></div>
+    <div class="fg-comp"><div class="fg-comp-val" style="color:${fg.posScore>=50?'var(--green)':'var(--red)'}">${Math.round(fg.posScore)}%</div><div class="fg-comp-lbl">חיוביות</div></div>`;
+}
+
+function drawFGGauge(score, activeColor) {
+  const canvas = $('fg-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height, cx = W/2, cy = H-10, R = Math.min(cx-10, H-20), r = R - 22;
+  ctx.clearRect(0, 0, W, H);
+  const isL = document.body.classList.contains('light');
+  const bgTrack = isL ? '#dce6f2' : '#162840';
+  // zones: 5 חלקים — extreme fear, fear, neutral, greed, extreme greed
+  const zones = [
+    { from: 0,  to: 20,  color: '#ff3a5c' },
+    { from: 20, to: 40,  color: '#f97316' },
+    { from: 40, to: 60,  color: '#f59e0b' },
+    { from: 60, to: 80,  color: '#5bc27f' },
+    { from: 80, to: 100, color: '#00e87a' },
+  ];
+  const toAngle = v => Math.PI + (v / 100) * Math.PI; // 180°→360°
+  // background arc
+  ctx.beginPath(); ctx.arc(cx, cy, R, Math.PI, 2*Math.PI); ctx.arc(cx, cy, r, 2*Math.PI, Math.PI, true);
+  ctx.fillStyle = bgTrack; ctx.fill();
+  // colored zones
+  zones.forEach(z => {
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, toAngle(z.from), toAngle(z.to));
+    ctx.arc(cx, cy, r, toAngle(z.to), toAngle(z.from), true);
+    ctx.fillStyle = z.color + 'cc'; ctx.fill();
+  });
+  // needle
+  const angle = toAngle(score);
+  const nx = cx + Math.cos(angle) * (r + (R-r)/2);
+  const ny = cy + Math.sin(angle) * (r + (R-r)/2);
+  ctx.beginPath(); ctx.arc(nx, ny, 5, 0, 2*Math.PI);
+  ctx.fillStyle = '#fff'; ctx.fill();
+  ctx.strokeStyle = activeColor; ctx.lineWidth = 2; ctx.stroke();
+}
+
+// ── 3. YTD BAR CHART ─────────────────────────
+function showLoadingState(sectionId, contentId, msg) {
+  const sec = $(sectionId);
+  if (sec) sec.style.display = 'block';
+  const el = $(contentId);
+  if (el) el.innerHTML = `<div style="text-align:center;color:var(--dim);font-size:11px;padding:16px;font-family:var(--mono)">
+    <div class="mini-ring" style="margin:0 auto 8px"></div>${msg}</div>`;
+}
+
+function renderYTDChart() {
+  const data = SECTORS.map(s => ({ sym: s.sym, name: s.name, ytd: (histMap[s.sym]||{}).ytd }))
+    .filter(s => s.ytd != null).sort((a,b) => b.ytd - a.ytd);
+  const sec = $('ytd-section');
+  if (sec) sec.style.display = 'block';
+  if (!data.length) return; // keep loading state
+  const maxAbs = Math.max(...data.map(s => Math.abs(s.ytd)), 1);
+  const isL = document.body.classList.contains('light');
+  $('ytd-bars').innerHTML = data.map(s => {
+    const pct = s.ytd;
+    const barW = Math.abs(pct) / maxAbs * 100;
+    const isPos = pct >= 0;
+    const color = isPos ? (isL ? '#00904a' : '#00e87a') : (isL ? '#cc1a3a' : '#ff3a5c');
+    const bgColor = isPos ? (isL ? 'rgba(0,144,74,.12)' : 'rgba(0,232,122,.1)') : (isL ? 'rgba(204,26,58,.12)' : 'rgba(255,58,92,.1)');
+    return `<div class="ytd-row">
+      <span class="ytd-sym">${s.sym}</span>
+      <div class="ytd-bar-track">
+        <div class="ytd-bar-fill" style="width:${barW}%;background:${color};background:linear-gradient(90deg,${bgColor},${color})"></div>
+      </div>
+      <span class="ytd-val" style="color:${color}">${pct>0?'+':''}${pct.toFixed(1)}%</span>
+    </div>`;
+  }).join('');
+}
+
+// ── 4. CORRELATION MATRIX ────────────────────
+function pearson(a, b) {
+  const n = Math.min(a.length, b.length);
+  if (n < 3) return null;
+  const ax = a.slice(-n), bx = b.slice(-n);
+  const ma = ax.reduce((s,v)=>s+v,0)/n;
+  const mb = bx.reduce((s,v)=>s+v,0)/n;
+  let num=0, da=0, db=0;
+  for(let i=0;i<n;i++){const x=ax[i]-ma,y=bx[i]-mb;num+=x*y;da+=x*x;db+=y*y;}
+  return da&&db ? num/Math.sqrt(da*db) : null;
+}
+function renderCorrelationMatrix() {
+  const syms = SECTORS.filter(s => histMap[s.sym]?.rawPrices?.length > 20);
+  const sec = $('corr-section');
+  if (sec) sec.style.display = 'block';
+  if (syms.length < 3) return; // keep loading state until enough data
+  const isL = document.body.classList.contains('light');
+  // header row
+  let html = `<table class="corr-table"><thead><tr><th>סקטור</th>${syms.map(s=>`<th>${s.sym}</th>`).join('')}</tr></thead><tbody>`;
+  syms.forEach(row => {
+    html += `<tr><td>${row.name}</td>`;
+    syms.forEach(col => {
+      const a = histMap[row.sym].rawPrices;
+      const b = histMap[col.sym].rawPrices;
+      if (row.sym === col.sym) {
+        html += `<td style="background:var(--border2);color:var(--dim)">1.0</td>`;
+      } else {
+        const r = pearson(a, b);
+        if (r == null) { html += `<td style="color:var(--dim)">–</td>`; return; }
+        const v = parseFloat(r.toFixed(2));
+        // צבע: ירוק = מתאם גבוה, אדום = הפוך, אפור = ניטרלי
+        const intensity = Math.abs(v);
+        let bg;
+        if (v > 0.6) bg = isL ? `rgba(0,144,74,${intensity*.35})` : `rgba(0,232,122,${intensity*.25})`;
+        else if (v < -0.2) bg = isL ? `rgba(204,26,58,${intensity*.35})` : `rgba(255,58,92,${intensity*.25})`;
+        else bg = 'transparent';
+        const col2 = v > 0.5 ? (isL?'#005828':'#00e87a') : v < -0.1 ? (isL?'#cc1a3a':'#ff3a5c') : (isL?'#4070a0':'#5070a0');
+        html += `<td style="background:${bg};color:${col2}">${v.toFixed(2)}</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  $('corr-table-wrap').innerHTML = html;
+}
+
+// ── 5. BREADTH INDICATOR (200-day SMA) ───────
+async function runBreadth() {
+  const btn = document.querySelector('.breadth-btn');
+  if (btn) { btn.textContent = 'סורק...'; btn.disabled = true; }
+  $('breadth-big').textContent = '⏳';
+  $('breadth-sub').textContent = 'מחשב ממוצע 200 יום...';
+
+  const holdingsSet = new Set();
+  Object.values(ETF_HOLDINGS).forEach(sector => sector.forEach(h => holdingsSet.add(h.s)));
+  const symbols = Array.from(holdingsSet).slice(0, 60); // top 60 לביצועים
+
+  let above = 0, total = 0;
+  await Promise.all(symbols.map(async sym => {
+    try {
+      const cb = Math.floor(Date.now() / 10000);
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym.replace('/','–').replace('.','-')}?range=1y&interval=1d&cb=${cb}`;
+      const r = await fetch(`${_proxyUrl}/?url=${encodeURIComponent(url)}`);
+      if (!r.ok) return;
+      const d = await r.json();
+      const closes = d.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(p => p != null);
+      if (!closes || closes.length < 20) return;
+      const current = closes[closes.length - 1];
+      const sma200 = closes.slice(-200).reduce((a,b)=>a+b,0) / Math.min(200, closes.length);
+      total++;
+      if (current > sma200) above++;
+    } catch(e) {}
+  }));
+
+  if (btn) { btn.textContent = 'רענן'; btn.disabled = false; }
+  if (!total) { $('breadth-big').textContent = '?'; return; }
+  const pct = Math.round((above / total) * 100);
+  const color = pct >= 60 ? 'var(--green)' : pct >= 40 ? '#f59e0b' : 'var(--red)';
+  $('breadth-big').textContent = pct + '%';
+  $('breadth-big').style.color = color;
+  $('breadth-fill').style.width = pct + '%';
+  $('breadth-fill').style.background = color;
+  $('breadth-above').textContent = `${above} מניות מעל`;
+  $('breadth-total').textContent = `מתוך ${total}`;
+  $('breadth-sub').textContent = pct >= 60 ? '📈 שוק בריא' : pct >= 40 ? '⚖️ מעורב' : '📉 שוק חלש';
+}
+
+// ══════════════════════════════════════
+// 5 NEW FEATURES
+// ══════════════════════════════════════
+
+// ── MACRO PANEL ──────────────────────
+const MACRO_SYMS = [
+  {sym:'EURUSD=X', id:'EURUSD', name:'EUR/USD', dec:4},
+  {sym:'USDILS=X', id:'USDILS', name:'USD/ILS', dec:3},
+  {sym:'CL=F',     id:'OIL',   name:'נפט',     dec:2},
+  {sym:'NG=F',     id:'GAS',   name:'גז',       dec:3},
+  {sym:'GC=F',     id:'GOLD',  name:'זהב',      dec:1},
+  {sym:'^TNX',     id:'TNX',   name:'10Y',      dec:3},
+];
+async function fetchMacro() {
+  try {
+    const quotes = await fetchYahooQuotesBatch(MACRO_SYMS.map(m=>m.sym));
+    // Store macro data in qmap so getSectorMacroTd can use it
+    Object.assign(qmap, quotes);
+    MACRO_SYMS.forEach(m => {
+      const d = quotes[m.sym] || {};
+      const priceEl = $(`mp-${m.id}`), chgEl = $(`mc-${m.id}`);
+      if (!priceEl || !chgEl) return;
+      priceEl.className = 'macro-price';
+      chgEl.className = 'macro-chg';
+      if (d.price == null) { priceEl.textContent='–'; chgEl.textContent=''; return; }
+      priceEl.textContent = Number(d.price).toFixed(m.dec);
+      const c = d.d1;
+      if (c == null) { chgEl.textContent=''; return; }
+      chgEl.textContent = (c>0?'+':'')+c.toFixed(2)+'%';
+      chgEl.classList.add(c>0.05?'up':c<-0.05?'down':'flat');
+    });
+  } catch(e) { console.error('macro fetch error',e); }
+}
+
+// ── VOLUME in fetchYahooQuotesBatch & renderSectors ──
+// (volume added to qmap via existing batch — see update below)
+
+// ── SECTOR ROTATION CHART ────────────
+function renderRotationChart() {
+  const data = SECTORS.map(s => ({
+    sym: s.sym, name: s.name,
+    x: histMap[s.sym]?.m1,  // 1-month return = X axis
+    y: histMap[s.sym]?.w1,  // 1-week return  = Y axis
+  })).filter(s => s.x != null && s.y != null);
+  if (data.length < 4) return;
+
+  const sec = $('rotation-section');
+  if (sec) sec.style.display = 'block';
+
+  const W=360, H=280, PAD=40;
+  const cx=W/2, cy=H/2;
+  const isL = document.body.classList.contains('light');
+
+  // Scales
+  const xs = data.map(d=>d.x), ys = data.map(d=>d.y);
+  const xRange = Math.max(Math.abs(Math.min(...xs)), Math.abs(Math.max(...xs)), 2) * 1.3;
+  const yRange = Math.max(Math.abs(Math.min(...ys)), Math.abs(Math.max(...ys)), 1) * 1.3;
+  const scX = v => cx + (v/xRange) * (W/2-PAD);
+  const scY = v => cy - (v/yRange) * (H/2-PAD);
+
+  const colors = {
+    'מוביל':  isL ? 'rgba(0,144,74,.12)' : 'rgba(0,232,122,.08)',
+    'מחלש':   isL ? 'rgba(245,158,11,.12)' : 'rgba(245,158,11,.08)',
+    'פיגור':  isL ? 'rgba(204,26,58,.12)' : 'rgba(255,58,92,.08)',
+    'משפר':   isL ? 'rgba(0,112,192,.12)' : 'rgba(0,180,255,.08)',
+  };
+  const dotColors = ['#00e87a','#f59e0b','#ff3a5c','#00b4ff','#a78bfa','#fb923c','#34d399','#60a5fa','#f472b6','#facc15','#94a3b8'];
+  const axisColor = isL ? '#b8c8de' : '#1e3550';
+  const textColor = isL ? '#4070a0' : '#3d5470';
+
+  let svg = `
+    <!-- quadrant backgrounds -->
+    <rect x="${cx}" y="${PAD}" width="${W/2-PAD}" height="${H/2-PAD}" fill="${colors['מוביל']}" rx="4"/>
+    <rect x="${PAD}" y="${PAD}" width="${W/2-PAD}" height="${H/2-PAD}" fill="${colors['משפר']}" rx="4"/>
+    <rect x="${cx}" y="${cy}" width="${W/2-PAD}" height="${H/2-PAD}" fill="${colors['מחלש']}" rx="4"/>
+    <rect x="${PAD}" y="${cy}" width="${W/2-PAD}" height="${H/2-PAD}" fill="${colors['פיגור']}" rx="4"/>
+    <!-- quadrant labels -->
+    <text x="${W-PAD-6}" y="${PAD+14}" text-anchor="end" class="rq-label" fill="${isL?'#00904a':'#00e87a'}">מוביל ↗</text>
+    <text x="${PAD+6}" y="${PAD+14}" text-anchor="start" class="rq-label" fill="${isL?'#0070c0':'#00b4ff'}">משפר ↑</text>
+    <text x="${W-PAD-6}" y="${H-PAD-6}" text-anchor="end" class="rq-label" fill="${isL?'#b45309':'#f59e0b'}">מחלש ↘</text>
+    <text x="${PAD+6}" y="${H-PAD-6}" text-anchor="start" class="rq-label" fill="${isL?'#cc1a3a':'#ff3a5c'}">פיגור ↙</text>
+    <!-- axes -->
+    <line x1="${PAD}" y1="${cy}" x2="${W-PAD}" y2="${cy}" stroke="${axisColor}" stroke-width="1"/>
+    <line x1="${cx}" y1="${PAD}" x2="${cx}" y2="${H-PAD}" stroke="${axisColor}" stroke-width="1"/>
+    <text x="${W-PAD+2}" y="${cy+4}" font-size="8" fill="${textColor}" font-family="var(--mono)">חודש+</text>
+    <text x="${PAD-2}" y="${cy+4}" font-size="8" fill="${textColor}" font-family="var(--mono)" text-anchor="end">חודש-</text>
+    <text x="${cx}" y="${PAD-4}" font-size="8" fill="${textColor}" font-family="var(--mono)" text-anchor="middle">שבוע+</text>
+    <text x="${cx}" y="${H-PAD+10}" font-size="8" fill="${textColor}" font-family="var(--mono)" text-anchor="middle">שבוע-</text>`;
+
+  data.forEach((s,i) => {
+    const px = scX(s.x), py = scY(s.y);
+    const col = dotColors[i % dotColors.length];
+    svg += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="7" fill="${col}" fill-opacity=".85" class="r-dot">
+      <title>${s.sym}: חודש ${s.x>0?'+':''}${s.x.toFixed(1)}% | שבוע ${s.y>0?'+':''}${s.y.toFixed(1)}%</title></circle>
+    <text x="${px.toFixed(1)}" y="${(py-10).toFixed(1)}" font-size="9" font-weight="700" fill="${col}" text-anchor="middle" font-family="var(--mono)">${s.sym}</text>`;
+  });
+
+  svg += '</svg>';  // will be set as innerHTML, no need for closing
+  $('rotation-svg').innerHTML = svg;
+}
+
+// ── MARKET INTERNALS ─────────────────
+function renderMarketInternals() {
+  const sectorData = SECTORS.map(s => ({
+    sym: s.sym,
+    d1: (qmap[s.sym]||{}).d1,
+    fromHi: (histMap[s.sym]||{}).fromHi,
+  })).filter(s => s.d1 != null && !isNaN(s.d1));
+
+  if (!sectorData.length) return;
+
+  const up = sectorData.filter(s => s.d1 > 0).length;
+  const dn = sectorData.filter(s => s.d1 < 0).length;
+  const avgD1 = sectorData.reduce((a,s) => a+s.d1, 0) / sectorData.length;
+  const hiData = sectorData.filter(s => s.fromHi != null);
+  const avgHi = hiData.length ? hiData.reduce((a,s) => a+s.fromHi, 0) / hiData.length : null;
+  const pctUp = up / sectorData.length;
+
+  const upColor = up >= dn ? 'var(--green)' : 'var(--red)';
+  const avgColor = avgD1 >= 0 ? 'var(--green)' : 'var(--red)';
+
+  $('mi-adv').textContent = `${up}/${dn}`;
+  $('mi-adv').style.color = upColor;
+  $('mi-adv-sub').textContent = `מתוך ${sectorData.length}`;
+
+  $('mi-avg').textContent = (avgD1>0?'+':'')+avgD1.toFixed(2)+'%';
+  $('mi-avg').style.color = avgColor;
+
+  if (avgHi != null) {
+    $('mi-hi52').textContent = avgHi.toFixed(1)+'%';
+    $('mi-hi52').style.color = avgHi > -5 ? 'var(--green)' : avgHi > -15 ? '#f59e0b' : 'var(--red)';
+  }
+
+  $('mi-bar').style.width = (pctUp * 100) + '%';
+  $('mi-bar').style.background = pctUp >= 0.7 ? 'var(--green)' : pctUp >= 0.5 ? '#5bc27f' : pctUp >= 0.3 ? '#f59e0b' : 'var(--red)';
+
+  const mood = pctUp >= 0.7 ? '📈 שוק חיובי מאוד' : pctUp >= 0.5 ? '↗ מעורב-חיובי' : pctUp >= 0.3 ? '↘ מעורב-שלילי' : '📉 שוק שלילי';
+  $('mi-mood').textContent = mood;
+}
+
+// ── EARNINGS CALENDAR (via spark earningsTimestamp) ─
+const TOP_EARN_SYMS = ['AAPL','MSFT','NVDA','AMZN','GOOGL','META','TSLA','JPM','V','WMT',
+  'JNJ','PFE','XOM','BAC','KO','NFLX','AMD','INTC','GS','DIS','COST','UNH','CVX','CRM','ADBE'];
+const EARN_NAMES = {
+  AAPL:'Apple',MSFT:'Microsoft',NVDA:'NVIDIA',AMZN:'Amazon',GOOGL:'Alphabet',
+  META:'Meta',TSLA:'Tesla',JPM:'JPMorgan',V:'Visa',WMT:'Walmart',
+  JNJ:'Johnson & Johnson',PFE:'Pfizer',XOM:'ExxonMobil',BAC:'Bank of America',
+  KO:'Coca-Cola',NFLX:'Netflix',AMD:'AMD',INTC:'Intel',GS:'Goldman Sachs',
+  DIS:'Disney',COST:'Costco',UNH:'UnitedHealth',CVX:'Chevron',CRM:'Salesforce',ADBE:'Adobe'
+};
+
+async function fetchEarningsCalendar() {
+  try {
+    const chunkSize = 10;
+    const allMeta = {};
+    // Batch fetch via spark (same endpoint we use for prices — no 401)
+    for (let i = 0; i < TOP_EARN_SYMS.length; i += chunkSize) {
+      const chunk = TOP_EARN_SYMS.slice(i, i + chunkSize);
+      const symbolsStr = chunk.join(',');
+      const cb = Math.floor(Date.now() / 10000);
+      const url = `https://query1.finance.yahoo.com/v7/finance/spark?symbols=${symbolsStr}&range=1d&interval=1d&cb=${cb}`;
+      const r = await fetch(`${_proxyUrl}/?url=${encodeURIComponent(url)}`);
+      if (!r.ok) continue;
+      const d = await r.json();
+      (d.spark?.result || []).forEach(res => {
+        const meta = res.response?.[0]?.meta;
+        if (meta?.earningsTimestamp) allMeta[res.symbol] = meta;
+      });
+    }
+
+    const now = new Date();
+    const in14days = new Date(now.getTime() + 14*24*3600*1000);
+
+    const upcoming = Object.entries(allMeta)
+      .map(([sym, meta]) => {
+        const ts = meta.earningsTimestamp;
+        const date = new Date(ts * 1000);
+        return { sym, date, ts };
+      })
+      .filter(e => e.date >= now && e.date <= in14days)
+      .sort((a,b) => a.ts - b.ts);
+
+    if (!upcoming.length) return;
+
+    const sec = $('earnings-section');
+    if (sec) sec.style.display = 'block';
+
+    const today = now.toDateString();
+    const tomorrow = new Date(now.getTime() + 86400000).toDateString();
+
+    $('earnings-grid').innerHTML = upcoming.map(e => {
+      const isToday = e.date.toDateString() === today;
+      const isTom   = e.date.toDateString() === tomorrow;
+      const dateStr = isToday ? 'היום' : isTom ? 'מחר' :
+        e.date.toLocaleDateString('he-IL', {weekday:'short', month:'short', day:'numeric'});
+      const cls = isToday ? 'today' : isTom ? 'tomorrow' : '';
+      const dateCls = isToday ? 'today' : (isTom ? 'soon' : '');
+      const q = qmap[e.sym] || {};
+      const priceStr = q.price ? `$${Number(q.price).toFixed(2)}  ${q.d1!=null?(q.d1>0?'▲':'▼')+(Math.abs(q.d1).toFixed(1))+'%':''}` : '';
+      return `<div class="earn-card ${cls}">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="earn-sym">${e.sym}</span>
+          <span class="earn-date ${dateCls}">${dateStr}</span>
+        </div>
+        <div class="earn-name">${EARN_NAMES[e.sym]||e.sym}</div>
+        ${priceStr?`<div class="earn-eps" style="font-family:var(--mono)">${priceStr}</div>`:''}
+      </div>`;
+    }).join('');
+  } catch(e) { console.error('earnings error', e); }
+}
+
+// ── MARKET INSIGHTS (auto, no API) ──────────────────────
+function runInsights() {
+  const grid = $('insights-grid');
+  const btn = $('insights-btn');
+  if (!grid) return;
+
+  // ── נתוני בסיס ──
+  const secData = SECTORS.map(s => ({
+    sym:s.sym, name:s.name,
+    d:qmap[s.sym]||{}, h:histMap[s.sym]||{}
+  }));
+  const validDay = secData.filter(s=>s.d.d1!=null&&!isNaN(s.d.d1));
+  if (!validDay.length) { grid.innerHTML='<div class="insight-empty">טוען נתונים... נסה שוב בעוד רגע</div>'; return; }
+
+  const avgD1 = validDay.reduce((a,s)=>a+s.d.d1,0)/validDay.length;
+  const upCount = validDay.filter(s=>s.d.d1>0).length;
+  const pctUp = upCount/validDay.length;
+  const sorted = [...validDay].sort((a,b)=>b.d.d1-a.d.d1);
+  const top = sorted[0], weak = sorted[sorted.length-1];
+  const fg = calcFearGreed();
+  const spy = qmap['SPY']||{}, qqq = qmap['QQQ']||{};
+  const vix = qmap['VIXY']||{};
+
+  // ── בניית כרטיסיות ──
+  const cards = [];
+
+  // 1. מגמת יום
+  let moodType, moodTitle, moodBody;
+  if (pctUp >= 0.7) {
+    moodType='bull';
+    moodTitle=`יום חיובי — ${upCount}/${validDay.length} סקטורים עולים`;
+    moodBody=`ממוצע שינוי הסקטורים עומד על ${avgD1>0?'+':''}${avgD1.toFixed(2)}%. רוחב שוק חיובי מעיד על עוצמה אמיתית ולא רק מניות בודדות שמושכות. ${spy.d1!=null?`S&P 500 ${spy.d1>0?'+':''}${spy.d1.toFixed(2)}%.`:''}`;
+  } else if (pctUp >= 0.45) {
+    moodType='neutral';
+    moodTitle=`יום מעורב — ${upCount}/${validDay.length} סקטורים חיוביים`;
+    moodBody=`שוק מפוצל ללא כיוון ברור. ממוצע ${avgD1>0?'+':''}${avgD1.toFixed(2)}%. בשוק מעורב עדיף להמתין לפריצה ברורה לכיוון אחד לפני כניסה לפוזיציה.`;
+  } else {
+    moodType='bear';
+    moodTitle=`יום שלילי — רק ${upCount}/${validDay.length} סקטורים חיוביים`;
+    moodBody=`לחץ מכירות רחב. ממוצע ${avgD1.toFixed(2)}%. כשרוב הסקטורים יורדים, קשה למצוא מקלט — שקול הגדלת מזומן או גידור.`;
+  }
+  cards.push({type:moodType, title:moodTitle, body:moodBody});
+
+  // 2. סקטור מוביל
+  if (top) {
+    const h = top.h;
+    const isAccelerating = h.w1!=null && top.d.d1 > h.w1/5;
+    cards.push({
+      type:'bull',
+      title:`${top.name} (${top.sym}) מוביל — ${top.d.d1>0?'+':''}${top.d.d1.toFixed(2)}% היום`,
+      body:`${h.m1!=null?`חודשי: ${h.m1>0?'+':''}${h.m1.toFixed(1)}%. `:''}`
+        +(h.fromHi!=null?`נמצא ${Math.abs(h.fromHi).toFixed(1)}% מתחת לשיא 52W. `:'')
+        +(isAccelerating?'מומנטום מתגבר — יום חזק יחסית לקצב השבוע. ':'')
+        +(h.ytd!=null?`מתחילת השנה: ${h.ytd>0?'+':''}${h.ytd.toFixed(1)}%.`:'')
+    });
+  }
+
+  // 3. סקטור חלש / סיכון
+  if (weak) {
+    const h = weak.h;
+    const nearLow = h.fromLo!=null && h.fromLo < 10;
+    cards.push({
+      type:'bear',
+      title:`${weak.name} (${weak.sym}) הכי חלש — ${weak.d.d1.toFixed(2)}% היום`,
+      body:`${h.m1!=null?`חודשי: ${h.m1>0?'+':''}${h.m1.toFixed(1)}%. `:''}`
+        +(nearLow?`קרוב לשפל שנתי — ${h.fromLo.toFixed(1)}% מעל השפל. תוסיף לחץ מוכרים. `:'')
+        +(h.ytd!=null?`YTD: ${h.ytd>0?'+':''}${h.ytd.toFixed(1)}%. `:'')
+        +'הימנע מכניסה נגד הכיוון בסקטור חלש.'
+    });
+  }
+
+  // 4. VIX / סנטימנט
+  if (vix.d1!=null) {
+    const vixUp = vix.d1 > 3;
+    const vixDown = vix.d1 < -3;
+    cards.push({
+      type: vixUp?'bear':vixDown?'bull':'neutral',
+      title: vixUp?`VIX עולה ${vix.d1>0?'+':''}${vix.d1.toFixed(1)}% — תנודתיות עולה`
+            :vixDown?`VIX יורד ${vix.d1.toFixed(1)}% — שוק רגוע`
+            :`VIX יציב (${vix.d1>0?'+':''}${vix.d1.toFixed(1)}%)`,
+      body: vixUp?`עלייה ב-VIX מסמנת חרדה בשוק. זה הזמן לצמצם סיכון, לא להגדיל. אופציות יקרות יותר כעת.`
+           :vixDown?`ירידת VIX מסמנת רגיעה. סביבה נוחה לפוזיציות ארוכות. אופציות זולות יחסית — הזדמנות ל-Covered Calls.`
+           :`תנודתיות נמוכה יחסית. שוק ב"המתנה". עדיף להמתין לזרז (נתון כלכלי, Earnings) לפני כניסה.`
+    });
+  }
+
+  // 5. המלצה טקטית — FG + Breadth
+  let tacticalType, tacticalTitle, tacticalBody;
+  if (fg.total >= 70 && pctUp < 0.4) {
+    tacticalType='bear'; tacticalTitle='סנטימנט גבוה + ירידות — זהירות!';
+    tacticalBody='שוק אופטימי מדי בזמן שמרבית הסקטורים יורדים. פיזור שלילי עלול לקדים ירידה חדה. שקול הפחתת חשיפה.';
+  } else if (fg.total <= 30 && pctUp > 0.6) {
+    tacticalType='bull'; tacticalTitle='פחד קיצוני + רוב עולה — הזדמנות?';
+    tacticalBody='שוק פסימי בעוד שרוב הסקטורים עולים. לרוב זהו סיגנל Contrarian חיובי. בדוק כניסה מבוקרת עם Stop Loss.';
+  } else if (pctUp >= 0.7 && avgD1 > 0.5) {
+    tacticalType='bull'; tacticalTitle='מומנטום חיובי רחב — Trend Following';
+    tacticalBody=`${upCount} סקטורים עולים עם ממוצע +${avgD1.toFixed(2)}%. שוק עם מומנטום חיובי נוטה להמשיך. הצטרף למגמה עם Trailing Stop.`;
+  } else {
+    tacticalType='info'; tacticalTitle='המתן לאיתות ברור';
+    tacticalBody='נתוני השוק כרגע מעורבים. אין כיוון דומיננטי ברור. עדיף לשבת על הגדר עד לפריצה ברורה — שמור תחמושת למצב ברור יותר.';
+  }
+  cards.push({type:tacticalType, title:tacticalTitle, body:tacticalBody});
+
+  // ── רינדור ──
+  const icons = {
+    bull:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>',
+    bear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>',
+    neutral:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>',
+    info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  };
+  grid.innerHTML = cards.map(c=>`
+    <div class="insight-card">
+      <div class="insight-card-hdr ${c.type}">${icons[c.type]||''}${c.title}</div>
+      <div class="insight-card-body">${c.body}</div>
+    </div>`).join('');
+
+  // עדכון כפתור
+  if(btn) btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> עדכן';
+}
+
+// ── PDF EXPORT ────────────────────────
+function exportDashboardPDF() {
+  const now = new Date();
+  const dateLabel = now.toLocaleDateString('he-IL', {year:'numeric', month:'long', day:'numeric'});
+  const timeLabel = now.toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'});
+
+  // נתוני מדדים
+  const indicesRows = [...INDICES, ...OTHER].map(s => {
+    const d = qmap[s.sym]||{};
+    const chgColor = (d.d1||0)>0 ? '#059669' : (d.d1||0)<0 ? '#dc2626' : '#6b7280';
+    return `<tr>
+      <td style="font-weight:700">${s.name}</td>
+      <td style="font-family:monospace;font-weight:600">${s.sym}</td>
+      <td style="font-family:monospace">${d.price ? fmtPrice(d.price,s.sym) : '–'}</td>
+      <td style="font-family:monospace;color:${chgColor};font-weight:700">${d.d1!=null?(d.d1>0?'+':'')+d.d1.toFixed(2)+'%':'–'}</td>
+    </tr>`;
+  }).join('');
+
+  // נתוני סקטורים
+  const sectorRows = SECTORS.map(s => {
+    const d = qmap[s.sym]||{}, h = histMap[s.sym]||{};
+    const chgColor = (d.d1||0)>0 ? '#059669' : (d.d1||0)<0 ? '#dc2626' : '#6b7280';
+    const vals = [d.d1,h.w1,h.m1,h.m3,h.m6,h.y1];
+    const a = avg(vals);
+    const cell = v => v!=null ? `<td style="font-family:monospace;color:${v>0?'#059669':v<0?'#dc2626':'#6b7280'};font-weight:${Math.abs(v)>3?'700':'400'}">${v>0?'+':''}${v.toFixed(1)}%</td>` : '<td style="color:#d1d5db">–</td>';
+    return `<tr>
+      <td style="font-weight:700">${s.name} <span style="font-family:monospace;color:#9ca3af;font-size:.75rem">${s.sym}</span></td>
+      ${cell(d.d1)}${cell(h.w1)}${cell(h.m1)}${cell(h.m3)}${cell(h.m6)}${cell(h.y1)}
+      ${a!=null?`<td style="font-family:monospace;font-weight:700;color:${a>0?'#059669':a<0?'#dc2626':'#6b7280'}">${a>0?'+':''}${a.toFixed(1)}%</td>`:'<td>–</td>'}
+    </tr>`;
+  }).join('');
+
+  // תובנות
+  const insightCards = document.querySelectorAll('.insight-card');
+  const insightsHtml = insightCards.length ? Array.from(insightCards).map(card => {
+    const hdr = card.querySelector('.insight-card-hdr');
+    const body = card.querySelector('.insight-card-body');
+    const type = hdr?.className.includes('bull')?'bull':hdr?.className.includes('bear')?'bear':'neutral';
+    const color = type==='bull'?'#059669':type==='bear'?'#dc2626':'#d97706';
+    return `<div style="padding:10px 0;border-bottom:1px solid #f3f4f6">
+      <div style="font-size:.8rem;font-weight:700;color:${color};margin-bottom:4px">${hdr?.textContent?.trim()||''}</div>
+      <div style="font-size:.78rem;color:#374151;line-height:1.5">${body?.textContent?.trim()||''}</div>
+    </div>`;
+  }).join('') : '<div style="color:#9ca3af;font-size:.8rem">אין תובנות</div>';
+
+  // FG
+  const fg = calcFearGreed();
+  const fgColor = fg.total>=70?'#059669':fg.total>=45?'#d97706':'#dc2626';
+  const fgLabel = fg.total>=70?'חמדנות':fg.total>=55?'חמדנות':fg.total>=45?'ניטרלי':fg.total>=25?'פחד':'פחד קיצוני';
+
+  const html = `<!DOCTYPE html><html dir="rtl" lang="he"><head>
+<meta charset="UTF-8"/>
+<title>דשבורד שוק אמריקאי — ${dateLabel}</title>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Rubik',sans-serif;background:#fff;color:#111827;font-size:13px;direction:rtl}
+.page{max-width:900px;margin:0 auto;padding:32px 28px}
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid #050d1a}
+.hdr-title{font-size:1.4rem;font-weight:800;color:#050d1a}
+.hdr-sub{font-size:.78rem;color:#6b7280;margin-top:3px}
+.hdr-meta{text-align:left;font-size:.75rem;color:#6b7280;line-height:1.7}
+.pills{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.pill{background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:6px 14px;font-size:.78rem}
+.pill b{font-size:1rem;font-weight:800;display:block}
+.section-title{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#6b7280;margin:20px 0 8px;display:flex;align-items:center;gap:6px}
+.section-title::before{content:'';width:3px;height:12px;background:#050d1a;border-radius:2px;display:inline-block}
+table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:.8rem}
+th{background:#f3f4f6;color:#374151;font-weight:600;padding:7px 10px;text-align:right;border:1px solid #e5e7eb;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px}
+td{padding:7px 10px;border:1px solid #f3f4f6;text-align:right;vertical-align:middle}
+tr:nth-child(even) td{background:#fafafa}
+.action-bar{position:fixed;bottom:0;left:0;right:0;background:#050d1a;padding:12px 24px;display:flex;gap:10px;justify-content:center}
+.action-btn{background:#00b4ff;color:#000;border:none;padding:10px 24px;border-radius:6px;font-weight:700;cursor:pointer;font-family:'Rubik',sans-serif;font-size:.85rem}
+.action-btn.sec{background:rgba(255,255,255,.15);color:#fff}
+@media print{.action-bar{display:none}body{font-size:11px}.page{padding:16px}}
+</style></head><body>
+<div class="page">
+  <div class="hdr">
+    <div>
+      <div class="hdr-title">דשבורד שוק אמריקאי</div>
+      <div class="hdr-sub">Yahoo Finance · Real-Time Market Data</div>
+    </div>
+    <div class="hdr-meta">
+      <div><strong>תאריך:</strong> ${dateLabel}</div>
+      <div><strong>שעה:</strong> ${timeLabel}</div>
+    </div>
+  </div>
+
+  <div class="pills">
+    <div class="pill"><b style="color:${fgColor}">${fg.total}</b>Fear & Greed</div>
+    <div class="pill"><b style="color:#050d1a">${SECTORS.filter(s=>(qmap[s.sym]||{}).d1>0).length}/${SECTORS.length}</b>סקטורים חיוביים</div>
+    <div class="pill"><b style="color:${(qmap['SPY']||{}).d1>0?'#059669':'#dc2626'}">${(qmap['SPY']||{}).d1!=null?((qmap['SPY'].d1>0?'+':'')+qmap['SPY'].d1.toFixed(2)+'%'):'–'}</b>S&P 500</div>
+    <div class="pill"><b style="color:${(qmap['QQQ']||{}).d1>0?'#059669':'#dc2626'}">${(qmap['QQQ']||{}).d1!=null?((qmap['QQQ'].d1>0?'+':'')+qmap['QQQ'].d1.toFixed(2)+'%'):'–'}</b>נאסד"ק</div>
+  </div>
+
+  <div class="section-title">מדדים מובילים</div>
+  <table><thead><tr><th>שם</th><th>סמל</th><th>מחיר</th><th>יום %</th></tr></thead><tbody>${indicesRows}</tbody></table>
+
+  <div class="section-title" style="page-break-before:auto">ביצועי סקטורים</div>
+  <table><thead><tr><th>סקטור</th><th>יום</th><th>שבוע</th><th>חודש</th><th>3 חד׳</th><th>6 חד׳</th><th>שנה</th><th>ממוצע</th></tr></thead><tbody>${sectorRows}</tbody></table>
+
+  <div class="section-title" style="page-break-before:always">תובנות שוק</div>
+  <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px">${insightsHtml}</div>
+
+  <div style="margin-top:32px;text-align:center;font-size:.7rem;color:#9ca3af;border-top:1px solid #f3f4f6;padding-top:12px">
+    דשבורד שוק אמריקאי · הופק ${dateLabel} בשעה ${timeLabel} · לצורך מידע בלבד, אינו מהווה ייעוץ השקעות
+  </div>
+</div>
+<div class="action-bar">
+  <button class="action-btn" onclick="window.print()">🖨️ הדפס / שמור PDF</button>
+  <button class="action-btn sec" onclick="window.close()">← סגור</button>
+</div>
+</body></html>`;
+
+  // iframe print — iOS safe (same pattern as Budgy)
+  const existing = document.getElementById('pdf-iframe');
+  if (existing) existing.remove();
+  const iframe = document.createElement('iframe');
+  iframe.id = 'pdf-iframe';
+  iframe.style.cssText = 'position:fixed;right:-10000px;bottom:-10000px;width:100%;height:100%;border:none';
+  document.body.appendChild(iframe);
+
+  let done = false;
+  function triggerPrint() {
+    if (done) return; done = true;
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    }, 2500);
+  }
+  iframe.onload = triggerPrint;
+  setTimeout(triggerPrint, 4000); // iOS fallback
+
+  const doc = iframe.contentWindow.document;
+  doc.open(); doc.write(html); doc.close();
+}
+
+// ── MACRO CONTEXT (FRED) ──────────────
+const MACRO_SERIES = {
+  DGS10:      {name:'10Y Treasury',    he:'תשואת אג"ח 10 שנים — ריבית בסיס לכל נכסי הסיכון',     suffix:'%'},
+  FEDFUNDS:   {name:'Fed Funds Rate',  he:'ריבית הפד — עולה=לחץ על מכפילים, יורדת=תמיכה בשוק',  suffix:'%'},
+  T10Y2Y:     {name:'Yield Curve',     he:'פרש תשואות 10Y-2Y — שלילי=אזהרת מיתון, חיובי=נורמלי', suffix:'%'},
+  DCOILWTICO: {name:'WTI Crude Oil',   he:'נפט גולמי — משפיע על עלויות ואינפלציה',               suffix:'$'},
+  MORTGAGE30US:{name:'Mortgage 30Y',  he:'ריבית משכנתא 30 שנה — לחץ על שוק הנדל"ן',             suffix:'%'},
+  UMCSENT:    {name:'Consumer Sentiment',he:'סנטימנט צרכני — מחזק את הצריכה הפרטית',             suffix:''},
+  VIXCLS:     {name:'VIX',            he:'מדד פחד — מעל 25=תנודתיות גבוהה, מתחת 15=שקט',        suffix:''},
+};
+
+// Map sector ETF → relevant FRED series
+const SECTOR_MACRO = {
+  XLK:  ['DGS10','FEDFUNDS','VIXCLS'],
+  XLF:  ['T10Y2Y','FEDFUNDS','DGS10'],
+  XLE:  ['DCOILWTICO','FEDFUNDS','DGS10'],
+  XLRE: ['MORTGAGE30US','DGS10','FEDFUNDS'],
+  XLY:  ['UMCSENT','FEDFUNDS','DGS10'],
+  XLP:  ['UMCSENT','FEDFUNDS','DGS10'],
+  XLC:  ['DGS10','FEDFUNDS','VIXCLS'],
+  XLI:  ['DGS10','FEDFUNDS','DCOILWTICO'],
+  XLB:  ['DCOILWTICO','DGS10','FEDFUNDS'],
+  XLU:  ['DGS10','FEDFUNDS','MORTGAGE30US'],
+  XLV:  ['DGS10','FEDFUNDS','VIXCLS'],
+};
+const DEFAULT_MACRO = ['DGS10','FEDFUNDS','VIXCLS'];
+
+function getStockSector(sym) {
+  for (const [etf, holdings] of Object.entries(ETF_HOLDINGS)) {
+    if (holdings.some(h => h.s === sym)) return etf;
+  }
+  return null;
+}
+
+async function fetchMacroContext(sym) {
+  const sector  = getStockSector(sym);
+  const series  = SECTOR_MACRO[sector] || DEFAULT_MACRO;
+  const results = {};
+  await Promise.allSettled(series.map(async id => {
+    try {
+      const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${id}&api_key=${FRED_KEY}&file_type=json&sort_order=desc&limit=3&observation_start=2020-01-01`;
+      const r = await fetch(_proxyUrl + '/?url=' + encodeURIComponent(url));
+      if (!r.ok) return;
+      const d = await r.json();
+      const obs = (d.observations || []).filter(o => o.value !== '.');
+      if (obs.length >= 1) {
+        const cur  = parseFloat(obs[0].value);
+        const prev = obs.length >= 2 ? parseFloat(obs[1].value) : null;
+        results[id] = {cur, prev, date: obs[0].date};
+      }
+    } catch(e) {}
+  }));
+  return {series, results, sector};
+}
+
+function renderMacroContext(macroData) {
+  const {series, results, sector} = macroData;
+  const items = series.map(id => {
+    const info = MACRO_SERIES[id];
+    const obs  = results[id];
+    if (!obs) return null;
+    const valStr = (info.suffix === '$' ? '$' : '') + obs.cur.toFixed(info.suffix==='%'?2:1) + (info.suffix==='%'?' %':'');
+    let chgHtml = '';
+    if (obs.prev != null) {
+      const diff = obs.cur - obs.prev;
+      const cls  = Math.abs(diff) < 0.01 ? 'flat' : diff > 0 ? 'up' : 'down';
+      chgHtml = `<div class="sp-macro-item-chg ${cls}">${diff>0?'+':''}${diff.toFixed(2)} מהפרסום הקודם</div>`;
+    }
+    return `<div class="sp-macro-item">
+      <div class="sp-macro-item-name">${info.name}</div>
+      <div class="sp-macro-item-val">${valStr}</div>
+      ${chgHtml}
+      <div class="sp-macro-item-he">${info.he}</div>
+    </div>`;
+  }).filter(Boolean).join('');
+
+  if (!items) return '';
+  const sectorLabel = sector ? ` · סקטור ${sector}` : '';
+  return `<div class="sp-macro">
+    <div class="sp-macro-title">הקשר מאקרו${sectorLabel}</div>
+    <div class="sp-macro-grid">${items}</div>
+  </div>`;
+}
+
+// ── ECONOMIC CALENDAR — FRED API (Federal Reserve St. Louis) ──
+const FRED_KEY = 'aa7f8d740d367d9ff2354194b5329fbe';
+
+// FOMC dates — only these aren't in FRED (Fed publishes annually)
+const FOMC_DATES = {
+  2025: ['2025-01-29','2025-03-19','2025-05-07','2025-06-18','2025-07-30','2025-09-17','2025-10-29','2025-12-10'],
+  2026: ['2026-01-28','2026-03-18','2026-04-29','2026-06-17','2026-07-29','2026-09-16','2026-11-04','2026-12-09'],
+};
+
+const FRED_RELEASES = [
+  {id:10,  name:'CPI Report',              he:'מדד המחירים לצרכן — מודד אינפלציה. גבוה מהצפוי = שוק יורד (חשש מריבית גבוהה).', impact:'high',   time:'08:30 ET', url:'https://www.bls.gov/cpi/'},
+  {id:50,  name:'NFP — Non-Farm Payrolls', he:'שכר חוץ-חקלאי — כמה משרות נוצרו. מדד עבודה חזק = כלכלה חזקה (לפעמים שוק יורד מחשש לריבית).', impact:'high',   time:'08:30 ET', url:'https://www.bls.gov/news.release/empsit.toc.htm'},
+  {id:54,  name:'PCE Price Index',         he:'הוצאות צריכה אישית — מדד האינפלציה המועדף על הפד. משפיע ישירות על החלטות ריבית.',  impact:'high',   time:'08:30 ET', url:'https://www.bea.gov/data/personal-consumption-expenditures-price-index'},
+  {id:53,  name:'GDP (Advance)',           he:'תוצר מקומי גולמי — גודל הכלכלה האמריקאית. שני רבעונים שליליים = מיתון.',           impact:'high',   time:'08:30 ET', url:'https://www.bea.gov/data/gdp/gross-domestic-product'},
+  {id:31,  name:'PPI Report',             he:'מדד מחירי יצרנים — אינפלציה מצד ההיצע. מקדים לעיתים את ה-CPI.',                   impact:'medium', time:'08:30 ET', url:'https://www.bls.gov/ppi/'},
+  {id:84,  name:'Retail Sales',           he:'מכירות קמעונאיות — כוח הצרכן. 70% מהכלכלה האמריקאית מבוססת על צריכה.',            impact:'medium', time:'08:30 ET', url:'https://www.census.gov/retail/index.html'},
+  {id:180, name:'Initial Jobless Claims', he:'תביעות אבטלה שבועיות — בריאות שוק העבודה. עלייה = התרופפות.',                      impact:'medium', time:'08:30 ET', url:'https://www.dol.gov/ui/data.pdf'},
+];
+
+async function fetchEconCalendarFRED() {
+  const today   = new Date();
+  const start   = today.toISOString().slice(0,10);
+  const end     = new Date(today.getTime() + 35*24*3600*1000).toISOString().slice(0,10);
+  const events  = [];
+
+  await Promise.allSettled(FRED_RELEASES.map(async rel => {
+    try {
+      const url = `https://api.stlouisfed.org/fred/release/dates?release_id=${rel.id}&api_key=${FRED_KEY}&file_type=json&sort_order=asc&realtime_start=${start}&realtime_end=${end}&include_release_dates_with_no_data=true`;
+      const r = await fetch(_proxyUrl + '/?url=' + encodeURIComponent(url));
+      if (!r.ok) return;
+      const d = await r.json();
+      (d.release_dates||[]).forEach(rd => {
+        if (rd.date >= start && rd.date <= end)
+          events.push({date:rd.date, name:rel.name, he:rel.he, impact:rel.impact, time:rel.time, url:rel.url, d:new Date(rd.date+'T12:00:00')});
+      });
+    } catch(e) {}
+  }));
+
+  // Add FOMC
+  const y = today.getFullYear();
+  [...(FOMC_DATES[y]||[]), ...(FOMC_DATES[y+1]||[])].forEach(date => {
+    if (date >= start && date <= end)
+      events.push({date, name:'FOMC Decision', he:'ועדת הריבית (פד) — קובעת את שיעור הריבית. עלייה=לחץ על מניות, ירידה=דחיפה לשוק.', impact:'high', time:'14:00 ET', url:'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm', d:new Date(date+'T12:00:00')});
+  });
+
+  return events.sort((a,b) => a.date.localeCompare(b.date));
+}
+
+async function renderEconCalendar() {
+  const wrap = $('econ-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="modal-loading" style="padding:20px;font-size:11px"><div class="mini-ring" style="margin:0 auto 8px"></div>טוען מ-FRED...</div>';
+
+  const today   = new Date();
+  const todayD  = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const past3   = new Date(todayD.getTime() - 3*24*3600*1000);
+  const DAYS_HE   = ['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'];
+  const MONTHS_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  let events = await fetchEconCalendarFRED();
+  events = events.filter(e => e.d >= past3);
+
+  if (!events.length) {
+    wrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--dim);font-size:12px">אין אירועים ב-30 הימים הקרובים</div>';
+    return;
+  }
+
+  wrap.innerHTML = events.map(e => {
+    const isToday = e.d.toDateString() === todayD.toDateString();
+    const isPast  = e.d < todayD;
+    const cls = isPast ? 'econ-past' : isToday ? 'econ-today-row' : '';
+    const href = e.url || '#';
+    return `<a class="econ-row ${cls}" href="${href}" onclick="if(this.href!=='#'){window.open('${href}','_blank','noopener,noreferrer');return false;}" style="text-decoration:none;color:inherit;display:flex;cursor:pointer">
+      <div class="econ-date-col">
+        <div class="econ-day">${e.d.getDate()}</div>
+        <div class="econ-mon">${MONTHS_EN[e.d.getMonth()]}</div>
+        <div class="econ-dow">${DAYS_HE[e.d.getDay()]}</div>
+      </div>
+      <div class="econ-body">
+        <div class="econ-name">${e.name}${isToday?' <span style="color:var(--blue);font-size:9px">• היום</span>':''}</div>
+        <div class="econ-he">${e.he}</div>
+        <div class="econ-impact">
+          <div class="econ-dot ${e.impact}"></div>
+          <span class="econ-impact-lbl">${e.impact==='high'?'השפעה גבוהה':'בינונית'}</span>
+        </div>
+      </div>
+      <div class="econ-time">${e.time}</div>
+    </a>`;
+  }).join('') + '<div style="padding:6px 12px 8px;text-align:left;font-size:9px;color:var(--dim);opacity:.6">מקור: FRED — Federal Reserve Bank of St. Louis</div>';
+}
+
+// ── SECTOR MACRO COLUMN (uses existing qmap data — no extra fetch) ──
+const FRED_COL_KEY = 'aa7f8d740d367d9ff2354194b5329fbe';
+const fredColData = {}; // {seriesId: {cur, prev}}
+
+const SECTOR_MACRO_COL = {
+  XLK:  {id:'DGS10',        label:'10Y',    fmt:v=>`${v.toFixed(2)}%`},
+  XLF:  {id:'DGS10',        label:'10Y',    fmt:v=>`${v.toFixed(2)}%`},
+  XLE:  {id:'DCOILWTICO',   label:'נפט',   fmt:v=>`$${v.toFixed(1)}`},
+  XLRE: {id:'DGS10',        label:'10Y',    fmt:v=>`${v.toFixed(2)}%`},
+  XLY:  {id:'DCOILWTICO',   label:'נפט',   fmt:v=>`$${v.toFixed(1)}`},
+  XLP:  {id:'DGS10',        label:'10Y',    fmt:v=>`${v.toFixed(2)}%`},
+  XLC:  {id:'DGS10',        label:'10Y',    fmt:v=>`${v.toFixed(2)}%`},
+  XLI:  {id:'DCOILWTICO',   label:'נפט',   fmt:v=>`$${v.toFixed(1)}`},
+  XLB:  {id:'DCOILWTICO',   label:'נפט',   fmt:v=>`$${v.toFixed(1)}`},
+  XLU:  {id:'DGS10',        label:'10Y',    fmt:v=>`${v.toFixed(2)}%`},
+  XLV:  {id:'DGS10',        label:'10Y',    fmt:v=>`${v.toFixed(2)}%`},
+};
+
+async function fetchFredColData() {
+  const needed = [...new Set(Object.values(SECTOR_MACRO_COL).map(v=>v.id))];
+  await Promise.allSettled(needed.map(async id => {
+    try {
+      const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${id}&api_key=${FRED_COL_KEY}&file_type=json&sort_order=desc&limit=3&observation_start=2020-01-01`;
+      const r = await fetch(_proxyUrl+'/?url='+encodeURIComponent(url));
+      if (!r.ok) return;
+      const d = await r.json();
+      const obs = (d.observations||[]).filter(o=>o.value!='.');
+      if (obs.length) fredColData[id] = {cur:parseFloat(obs[0].value), prev:obs.length>1?parseFloat(obs[1].value):null};
+    } catch(e){}
+  }));
+}
+
+function getSectorMacroTd(sym) {
+  const conf = SECTOR_MACRO_COL[sym];
+  if (!conf) return '<td style="border-left:2px solid var(--border2)"></td>';
+  const obs = fredColData[conf.id];
+  if (!obs) return '<td style="color:var(--dim);font-size:9px;border-left:2px solid var(--border2)">–</td>';
+  const val = conf.fmt(obs.cur);
+  const noChg = obs.prev==null || Math.abs(obs.cur-obs.prev)<0.001;
+  const arrow = noChg ? '' : obs.cur>obs.prev ? ' ▲' : ' ▼';
+  const clr = noChg ? 'var(--dim)' : obs.cur>obs.prev ? 'var(--red)' : 'var(--green)';
+  return `<td style="font-family:var(--mono);font-size:9px;white-space:nowrap;border-left:2px solid var(--border2);color:${clr}" title="${conf.label}: ${val}">${val}${arrow}</td>`;
+}
+
+// Auto-start if key saved
+startMarketClock(); // שעון שוק פועל תמיד, גם לפני לוגין
+if (_proxyUrl) {
+  init();
+} else {
+  showScreen('screen-key');
+}
