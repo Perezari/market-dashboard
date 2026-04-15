@@ -288,42 +288,108 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMobileMenu();c
 
 // ── Yahoo Finance API only (Finnhub removed) ─────────
 
-async function fetchMarketNews() {
-  // נשתמש בנקודת החיפוש של יאהו כדי להביא 5 כתבות על שוק המניות
-  const cb = Math.floor(Date.now() / 10000);
-  const yahooUrl = `https://query2.finance.yahoo.com/v1/finance/search?q=stock+market&newsCount=5&cb=${cb}`;
-  const proxyUrl = `${_proxyUrl}/?url=${encodeURIComponent(yahooUrl)}`;  
-  
-  try {
-    const r = await fetch(proxyUrl);
-    if (!r.ok) return;
-    const d = await r.json();
-    const news = d.news || [];
-    
-    if (news.length === 0) {
-      $('news-grid').innerHTML = '<div style="color:var(--dim); font-size:12px;">לא נמצאו חדשות כרגע.</div>';
-      return;
-    }
+// ── NEWS SECTION — tabs: עברית | English ────────────
 
-	$('news-grid').innerHTML = news.map(item => {
-      const date = new Date(item.providerPublishTime * 1000).toLocaleTimeString('he-IL', {hour: '2-digit', minute: '2-digit'});
-      return `
-        <a href="${item.link}" target="_blank" class="news-card">
-          <div class="news-title">${item.title}</div>
-          <div class="news-meta">
-            <span class="news-time">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-              ${date}
-            </span>
-            <span class="news-source">${item.publisher}</span>
-          </div>
-        </a>
-      `;
-    }).join('');
-  } catch (e) {
-    console.error("Error fetching news", e);
-    $('news-grid').innerHTML = '<div style="color:var(--red); font-size:12px;">שגיאה בטעינת חדשות.</div>';
-  }
+const HEBREW_NEWS_FEEDS = [
+  { name: 'וואלה כסף',      url: 'https://rss.walla.co.il/feed/557'   },
+  { name: 'כסף עולמי',      url: 'https://rss.walla.co.il/feed/112'   },
+  { name: 'קריפטו',         url: 'https://rss.walla.co.il/feed/13373' },
+  { name: 'וואלה TECH',     url: 'https://rss.walla.co.il/feed/4000'  },
+  { name: 'חדשות בעולם',    url: 'https://rss.walla.co.il/feed/2'     },
+  { name: 'דעות כסף',       url: 'https://rss.walla.co.il/feed/4997'  },
+  { name: 'רשתות חברתיות',  url: 'https://rss.walla.co.il/feed/13019' },
+];
+
+const EN_NEWS_FEEDS = [
+  { name: 'Benzinga Markets',  url: 'https://rss.app/feeds/6xoFWSgjRpOcDBAX.xml' },
+  { name: 'Benzinga Financial', url: 'https://rss.app/feeds/GlMwezZhdiLNXGNT.xml' },
+];
+
+function _parseRSSItems(text, sourceName) {
+  const items = [];
+  if (!text?.trim().startsWith('<') || text.includes('<!DOCTYPE html')) return items;
+  const xml = new DOMParser().parseFromString(text, 'text/xml');
+  if (xml.querySelector('parseerror,parsererror')) return items;
+  const nodes = [...xml.querySelectorAll('item'), ...xml.querySelectorAll('entry')];
+  nodes.slice(0, 8).forEach(node => {
+    const title = (node.querySelector('title')?.textContent || '').trim().replace(/<!\[CDATA\[|\]\]>/g, '');
+    const linkEl = node.querySelector('link');
+    const link = linkEl?.textContent?.trim() || linkEl?.getAttribute('href') || '';
+    const pub = node.querySelector('pubDate,published,updated')?.textContent?.trim();
+    const img = node.querySelector('enclosure[type^="image"]')?.getAttribute('url')
+              || node.querySelector('media\\:content,content')?.getAttribute('url')
+              || node.querySelector('image')?.getAttribute('url') || null;
+    if (title && link?.startsWith('http')) items.push({ title, link, pub, source: sourceName, img });
+  });
+  return items;
+}
+
+async function fetchHebrewNews() {
+  const grid = $('news-grid');
+  grid.innerHTML = '<div class="modal-loading" style="color:var(--dim);font-size:12px"><div class="mini-ring" style="margin:0 auto 8px"></div>טוען חדשות...</div>';
+  const allItems = [];
+  await Promise.allSettled(HEBREW_NEWS_FEEDS.map(async feed => {
+    try {
+      const r = await fetch(`${_proxyUrl}/?url=${encodeURIComponent(feed.url)}`);
+      if (!r.ok) return;
+      _parseRSSItems(await r.text(), feed.name).forEach(i => allItems.push(i));
+    } catch(e) {}
+  }));
+  _renderNewsGrid(allItems, 'he');
+}
+
+async function fetchEnglishNews() {
+  const grid = $('news-grid');
+  grid.innerHTML = '<div class="modal-loading" style="color:var(--dim);font-size:12px"><div class="mini-ring" style="margin:0 auto 8px"></div>Loading...</div>';
+  const allItems = [];
+  await Promise.allSettled(EN_NEWS_FEEDS.map(async feed => {
+    try {
+      const r = await fetch(`${_proxyUrl}/?url=${encodeURIComponent(feed.url)}`);
+      if (!r.ok) return;
+      _parseRSSItems(await r.text(), feed.name).forEach(i => allItems.push(i));
+    } catch(e) {}
+  }));
+  _renderNewsGrid(allItems, 'en');
+}
+
+function _renderNewsGrid(items, lang) {
+  const grid = $('news-grid');
+  const sorted = [...items].sort((a,b) => new Date(b.pub||0) - new Date(a.pub||0)).slice(0, 16);
+  if (!sorted.length) { grid.innerHTML='<div style="color:var(--dim);font-size:12px;text-align:center;padding:16px">לא נמצאו חדשות.</div>'; return; }
+  const isHe = lang === 'he';
+  grid.innerHTML = sorted.map(item => {
+    const time = item.pub ? new Date(item.pub).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}) : '';
+    const imgHtml = item.img ? `<div class="news-thumb"><img src="${item.img}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'"></div>` : '';
+    return `<a href="${item.link.replace(/"/g,'&quot;')}" target="_blank" rel="noopener noreferrer" class="news-card${item.img?' news-card-img':''}">
+      ${imgHtml}
+      <div class="news-card-text">
+        <div class="news-title"${isHe?'':' style="direction:ltr;text-align:left"'}>${item.title}</div>
+        <div class="news-meta"${isHe?'':' style="direction:ltr;justify-content:flex-start;gap:8px"'}>
+          <span class="news-time"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${time}</span>
+          <span class="news-source">${item.source}</span>
+        </div>
+      </div>
+    </a>`;
+  }).join('');
+}
+
+let _activeNewsTab = 'he';
+function initNewsSection() {
+  const section = document.querySelector('.news-section');
+  if (!section || section.querySelector('.news-tab-bar')) return;
+  const bar = document.createElement('div');
+  bar.className = 'news-tab-bar';
+  bar.innerHTML = `
+    <button class="news-tab-btn active" onclick="switchNewsTab('he')">🇮🇱 עברית</button>
+    <button class="news-tab-btn" onclick="switchNewsTab('en')">📈 Benzinga</button>`;
+  section.insertBefore(bar, $('news-grid'));
+  fetchHebrewNews();
+}
+function switchNewsTab(lang) {
+  _activeNewsTab = lang;
+  document.querySelectorAll('.news-tab-btn').forEach(b =>
+    b.classList.toggle('active', b.textContent.includes(lang==='he'?'עברית':'Benzinga')));
+  if (lang==='he') fetchHebrewNews(); else fetchEnglishNews();
 }
 
 async function fetchAndRenderMovers() {
@@ -1358,7 +1424,7 @@ async function init(){
     initSyncObserver(); // observe table for automatic height sync // skeleton מיידי עם יום% אמיתי
     renderSummary();
     renderFearGreed();
-    fetchMarketNews();
+    initNewsSection();
     fetchAndRenderMovers();
     drawChart();
     // הצג skeleton ל-YTD ו-Correlation מיד
