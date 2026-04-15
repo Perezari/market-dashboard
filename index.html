@@ -879,26 +879,28 @@ body.light .news-card:hover {
    6 NEW FEATURES — CSS
 ══════════════════════════════════════════════ */
 
-/* ── 1. MARKET CLOCK BAR ── */
-.market-bar{
-  display:flex;align-items:center;justify-content:space-between;
-  background:var(--bg2);border-bottom:1px solid var(--border);
-  padding:5px 16px;gap:12px;font-size:11px;
+/* ── 1. MARKET CLOCK CARD (dashed, in idx-other grid) ── */
+.market-clock-card{
+  background:transparent;
+  border:1.5px dashed var(--border2);
+  border-radius:8px;padding:9px 11px;
+  display:flex;flex-direction:column;gap:5px;
 }
-.market-status{display:flex;align-items:center;gap:7px}
+.mc-status-row{display:flex;align-items:center;gap:6px}
+.mc-bottom{font-size:8px;color:var(--dim);font-family:var(--mono);opacity:.6}
 .market-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;animation:pulse 2s ease infinite}
 .market-dot.open{background:#00e87a;box-shadow:0 0 8px #00e87a}
 .market-dot.pre{background:#f59e0b;box-shadow:0 0 8px #f59e0b}
 .market-dot.after{background:#f59e0b;box-shadow:0 0 8px #f59e0b}
 .market-dot.closed{background:var(--dim);box-shadow:none;animation:none}
-.market-label{font-weight:700;font-family:var(--mono);font-size:10px;letter-spacing:.5px}
+.market-label{font-weight:800;font-family:var(--mono);font-size:11px;letter-spacing:.4px}
 .market-label.open{color:#00e87a}
 .market-label.pre,.market-label.after{color:#f59e0b}
 .market-label.closed{color:var(--dim)}
-.market-countdown{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.market-countdown{font-family:var(--mono);font-size:10px;color:var(--dim);font-weight:600;line-height:1.3}
 .market-countdown b{color:var(--text)}
-.market-times{font-size:9px;color:var(--dim);font-family:var(--mono);opacity:.6}
-@media(max-width:480px){.market-times{display:none}}
+
+
 
 /* ── 2. FEAR & GREED ── */
 .fg-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;align-items:center;gap:4px}
@@ -1119,15 +1121,7 @@ body.light .macro-chg.down{background:rgba(204,26,58,.1)}
 
   <div class="ticker-wrap"><div class="ticker" id="ticker"></div></div>
 
-  <!-- שעון שוק -->
-  <div class="market-bar">
-    <div class="market-status">
-      <div class="market-dot closed" id="market-dot"></div>
-      <span class="market-label closed" id="market-label">טוען...</span>
-    </div>
-    <div class="market-countdown" id="market-countdown"></div>
-    <div class="market-times">NYSE: 09:30–16:00 ET</div>
-  </div>
+
 
   <!-- מאקרו -->
   <div class="macro-bar" id="macro-bar">
@@ -2455,6 +2449,16 @@ async function init(){
     renderTicker();
     renderCards('idx-main',  INDICES, ['יום'], ['d1']);
     renderCards('idx-other', OTHER,   ['יום'], ['d1']);
+    // כרטיסיית שעון שוק מקווקוות
+    if(!$('market-clock-card')){
+      const mc=document.createElement('div');
+      mc.id='market-clock-card'; mc.className='market-clock-card';
+      mc.innerHTML='<div class="mc-status-row"><div class="market-dot closed" id="market-dot"></div><span class="market-label closed" id="market-label">טוען...</span></div>'
+        +'<div class="market-countdown" id="market-countdown"></div>'
+        +'<div class="mc-bottom">NYSE 09:30–16:00 ET</div>';
+      $('idx-other').appendChild(mc);
+    }
+
     renderPositivity();
     renderSectorsWithSkeleton(); // skeleton מיידי עם יום% אמיתי
     renderSummary();
