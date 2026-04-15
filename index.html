@@ -608,7 +608,16 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 .sp-price{font-family:var(--mono);font-size:20px;font-weight:800;color:var(--text)}
 .sp-chg{font-family:var(--mono);font-size:11px;font-weight:700}
 .sp-chg.up{color:var(--green)}.sp-chg.down{color:var(--red)}.sp-chg.flat{color:var(--dim)}
-.sp-body{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
+.sp-tabs{display:flex;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+.sp-tab{flex:1;padding:9px 4px;font-size:11px;font-weight:700;font-family:var(--sans);background:none;border:none;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;margin-bottom:-1px}
+.sp-tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+.sp-tab:hover:not(.active){color:var(--text);background:var(--bg3)}
+.sp-fund-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+.sp-fund-item{background:var(--bg2);padding:11px 14px}
+.sp-fund-label{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px}
+.sp-fund-val{font-family:var(--mono);font-size:13px;font-weight:800;color:var(--text)}
+.sp-fund-sub{font-size:9px;color:var(--dim);margin-top:2px}
+.sp-fund-note{padding:10px 14px;font-size:10px;color:var(--dim);font-style:italic}
 .sp-chart-wrap{padding:12px 16px;border-bottom:1px solid var(--border)}
 .sp-chart-wrap canvas{display:block;width:100%!important}
 .sp-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
@@ -1108,7 +1117,30 @@ body.light .macro-chg.down{background:rgba(204,26,58,.1)}
 .insight-loading{display:flex;align-items:center;gap:10px;color:var(--dim);font-size:12px;padding:20px;justify-content:center}
 .insight-empty{text-align:center;color:var(--dim);font-size:12px;padding:24px;opacity:.7}
 @media(max-width:480px){.insights-grid{grid-template-columns:1fr}.insights-section{padding:12px 10px}}
-.earnings-section{padding:12px 16px;border-top:1px solid var(--border);background:var(--bg)}
+/* ── ECONOMIC CALENDAR ── */
+.econ-section{padding:12px 16px;border-top:1px solid var(--border);background:var(--bg)}
+.econ-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.econ-row{display:flex;align-items:flex-start;gap:12px;padding:11px 14px;border-bottom:1px solid var(--border);transition:background .12s}
+.econ-row:last-child{border-bottom:none}
+.econ-row:hover{background:var(--bg3)}
+.econ-date-col{flex-shrink:0;width:48px;text-align:center}
+.econ-day{font-family:var(--mono);font-size:17px;font-weight:800;color:var(--text);line-height:1}
+.econ-mon{font-size:8px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-top:1px}
+.econ-dow{font-size:8px;color:var(--dim);opacity:.7}
+.econ-body{flex:1;min-width:0}
+.econ-name{font-size:12px;font-weight:700;color:var(--text)}
+.econ-he{font-size:10px;color:var(--dim);margin-top:2px;line-height:1.4}
+.econ-impact{display:flex;align-items:center;gap:4px;margin-top:5px}
+.econ-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.econ-dot.high{background:#ef4444}.econ-dot.medium{background:#f59e0b}.econ-dot.low{background:var(--dim)}
+.econ-impact-lbl{font-size:9px;font-weight:700;letter-spacing:.4px}
+.econ-dot.high+.econ-impact-lbl{color:#ef4444}.econ-dot.medium+.econ-impact-lbl{color:#f59e0b}.econ-dot.low+.econ-impact-lbl{color:var(--dim)}
+.econ-time{flex-shrink:0;font-family:var(--mono);font-size:9px;color:var(--dim);text-align:right}
+.econ-today-row{background:rgba(0,180,255,.05)!important;border-right:3px solid var(--blue)}
+.econ-past{opacity:.4}
+@media(max-width:480px){.econ-time{font-size:8px}}
+
+/* ── EARNINGS CALENDAR ── */
 .earnings-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:8px}
 .earn-card{background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;transition:border-color .15s}
 .earn-card:hover{border-color:var(--blue)}
@@ -1499,6 +1531,14 @@ body.light .macro-chg.down{background:rgba(204,26,58,.1)}
   </div>
 
 
+  <!-- לוח אירועים כלכליים -->
+  <div class="econ-section">
+    <div class="section-label">לוח אירועים כלכליים — 30 ימים קרובים</div>
+    <div class="econ-wrap" id="econ-wrap">
+      <div class="modal-loading" style="padding:20px;font-size:11px"><div class="mini-ring" style="margin:0 auto 8px"></div>טוען...</div>
+    </div>
+  </div>
+
   <!-- לוח רווחים -->
   <div class="earnings-section" id="earnings-section" style="display:none">
     <div class="section-label">לוח רווחים — S&P 500 (7 ימים קרובים)</div>
@@ -1541,6 +1581,12 @@ body.light .macro-chg.down{background:rgba(204,26,58,.1)}
         <div class="sp-price" id="sp-price">–</div>
         <div class="sp-chg" id="sp-chg">–</div>
       </div>
+    </div>
+    <!-- Tabs -->
+    <div class="sp-tabs" id="sp-tabs">
+      <button class="sp-tab active" onclick="switchStockTab('chart')" id="tab-chart">גרף</button>
+      <button class="sp-tab" onclick="switchStockTab('fundamentals')" id="tab-fundamentals">פונדמנטלס</button>
+      <button class="sp-tab" onclick="switchStockTab('news')" id="tab-news">חדשות</button>
     </div>
     <div class="sp-body" id="sp-body">
       <div class="modal-loading" style="padding:40px"><div class="mini-ring" style="margin:0 auto 10px"></div>טוען...</div>
@@ -2567,14 +2613,13 @@ async function openStockDetail(sym, name) {
   $('sp-body').innerHTML = '<div class="modal-loading" style="padding:40px"><div class="mini-ring" style="margin:0 auto 10px"></div>טוען '+sym+'...</div>';
 
   try {
-    // v8/chart — only endpoint that works reliably
     const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=1d&interval=5m&includePrePost=true`;
     const newsUrl  = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(sym)}&newsCount=5&quotesCount=0&enableFuzzyQuery=false`;
     const [cRes, nRes] = await Promise.allSettled([
       fetch(_proxyUrl+'/?url='+encodeURIComponent(chartUrl)),
       fetch(_proxyUrl+'/?url='+encodeURIComponent(newsUrl)),
     ]);
-    let meta={}, timestamps=[], closes=[], news=[];
+    let meta={}, timestamps=[], closes=[], news={}, fundData={};
     if (cRes.status==='fulfilled' && cRes.value.ok) {
       const d = await cRes.value.json();
       const r = d.chart?.result?.[0];
@@ -2583,13 +2628,18 @@ async function openStockDetail(sym, name) {
     if (nRes.status==='fulfilled' && nRes.value.ok) {
       const d = await nRes.value.json(); news=d.news||[];
     }
-    renderStockDetail(sym, name, meta, timestamps, closes, news, dq);
+    // Store globally for tab switching
+    window._spData = {sym, name, meta, timestamps, closes, news, dq, fundData};
+    renderStockDetail(sym, name, meta, timestamps, closes, news, dq, fundData);
+    // Reset tabs
+    document.querySelectorAll('.sp-tab').forEach(t=>t.classList.remove('active'));
+    $('tab-chart')?.classList.add('active');
   } catch(e) {
     $('sp-body').innerHTML = '<div class="modal-loading" style="padding:30px;color:var(--dim)">שגיאה בטעינה</div>';
   }
 }
 
-function renderStockDetail(sym, name, meta, timestamps, closes, news, dq) {
+function renderStockDetail(sym, name, meta, timestamps, closes, news, dq, fundData={}) {
   const fmt2 = v => v!=null ? Number(v).toFixed(2) : '–';
   const fmtB = v => {
     if (!v) return '–';
@@ -2662,8 +2712,64 @@ function renderStockDetail(sym, name, meta, timestamps, closes, news, dq) {
     }).join('')}
   </div>` : '';
 
-  $('sp-body').innerHTML = chartHtml + statsHtml + newsHtml +
-    '<div style="height:max(env(safe-area-inset-bottom),20px)"></div>';
+  // Save tab content globally
+  window._spChartHtml = chartHtml + statsHtml + '<div style="height:max(env(safe-area-inset-bottom),20px)"></div>';
+
+  window._spNewsHtml = news.length
+    ? news.slice(0,6).map(n=>{
+        const ago=n.providerPublishTime?Math.round((Date.now()/1000-n.providerPublishTime)/3600):null;
+        return `<a class="sp-news-item" href="${n.link||'#'}" target="_blank" rel="noopener" style="display:flex;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);text-decoration:none;color:inherit">
+          <div style="flex:1"><div class="sp-news-title">${n.title||''}</div>
+          <div class="sp-news-meta">${n.publisher||''} ${ago!=null?'· '+(ago<1?'עכשיו':ago+'h ago'):''}</div></div>
+        </a>`;
+      }).join('') + '<div style="height:max(env(safe-area-inset-bottom),20px)"></div>'
+    : '<div style="padding:30px;text-align:center;color:var(--dim);font-size:12px">אין חדשות זמינות</div>';
+
+  // Fundamentals
+  // Fundamentals from meta (v8/chart) — available fields only
+  const f2 = v => v!=null ? Number(v).toFixed(2) : '–';
+  const fmtB2 = v => { if(!v&&v!==0)return'–'; if(v>=1e12)return(v/1e12).toFixed(2)+'T'; if(v>=1e9)return(v/1e9).toFixed(1)+'B'; if(v>=1e6)return(v/1e6).toFixed(1)+'M'; return v.toLocaleString(); };
+  const fundItems = [
+    {label:'52W High',     he:'שיא 52 שבועות',          val: meta.fiftyTwoWeekHigh ? '$'+f2(meta.fiftyTwoWeekHigh) : '–'},
+    {label:'52W Low',      he:'שפל 52 שבועות',          val: meta.fiftyTwoWeekLow  ? '$'+f2(meta.fiftyTwoWeekLow)  : '–'},
+    {label:'Prev Close',   he:'סגירה אתמול',             val: meta.chartPreviousClose ? '$'+f2(meta.chartPreviousClose) : '–'},
+    {label:'Day High',     he:'שיא יומי',                val: meta.regularMarketDayHigh ? '$'+f2(meta.regularMarketDayHigh) : '–'},
+    {label:'Day Low',      he:'שפל יומי',                val: meta.regularMarketDayLow  ? '$'+f2(meta.regularMarketDayLow)  : '–'},
+    {label:'Volume',       he:'נפח מסחר היום',          val: fmtB2(meta.regularMarketVolume || dq.vol)},
+    {label:'Avg Volume',   he:'ממוצע נפח יומי (20י)',   val: fmtB2(dq.avgVol)},
+    {label:'Exchange',     he:'בורסה',                   val: meta.exchangeName || '–'},
+  ];
+  window._spFundHtml = `
+    <div class="sp-fund-grid">${fundItems.map(f=>`
+      <div class="sp-fund-item">
+        <div class="sp-fund-label">${f.label}</div>
+        <div class="sp-fund-val">${f.val}</div>
+        <div class="sp-fund-sub">${f.he}</div>
+      </div>`).join('')}
+    </div>
+    <div style="padding:14px 16px;border-top:1px solid var(--border)">
+      <div style="font-size:10px;color:var(--dim);margin-bottom:10px">לנתוני פונדמנטלס מלאים (P/E, EPS, הכנסות, מאזן):</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <a href="https://finance.yahoo.com/quote/${sym}/financials" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:5px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:9px;text-decoration:none;color:var(--text);font-size:11px;font-weight:700">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 7 13.5 15.5 8.5 10.5 1 18"/><polyline points="16 7 22 7 22 13"/></svg>
+          Yahoo Finance
+        </a>
+        <a href="https://stockanalysis.com/stocks/${sym.toLowerCase()}/financials/" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:5px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:9px;text-decoration:none;color:var(--text);font-size:11px;font-weight:700">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Stock Analysis
+        </a>
+      </div>
+    </div>
+    <div style="height:max(env(safe-area-inset-bottom),20px)"></div>`;
+
+  $('sp-body').innerHTML = window._spChartHtml;
+}
+
+function switchStockTab(tab) {
+  document.querySelectorAll('.sp-tab').forEach(t=>t.classList.remove('active'));
+  $('tab-'+tab)?.classList.add('active');
+  $('sp-body').innerHTML = (tab==='fundamentals'?window._spFundHtml:tab==='news'?window._spNewsHtml:window._spChartHtml)
+    || '<div style="padding:30px;text-align:center;color:var(--dim)">טוען...</div>';
 }
 
 function closeStockDetail(e) {
@@ -2742,6 +2848,7 @@ async function init(){
     fetchMacro();
     renderMarketInternals();
     fetchEarningsCalendar();
+    renderEconCalendar(); // async — runs in background
 
     // Background: parallel fetch → single render
     $('footer').textContent='טוען נתונים היסטוריים...';
@@ -3522,6 +3629,96 @@ tr:nth-child(even) td{background:#fafafa}
 
   const doc = iframe.contentWindow.document;
   doc.open(); doc.write(html); doc.close();
+}
+
+// ── ECONOMIC CALENDAR — FRED API (Federal Reserve St. Louis) ──
+const FRED_KEY = 'aa7f8d740d367d9ff2354194b5329fbe';
+
+// FOMC dates — only these aren't in FRED (Fed publishes annually)
+const FOMC_DATES = {
+  2025: ['2025-01-29','2025-03-19','2025-05-07','2025-06-18','2025-07-30','2025-09-17','2025-10-29','2025-12-10'],
+  2026: ['2026-01-28','2026-03-18','2026-04-29','2026-06-17','2026-07-29','2026-09-16','2026-11-04','2026-12-09'],
+};
+
+const FRED_RELEASES = [
+  {id:10,  name:'CPI Report',              he:'מדד המחירים לצרכן — מודד אינפלציה. גבוה מהצפוי = שוק יורד (חשש מריבית גבוהה).', impact:'high',   time:'08:30 ET'},
+  {id:50,  name:'NFP — Non-Farm Payrolls', he:'שכר חוץ-חקלאי — כמה משרות נוצרו. מדד עבודה חזק = כלכלה חזקה (לפעמים שוק יורד מחשש לריבית).', impact:'high',   time:'08:30 ET'},
+  {id:54,  name:'PCE Price Index',         he:'הוצאות צריכה אישית — מדד האינפלציה המועדף על הפד. משפיע ישירות על החלטות ריבית.',  impact:'high',   time:'08:30 ET'},
+  {id:53,  name:'GDP (Advance)',           he:'תוצר מקומי גולמי — גודל הכלכלה האמריקאית. שני רבעונים שליליים = מיתון.',           impact:'high',   time:'08:30 ET'},
+  {id:31,  name:'PPI Report',             he:'מדד מחירי יצרנים — אינפלציה מצד ההיצע. מקדים לעיתים את ה-CPI.',                   impact:'medium', time:'08:30 ET'},
+  {id:84,  name:'Retail Sales',           he:'מכירות קמעונאיות — כוח הצרכן. 70% מהכלכלה האמריקאית מבוססת על צריכה.',            impact:'medium', time:'08:30 ET'},
+  {id:180, name:'Initial Jobless Claims', he:'תביעות אבטלה שבועיות — בריאות שוק העבודה. עלייה = התרופפות.',                      impact:'medium', time:'08:30 ET'},
+];
+
+async function fetchEconCalendarFRED() {
+  const today   = new Date();
+  const start   = today.toISOString().slice(0,10);
+  const end     = new Date(today.getTime() + 35*24*3600*1000).toISOString().slice(0,10);
+  const events  = [];
+
+  await Promise.allSettled(FRED_RELEASES.map(async rel => {
+    try {
+      const url = `https://api.stlouisfed.org/fred/release/dates?release_id=${rel.id}&api_key=${FRED_KEY}&file_type=json&sort_order=asc&realtime_start=${start}&realtime_end=${end}&include_release_dates_with_no_data=true`;
+      const r = await fetch(_proxyUrl + '/?url=' + encodeURIComponent(url));
+      if (!r.ok) return;
+      const d = await r.json();
+      (d.release_dates||[]).forEach(rd => {
+        if (rd.date >= start && rd.date <= end)
+          events.push({date:rd.date, name:rel.name, he:rel.he, impact:rel.impact, time:rel.time, d:new Date(rd.date+'T12:00:00')});
+      });
+    } catch(e) {}
+  }));
+
+  // Add FOMC
+  const y = today.getFullYear();
+  [...(FOMC_DATES[y]||[]), ...(FOMC_DATES[y+1]||[])].forEach(date => {
+    if (date >= start && date <= end)
+      events.push({date, name:'FOMC Decision', he:'ועדת הריבית (פד) — קובעת את שיעור הריבית. עלייה=לחץ על מניות, ירידה=דחיפה לשוק.', impact:'high', time:'14:00 ET', d:new Date(date+'T12:00:00')});
+  });
+
+  return events.sort((a,b) => a.date.localeCompare(b.date));
+}
+
+async function renderEconCalendar() {
+  const wrap = $('econ-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="modal-loading" style="padding:20px;font-size:11px"><div class="mini-ring" style="margin:0 auto 8px"></div>טוען מ-FRED...</div>';
+
+  const today   = new Date();
+  const todayD  = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const past3   = new Date(todayD.getTime() - 3*24*3600*1000);
+  const DAYS_HE   = ['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'];
+  const MONTHS_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  let events = await fetchEconCalendarFRED();
+  events = events.filter(e => e.d >= past3);
+
+  if (!events.length) {
+    wrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--dim);font-size:12px">אין אירועים ב-30 הימים הקרובים</div>';
+    return;
+  }
+
+  wrap.innerHTML = events.map(e => {
+    const isToday = e.d.toDateString() === todayD.toDateString();
+    const isPast  = e.d < todayD;
+    const cls = isPast ? 'econ-past' : isToday ? 'econ-today-row' : '';
+    return `<div class="econ-row ${cls}">
+      <div class="econ-date-col">
+        <div class="econ-day">${e.d.getDate()}</div>
+        <div class="econ-mon">${MONTHS_EN[e.d.getMonth()]}</div>
+        <div class="econ-dow">${DAYS_HE[e.d.getDay()]}</div>
+      </div>
+      <div class="econ-body">
+        <div class="econ-name">${e.name}${isToday?' <span style="color:var(--blue);font-size:9px">• היום</span>':''}</div>
+        <div class="econ-he">${e.he}</div>
+        <div class="econ-impact">
+          <div class="econ-dot ${e.impact}"></div>
+          <span class="econ-impact-lbl">${e.impact==='high'?'השפעה גבוהה':'בינונית'}</span>
+        </div>
+      </div>
+      <div class="econ-time">${e.time}</div>
+    </div>`;
+  }).join('') + '<div style="padding:6px 12px 8px;text-align:left;font-size:9px;color:var(--dim);opacity:.6">מקור: FRED — Federal Reserve Bank of St. Louis</div>';
 }
 
 // Auto-start if key saved
