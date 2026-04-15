@@ -1120,6 +1120,10 @@ body.light .macro-chg.down{background:rgba(204,26,58,.1)}
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
         מעבדה
       </button>
+      <button class="hdr-btn hdr-btn-desktop" onclick="exportDashboardPDF()" title="ייצוא PDF">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        PDF
+      </button>
       <button class="hdr-btn hdr-btn-desktop" onclick="logout()" title="התנתק">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         יציאה
@@ -1186,6 +1190,11 @@ body.light .macro-chg.down{background:rgba(204,26,58,.1)}
       <button class="mob-item" onclick="init();closeMobileMenu()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
         <span class="mob-item-label">רענן נתונים</span>
+      </button>
+
+      <button class="mob-item" onclick="exportDashboardPDF();closeMobileMenu()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span class="mob-item-label">ייצוא PDF</span>
       </button>
 
       <button class="mob-item" onclick="toggleTheme()">
@@ -3155,6 +3164,143 @@ function runInsights() {
 
   // עדכון כפתור
   if(btn) btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> עדכן';
+}
+
+// ── PDF EXPORT ────────────────────────
+function exportDashboardPDF() {
+  const now = new Date();
+  const dateLabel = now.toLocaleDateString('he-IL', {year:'numeric', month:'long', day:'numeric'});
+  const timeLabel = now.toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'});
+
+  // נתוני מדדים
+  const indicesRows = [...INDICES, ...OTHER].map(s => {
+    const d = qmap[s.sym]||{};
+    const chgColor = (d.d1||0)>0 ? '#059669' : (d.d1||0)<0 ? '#dc2626' : '#6b7280';
+    return `<tr>
+      <td style="font-weight:700">${s.name}</td>
+      <td style="font-family:monospace;font-weight:600">${s.sym}</td>
+      <td style="font-family:monospace">${d.price ? fmtPrice(d.price,s.sym) : '–'}</td>
+      <td style="font-family:monospace;color:${chgColor};font-weight:700">${d.d1!=null?(d.d1>0?'+':'')+d.d1.toFixed(2)+'%':'–'}</td>
+    </tr>`;
+  }).join('');
+
+  // נתוני סקטורים
+  const sectorRows = SECTORS.map(s => {
+    const d = qmap[s.sym]||{}, h = histMap[s.sym]||{};
+    const chgColor = (d.d1||0)>0 ? '#059669' : (d.d1||0)<0 ? '#dc2626' : '#6b7280';
+    const vals = [d.d1,h.w1,h.m1,h.m3,h.m6,h.y1];
+    const a = avg(vals);
+    const cell = v => v!=null ? `<td style="font-family:monospace;color:${v>0?'#059669':v<0?'#dc2626':'#6b7280'};font-weight:${Math.abs(v)>3?'700':'400'}">${v>0?'+':''}${v.toFixed(1)}%</td>` : '<td style="color:#d1d5db">–</td>';
+    return `<tr>
+      <td style="font-weight:700">${s.name} <span style="font-family:monospace;color:#9ca3af;font-size:.75rem">${s.sym}</span></td>
+      ${cell(d.d1)}${cell(h.w1)}${cell(h.m1)}${cell(h.m3)}${cell(h.m6)}${cell(h.y1)}
+      ${a!=null?`<td style="font-family:monospace;font-weight:700;color:${a>0?'#059669':a<0?'#dc2626':'#6b7280'}">${a>0?'+':''}${a.toFixed(1)}%</td>`:'<td>–</td>'}
+    </tr>`;
+  }).join('');
+
+  // תובנות
+  const insightCards = document.querySelectorAll('.insight-card');
+  const insightsHtml = insightCards.length ? Array.from(insightCards).map(card => {
+    const hdr = card.querySelector('.insight-card-hdr');
+    const body = card.querySelector('.insight-card-body');
+    const type = hdr?.className.includes('bull')?'bull':hdr?.className.includes('bear')?'bear':'neutral';
+    const color = type==='bull'?'#059669':type==='bear'?'#dc2626':'#d97706';
+    return `<div style="padding:10px 0;border-bottom:1px solid #f3f4f6">
+      <div style="font-size:.8rem;font-weight:700;color:${color};margin-bottom:4px">${hdr?.textContent?.trim()||''}</div>
+      <div style="font-size:.78rem;color:#374151;line-height:1.5">${body?.textContent?.trim()||''}</div>
+    </div>`;
+  }).join('') : '<div style="color:#9ca3af;font-size:.8rem">אין תובנות</div>';
+
+  // FG
+  const fg = calcFearGreed();
+  const fgColor = fg.total>=70?'#059669':fg.total>=45?'#d97706':'#dc2626';
+  const fgLabel = fg.total>=70?'חמדנות':fg.total>=55?'חמדנות':fg.total>=45?'ניטרלי':fg.total>=25?'פחד':'פחד קיצוני';
+
+  const html = `<!DOCTYPE html><html dir="rtl" lang="he"><head>
+<meta charset="UTF-8"/>
+<title>דשבורד שוק אמריקאי — ${dateLabel}</title>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Rubik',sans-serif;background:#fff;color:#111827;font-size:13px;direction:rtl}
+.page{max-width:900px;margin:0 auto;padding:32px 28px}
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid #050d1a}
+.hdr-title{font-size:1.4rem;font-weight:800;color:#050d1a}
+.hdr-sub{font-size:.78rem;color:#6b7280;margin-top:3px}
+.hdr-meta{text-align:left;font-size:.75rem;color:#6b7280;line-height:1.7}
+.pills{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.pill{background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:6px 14px;font-size:.78rem}
+.pill b{font-size:1rem;font-weight:800;display:block}
+.section-title{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#6b7280;margin:20px 0 8px;display:flex;align-items:center;gap:6px}
+.section-title::before{content:'';width:3px;height:12px;background:#050d1a;border-radius:2px;display:inline-block}
+table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:.8rem}
+th{background:#f3f4f6;color:#374151;font-weight:600;padding:7px 10px;text-align:right;border:1px solid #e5e7eb;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px}
+td{padding:7px 10px;border:1px solid #f3f4f6;text-align:right;vertical-align:middle}
+tr:nth-child(even) td{background:#fafafa}
+.action-bar{position:fixed;bottom:0;left:0;right:0;background:#050d1a;padding:12px 24px;display:flex;gap:10px;justify-content:center}
+.action-btn{background:#00b4ff;color:#000;border:none;padding:10px 24px;border-radius:6px;font-weight:700;cursor:pointer;font-family:'Rubik',sans-serif;font-size:.85rem}
+.action-btn.sec{background:rgba(255,255,255,.15);color:#fff}
+@media print{.action-bar{display:none}body{font-size:11px}.page{padding:16px}}
+</style></head><body>
+<div class="page">
+  <div class="hdr">
+    <div>
+      <div class="hdr-title">דשבורד שוק אמריקאי</div>
+      <div class="hdr-sub">Yahoo Finance · Real-Time Market Data</div>
+    </div>
+    <div class="hdr-meta">
+      <div><strong>תאריך:</strong> ${dateLabel}</div>
+      <div><strong>שעה:</strong> ${timeLabel}</div>
+    </div>
+  </div>
+
+  <div class="pills">
+    <div class="pill"><b style="color:${fgColor}">${fg.total}</b>Fear & Greed</div>
+    <div class="pill"><b style="color:#050d1a">${SECTORS.filter(s=>(qmap[s.sym]||{}).d1>0).length}/${SECTORS.length}</b>סקטורים חיוביים</div>
+    <div class="pill"><b style="color:${(qmap['SPY']||{}).d1>0?'#059669':'#dc2626'}">${(qmap['SPY']||{}).d1!=null?((qmap['SPY'].d1>0?'+':'')+qmap['SPY'].d1.toFixed(2)+'%'):'–'}</b>S&P 500</div>
+    <div class="pill"><b style="color:${(qmap['QQQ']||{}).d1>0?'#059669':'#dc2626'}">${(qmap['QQQ']||{}).d1!=null?((qmap['QQQ'].d1>0?'+':'')+qmap['QQQ'].d1.toFixed(2)+'%'):'–'}</b>נאסד"ק</div>
+  </div>
+
+  <div class="section-title">מדדים מובילים</div>
+  <table><thead><tr><th>שם</th><th>סמל</th><th>מחיר</th><th>יום %</th></tr></thead><tbody>${indicesRows}</tbody></table>
+
+  <div class="section-title" style="page-break-before:auto">ביצועי סקטורים</div>
+  <table><thead><tr><th>סקטור</th><th>יום</th><th>שבוע</th><th>חודש</th><th>3 חד׳</th><th>6 חד׳</th><th>שנה</th><th>ממוצע</th></tr></thead><tbody>${sectorRows}</tbody></table>
+
+  <div class="section-title" style="page-break-before:always">תובנות שוק</div>
+  <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px">${insightsHtml}</div>
+
+  <div style="margin-top:32px;text-align:center;font-size:.7rem;color:#9ca3af;border-top:1px solid #f3f4f6;padding-top:12px">
+    דשבורד שוק אמריקאי · הופק ${dateLabel} בשעה ${timeLabel} · לצורך מידע בלבד, אינו מהווה ייעוץ השקעות
+  </div>
+</div>
+<div class="action-bar">
+  <button class="action-btn" onclick="window.print()">🖨️ הדפס / שמור PDF</button>
+  <button class="action-btn sec" onclick="window.close()">← סגור</button>
+</div>
+</body></html>`;
+
+  // iframe print — iOS safe (same pattern as Budgy)
+  const existing = document.getElementById('pdf-iframe');
+  if (existing) existing.remove();
+  const iframe = document.createElement('iframe');
+  iframe.id = 'pdf-iframe';
+  iframe.style.cssText = 'position:fixed;right:-10000px;bottom:-10000px;width:100%;height:100%;border:none';
+  document.body.appendChild(iframe);
+
+  let done = false;
+  function triggerPrint() {
+    if (done) return; done = true;
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    }, 2500);
+  }
+  iframe.onload = triggerPrint;
+  setTimeout(triggerPrint, 4000); // iOS fallback
+
+  const doc = iframe.contentWindow.document;
+  doc.open(); doc.write(html); doc.close();
 }
 
 // Auto-start if key saved
