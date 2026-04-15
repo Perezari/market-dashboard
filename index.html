@@ -3947,7 +3947,8 @@ async function renderEconCalendar() {
     const isToday = e.d.toDateString() === todayD.toDateString();
     const isPast  = e.d < todayD;
     const cls = isPast ? 'econ-past' : isToday ? 'econ-today-row' : '';
-    return `<a class="econ-row ${cls}" href="${e.url||'#'}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:flex;cursor:pointer">
+    const href = e.url || '#';
+    return `<a class="econ-row ${cls}" href="${href}" onclick="if(this.href!=='#'){window.open('${href}','_blank','noopener,noreferrer');return false;}" style="text-decoration:none;color:inherit;display:flex;cursor:pointer">
       <div class="econ-date-col">
         <div class="econ-day">${e.d.getDate()}</div>
         <div class="econ-mon">${MONTHS_EN[e.d.getMonth()]}</div>
