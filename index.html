@@ -296,9 +296,9 @@ body.light .tbl-frozen-row{background:#fff}
 body.light .tbl-frozen-avg{background:var(--bg3)!important}
 .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;flex:1;min-width:0;will-change:scroll-position}
 table.t{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;min-width:520px}
-.t th{background:var(--bg);color:var(--dim);font-weight:600;padding:0 6px;height:26px;max-height:26px;line-height:26px;overflow:hidden;white-space:nowrap;border-bottom:1px solid var(--border);border-right:1px solid var(--border);font-size:9px;text-align:center;text-transform:uppercase;letter-spacing:.8px}
+.t th{background:var(--bg);color:var(--dim);font-weight:600;padding:0 6px;height:22px;max-height:22px;line-height:22px;overflow:hidden;white-space:nowrap;border-bottom:1px solid var(--border);border-right:1px solid var(--border);font-size:9px;text-align:center;text-transform:uppercase;letter-spacing:.8px}
 .t th:last-child{border-right:none}
-.t td{padding:0 6px;height:24px;max-height:24px;line-height:24px;overflow:hidden;white-space:nowrap;border-bottom:1px solid var(--border);border-right:1px solid var(--border);text-align:center;font-family:var(--mono);font-size:11px}
+.t td{padding:0 6px;height:20px;max-height:20px;line-height:20px;overflow:hidden;white-space:nowrap;border-bottom:1px solid var(--border);border-right:1px solid var(--border);text-align:center;font-family:var(--mono);font-size:11px}
 .t td:last-child{border-right:none}
 .t tr:last-child td{border-bottom:none}
 
@@ -606,7 +606,7 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
   .stock-panel{border-radius:14px;max-height:88vh;box-shadow:0 24px 60px rgba(0,0,0,.5)}
 }
 @media(max-width:480px){
-  .stock-panel{max-height:100vh!important;height:100vh!important;border-radius:0!important}
+  .stock-panel{max-height:100vh!important;height:100vh!important;border-radius:0!important;padding-top:env(safe-area-inset-top)}
 }
 .sp-hdr{padding:14px 16px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
 .sp-close-btn{background:var(--bg3);border:1px solid var(--border);color:var(--dim);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s;order:-1}
@@ -2635,24 +2635,51 @@ async function openStockDetail(sym, name) {
   try {
     const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=1d&interval=5m&includePrePost=true`;
     const newsUrl  = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(sym)}&newsCount=5&quotesCount=0&enableFuzzyQuery=false`;
-    const [cRes, nRes, macroData] = await Promise.allSettled([
+    const histUrl  = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=1mo&interval=1d`;
+    const [cRes, nRes, macroData, hRes] = await Promise.allSettled([
       fetch(_proxyUrl+'/?url='+encodeURIComponent(chartUrl)),
       fetch(_proxyUrl+'/?url='+encodeURIComponent(newsUrl)),
       fetchMacroContext(sym),
+      fetch(_proxyUrl+'/?url='+encodeURIComponent(histUrl)),
     ]);
-    let meta={}, timestamps=[], closes=[], news=[], macro={series:[],results:{},sector:null};
+    let meta={}, timestamps=[], closes=[], volumes=[], news=[], macro={series:[],results:{},sector:null};
     if (cRes.status==='fulfilled' && cRes.value.ok) {
       const d = await cRes.value.json();
       const r = d.chart?.result?.[0];
-      if (r) { meta=r.meta||{}; timestamps=r.timestamp||[]; closes=r.indicators?.quote?.[0]?.close||[]; }
+      if (r) { meta=r.meta||{}; timestamps=r.timestamp||[]; closes=r.indicators?.quote?.[0]?.close||[]; volumes=r.indicators?.quote?.[0]?.volume||[]; }
+    }
+    // Fallback: if intraday data missing/sparse (weekend/holiday), try 5d/1d chart
+    if (closes.filter(c=>c!=null).length < 3) {
+      try {
+        const fallUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=5d&interval=1d`;
+        const fRes = await fetch(_proxyUrl+'/?url='+encodeURIComponent(fallUrl));
+        if (fRes.ok) {
+          const fd = await fRes.json();
+          const fr = fd.chart?.result?.[0];
+          if (fr) { if (!meta.regularMarketPrice) meta={...fr.meta,...meta}; timestamps=fr.timestamp||[]; closes=fr.indicators?.quote?.[0]?.close||[]; volumes=fr.indicators?.quote?.[0]?.volume||[]; }
+        }
+      } catch(e) {}
     }
     if (nRes.status==='fulfilled' && nRes.value.ok) {
       const d = await nRes.value.json(); news=d.news||[];
     }
     if (macroData.status==='fulfilled') macro = macroData.value;
+    // Compute avgVol from 1mo daily history (accurate daily average)
+    if (!meta.averageDailyVolume3Month && !meta.averageDailyVolume10Day) {
+      try {
+        if (hRes.status==='fulfilled' && hRes.value.ok) {
+          const hd = await hRes.value.json();
+          const hr = hd.chart?.result?.[0];
+          if (hr) {
+            const dvols = (hr.indicators?.quote?.[0]?.volume||[]).filter(v=>v!=null&&v>0);
+            if (dvols.length >= 2) meta.averageDailyVolume3Month = Math.round(dvols.reduce((a,b)=>a+b,0)/dvols.length);
+          }
+        }
+      } catch(e) {}
+    }
     // Store globally for tab switching
-    window._spData = {sym, name, meta, timestamps, closes, news, dq, macro};
-    renderStockDetail(sym, name, meta, timestamps, closes, news, dq, {}, macro);
+    window._spData = {sym, name, meta, timestamps, closes, volumes, news, dq, macro};
+    renderStockDetail(sym, name, meta, timestamps, closes, volumes, news, dq, {}, macro);
     // Reset tabs
     document.querySelectorAll('.sp-tab').forEach(t=>t.classList.remove('active'));
     $('tab-chart')?.classList.add('active');
@@ -2661,7 +2688,7 @@ async function openStockDetail(sym, name) {
   }
 }
 
-function renderStockDetail(sym, name, meta, timestamps, closes, news, dq, fundData={}, macro={series:[],results:{},sector:null}) {
+function renderStockDetail(sym, name, meta, timestamps, closes, volumes, news, dq, fundData={}, macro={series:[],results:{},sector:null}) {
   const fmt2 = v => v!=null ? Number(v).toFixed(2) : '–';
   const fmtB = v => {
     if (!v) return '–';
@@ -2690,35 +2717,77 @@ function renderStockDetail(sym, name, meta, timestamps, closes, news, dq, fundDa
     <div class="sp-stat"><div class="sp-stat-label">Volume</div>
       <div class="sp-stat-val">${fmtB(meta.regularMarketVolume||dq.vol)}</div></div>
     <div class="sp-stat"><div class="sp-stat-label">Avg Volume</div>
-      <div class="sp-stat-val">${fmtB(dq.avgVol)}</div></div>
+      <div class="sp-stat-val">${fmtB(meta.averageDailyVolume3Month||meta.averageDailyVolume10Day||dq.avgVol)}</div></div>
     <div class="sp-stat"><div class="sp-stat-label">Prev Close</div>
       <div class="sp-stat-val">${meta.chartPreviousClose?'$'+fmt2(meta.chartPreviousClose):'–'}</div></div>
     <div class="sp-stat"><div class="sp-stat-label">Exchange</div>
       <div class="sp-stat-val" style="font-size:10px">${meta.exchangeName||'–'}</div></div>
   </div>`;
 
-  // Intraday SVG chart
+  // Intraday SVG chart — SVG for lines/area/volume, HTML overlay for labels
   let chartHtml = '';
-  const pts = closes.map((c,i)=>({c,t:timestamps[i]})).filter(p=>p.c!=null);
+  const pts = closes.map((c,i)=>({c,t:timestamps[i],v:volumes[i]||0})).filter(p=>p.c!=null);
   if (pts.length > 2) {
-    const W=500,H=80,pad=4;
+    const W=500, CH=110, VH=26, PAD={l:0,r:0,t:6,b:2};
+    const cH=CH-PAD.t-PAD.b;
     const minC=Math.min(...pts.map(p=>p.c)), maxC=Math.max(...pts.map(p=>p.c));
-    const rng=maxC-minC||1;
+    const rng=(maxC-minC)||minC*0.01||1;
+    const padV=rng*0.1;
+    const lo=minC-padV, hi=maxC+padV, vRng=hi-lo;
     const prev=meta.chartPreviousClose||pts[0].c;
-    const isUp=(pts[pts.length-1]?.c||0)>=prev;
+    const lastC=pts[pts.length-1].c;
+    const isUp=lastC>=prev;
     const col=isUp?'#00e87a':'#ff3a5c';
-    const tx=i=>(i/(pts.length-1))*(W-pad*2)+pad;
-    const ty=v=>H-pad-((v-minC)/rng)*(H-pad*2);
-    const line=pts.map((p,i)=>`${tx(i).toFixed(1)},${ty(p.c).toFixed(1)}`).join(' ');
-    const area=`M${pad},${H} `+pts.map((p,i)=>`L${tx(i).toFixed(1)},${ty(p.c).toFixed(1)}`).join(' ')+` L${tx(pts.length-1).toFixed(1)},${H} Z`;
+    const tx=i=>(i/(pts.length-1))*W;
+    const ty=v=>PAD.t+cH-((v-lo)/vRng)*cH;
+    const linePoints=pts.map((p,i)=>`${tx(i).toFixed(1)},${ty(p.c).toFixed(1)}`).join(' ');
+    const areaPath=`M0,${(PAD.t+cH).toFixed(1)} `+pts.map((p,i)=>`L${tx(i).toFixed(1)},${ty(p.c).toFixed(1)}`).join(' ')+` L${W},${(PAD.t+cH).toFixed(1)} Z`;
     const prevY=ty(prev).toFixed(1);
-    chartHtml = `<div class="sp-chart-wrap">
-      <svg width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block;height:80px">
-        <defs><linearGradient id="spg${sym}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${col}" stop-opacity=".3"/><stop offset="100%" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
-        <line x1="${pad}" y1="${prevY}" x2="${W-pad}" y2="${prevY}" stroke="${col}" stroke-width="1" stroke-dasharray="3,3" opacity=".4"/>
-        <path d="${area}" fill="url(#spg${sym})"/>
-        <polyline points="${line}" fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+    // Volume bars — full width SVG
+    const maxVol=Math.max(...pts.map(p=>p.v),1);
+    const volBars=pts.map((p,i)=>{
+      const bw=Math.max(1,(W/pts.length)*0.65);
+      const bh=Math.max(1,(p.v/maxVol)*VH);
+      const bx=tx(i)-bw/2;
+      return `<rect x="${bx.toFixed(1)}" y="${(VH-bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" fill="${col}" opacity=".3"/>`;
+    }).join('');
+    // Grid lines
+    const gridLines=[0.25,0.5,0.75].map(f=>`<line x1="0" y1="${(PAD.t+cH*(1-f)).toFixed(1)}" x2="${W}" y2="${(PAD.t+cH*(1-f)).toFixed(1)}" stroke="rgba(255,255,255,.04)" stroke-width="1"/>`).join('');
+    // Prev close dashed line
+    const prevLine=`<line x1="0" y1="${prevY}" x2="${W}" y2="${prevY}" stroke="rgba(204,216,234,.25)" stroke-width="1" stroke-dasharray="4,4"/>`;
+    // Current price horizontal dashed line
+    const curY=ty(lastC).toFixed(1);
+    const curLine=`<line x1="0" y1="${curY}" x2="${W}" y2="${curY}" stroke="${col}" stroke-width="0.8" stroke-dasharray="2,4" opacity=".6"/>`;
+    // HTML price labels — position as % of total container height (130 chart + 28 vol + 18 time = 176px)
+    const _totH=176;
+    const tyPct=v=>((PAD.t+cH-((v-lo)/vRng)*cH)/_totH*100).toFixed(1);
+    // HTML time labels
+    const timePts=[0, Math.floor(pts.length*0.25), Math.floor(pts.length*0.5), Math.floor(pts.length*0.75), pts.length-1];
+    const timeLblsHtml=timePts.map(i=>{
+      const ts=pts[i]?.t; if(!ts) return '';
+      const d=new Date(ts*1000);
+      const h=d.getUTCHours()-4, m=d.getUTCMinutes();
+      const hh=(h+24)%24; const suffix=hh<12?'AM':'PM'; const h12=hh%12||12;
+      const lbl=`${h12}${m?':'+String(m).padStart(2,'0'):''}${suffix}`;
+      const pct=(i/(pts.length-1)*100).toFixed(1);
+      const anchor=i===0?'left':i===pts.length-1?'right':'center';
+      return `<span style="position:absolute;left:${pct}%;transform:translateX(${i===0?'0':i===pts.length-1?'-100%':'-50%'});font-size:8px;color:rgba(204,216,234,.4);font-family:var(--sans);white-space:nowrap">${lbl}</span>`;
+    }).join('');
+    chartHtml = `<div class="sp-chart-wrap" style="padding:0;background:var(--bg2);user-select:none">
+      <div style="position:relative">
+        <svg width="100%" viewBox="0 0 ${W} ${CH}" preserveAspectRatio="none" style="display:block;height:130px">
+          <defs><linearGradient id="spg${sym}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${col}" stop-opacity=".2"/><stop offset="100%" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+          ${gridLines}${prevLine}
+          <path d="${areaPath}" fill="url(#spg${sym})"/>
+          <polyline points="${linePoints}" fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          ${curLine}
+        </svg>
+        <svg width="100%" viewBox="0 0 ${W} ${VH}" preserveAspectRatio="none" style="display:block;height:28px">${volBars}</svg>
+        <div style="position:absolute;top:${tyPct(maxC)}%;right:4px;transform:translateY(-50%);font-size:8px;color:rgba(204,216,234,.45);font-family:var(--mono);pointer-events:none;line-height:1">${maxC.toFixed(2)}</div>
+        <div style="position:absolute;top:${tyPct(minC)}%;right:4px;transform:translateY(-50%);font-size:8px;color:rgba(204,216,234,.45);font-family:var(--mono);pointer-events:none;line-height:1">${minC.toFixed(2)}</div>
+        <div style="position:absolute;top:${tyPct(lastC)}%;right:4px;transform:translateY(-50%);font-size:8px;color:${col};font-weight:700;font-family:var(--mono);pointer-events:none;background:var(--bg2);padding:1px 0;line-height:1">${lastC.toFixed(2)}</div>
+        <div style="position:relative;height:18px;margin:0 4px">${timeLblsHtml}</div>
+      </div>
     </div>`;
   }
 
@@ -2740,9 +2809,22 @@ function renderStockDetail(sym, name, meta, timestamps, closes, news, dq, fundDa
   window._spNewsHtml = news.length
     ? news.slice(0,6).map(n=>{
         const ago=n.providerPublishTime?Math.round((Date.now()/1000-n.providerPublishTime)/3600):null;
+        const t=(n.title||'').toLowerCase();
+        const pos=['surge','soar','beat','gain','growth','strong','record','upgrade','rally','rise','profit','exceed','jumps','climbs'];
+        const neg=['fall','drop','miss','loss','weak','cut','crash','decline','plunge','slump','disappoint','warning','concern','below','down'];
+        const p=pos.filter(w=>t.includes(w)).length, ng=neg.filter(w=>t.includes(w)).length;
+        const sent=p>ng?'positive':ng>p?'negative':'neutral';
+        const badge=sent==='positive'?'<span style="display:inline-flex;align-items:center;font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:var(--gd);color:var(--green);text-transform:uppercase">▲ חיובי</span>'
+          :sent==='negative'?'<span style="display:inline-flex;align-items:center;font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:var(--rd);color:var(--red);text-transform:uppercase">▼ שלילי</span>'
+          :'<span style="display:inline-flex;align-items:center;font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:var(--bg4);color:var(--dim);text-transform:uppercase">● ניטרלי</span>';
         return `<a class="sp-news-item" href="${n.link||'#'}" target="_blank" rel="noopener" style="display:flex;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);text-decoration:none;color:inherit">
-          <div style="flex:1"><div class="sp-news-title">${n.title||''}</div>
-          <div class="sp-news-meta">${n.publisher||''} ${ago!=null?'· '+(ago<1?'עכשיו':ago+'h ago'):''}</div></div>
+          <div style="flex:1">
+            <div class="sp-news-title">${n.title||''}</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:5px">
+              ${badge}
+              <span class="sp-news-meta">${n.publisher||''} ${ago!=null?'· '+(ago<1?'עכשיו':ago+'h ago'):''}</span>
+            </div>
+          </div>
         </a>`;
       }).join('') + '<div style="height:max(env(safe-area-inset-bottom),20px)"></div>'
     : '<div style="padding:30px;text-align:center;color:var(--dim);font-size:12px">אין חדשות זמינות</div>';
