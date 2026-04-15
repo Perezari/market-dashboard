@@ -1182,14 +1182,19 @@ body.light .macro-chg.down{background:rgba(204,26,58,.1)}
     <div>
       <div class="section-label">ביצועי סקטורים — SPDR ETFs</div>
 	  <div class="tbl-scroll-hint">← גלול לצד לכל העמודות →</div>
-	<div class="tbl-wrap">
+	<div class="tbl-container">
+        <div class="tbl-frozen" id="sector-frozen">
+          <div class="tbl-frozen-hdr">סקטור</div>
+        </div>
+        <div class="tbl-wrap">
         <table class="t">
           <thead>
-            <tr><th>סקטור</th><th>יום %</th><th>שבוע</th><th>חודש</th><th>3 חד׳</th><th>6 חד׳</th><th>שנה</th><th>שיא 52W</th><th>שפל 52W</th><th>נפח</th><th>ממוצע</th></tr>
+            <tr><th>יום %</th><th>שבוע</th><th>חודש</th><th>3 חד׳</th><th>6 חד׳</th><th>שנה</th><th>שיא 52W</th><th>שפל 52W</th><th>נפח</th><th>ממוצע</th></tr>
           </thead>
           <tbody id="sector-tbody"></tbody>
         </table>
-    </div>
+        </div>
+      </div>
 
       <!-- YTD + Correlation — inline below sectors table -->
       <div id="ytd-section" style="display:none;margin-top:10px">
@@ -2076,19 +2081,39 @@ async function runScreener() {
 
 function renderSectorsWithSkeleton(){
   const sk='<td class="lc">&nbsp;</td>';
-  const rows=SECTORS.map(s=>{
-    return`<tr>
-      <td><span class="sym">${s.sym}</span>${s.name}</td>
-      ${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}
-    </tr>`;
+  const frozenRows = SECTORS.map(s =>
+    `<div class="tbl-frozen-row"><span class="sym">${s.sym}</span>${s.name}</div>`
+  ).join('') + '<div class="tbl-frozen-row tbl-frozen-avg">ממוצע</div>';
+  $('sector-frozen').innerHTML = '<div class="tbl-frozen-hdr">סקטור</div>' + frozenRows;
+
+  const rows = SECTORS.map(() =>
+    `<tr>${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}</tr>`
+  );
+  rows.push(`<tr class="avgrow">${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}<td class="lc">&nbsp;</td></tr>`);
+  $('sector-tbody').innerHTML = rows.join('');
+}
+
+function syncFrozenRows() {
+  const rows = document.querySelectorAll('#sector-tbody tr');
+  const frozenRows = document.querySelectorAll('#sector-frozen .tbl-frozen-row');
+  // Sync header
+  const th = document.querySelector('.t th');
+  const fh = document.querySelector('.tbl-frozen-hdr');
+  if (th && fh) fh.style.height = th.offsetHeight + 'px';
+  // Sync data rows
+  rows.forEach((tr, i) => {
+    if (frozenRows[i]) frozenRows[i].style.height = tr.offsetHeight + 'px';
   });
-  rows.push(`<tr class="avgrow"><td>ממוצע סקטורים</td>
-    ${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}<td class="lc">&nbsp;</td>
-  </tr>`);
-  $('sector-tbody').innerHTML=rows.join('');
 }
 
 function renderSectors(){
+  // עמודת שמות קפואה (לא sticky — אין ריצוד)
+  const frozen = $('sector-frozen');
+  if(frozen) frozen.innerHTML = '<div class="tbl-frozen-hdr">סקטור</div>'
+    + SECTORS.map(s=>`<div class="tbl-frozen-row" onclick="openSectorModal('${s.sym}','${s.name}')" style="cursor:pointer"><span class="sym">${s.sym}</span>${s.name}</div>`).join('')
+    + '<div class="tbl-frozen-row tbl-frozen-avg">ממוצע סקטורים</div>';
+
+  // טבלת נתונים (ללא עמודת שמות)
   const rows=SECTORS.map(s=>{
     const d=qmap[s.sym]||{};
     const h=histMap[s.sym]||{};
@@ -2097,10 +2122,8 @@ function renderSectors(){
     const td=(v,cls='')=>`<td class="${cellCls(v)}${cls?' '+cls:''}">${pct(v)}</td>`;
     const hiTd = h.fromHi!=null ? `<td class="hi52">${pct(h.fromHi)}</td>` : '<td style="color:var(--dim)">–</td>';
     const loTd = h.fromLo!=null ? `<td class="lo52">${pct(h.fromLo)}</td>` : '<td style="color:var(--dim)">–</td>';
-    // Volume indicator — vol from qmap (today), avgVol from histMap (20d avg)
     let volTd = '<td style="color:var(--dim)">–</td>';
-    const todayVol = d.vol;
-    const avgVol20 = h.avgVol;
+    const todayVol = d.vol, avgVol20 = h.avgVol;
     if (todayVol && avgVol20 && avgVol20 > 0) {
       const vr = todayVol / avgVol20;
       const vi = vr > 1.5 ? '🔥' : vr > 1.1 ? '▲' : vr < 0.6 ? '💤' : vr < 0.9 ? '▼' : '●';
@@ -2108,7 +2131,6 @@ function renderSectors(){
       volTd = `<td class="${vc}" title="${(vr*100).toFixed(0)}% מהממוצע">${vi} ${(vr*100).toFixed(0)}%</td>`;
     }
     return`<tr onclick="openSectorModal('${s.sym}','${s.name}')" title="לחץ לראות אחזקות">
-      <td><span class="sym">${s.sym}</span>${s.name}</td>
       ${td(d.d1)}${td(h.w1)}${td(h.m1)}${td(h.m3)}${td(h.m6)}${td(h.y1)}${hiTd}${loTd}${volTd}
       <td class="${cellCls(a)}">${pct(a)}</td>
     </tr>`;
@@ -2118,11 +2140,12 @@ function renderSectors(){
     return[d.d1,h.w1,h.m1,h.m3,h.m6,h.y1][pi];
   })));
   const ov=avg(periodAvgs);
-  rows.push(`<tr class="avgrow"><td>ממוצע סקטורים</td>
+  rows.push(`<tr class="avgrow">
     ${periodAvgs.map((v)=>`<td class="${cellCls(v)}">${pct(v)}</td>`).join('')}<td></td><td></td><td></td>
     <td class="${cellCls(ov)}"><b>${pct(ov)}</b></td>
   </tr>`);
   $('sector-tbody').innerHTML=rows.join('');
+  requestAnimationFrame(syncFrozenRows);
 }
 
 function renderSummary(){
@@ -2424,7 +2447,6 @@ async function init(){
     const corrSec=$('corr-section'); if(corrSec) corrSec.style.display='block';
     $('corr-table-wrap').innerHTML=`<div style="text-align:center;color:var(--dim);font-size:11px;padding:20px;font-family:var(--mono)"><div class="mini-ring" style="margin:0 auto 8px"></div>מחשב מתאמים...</div>`;
     showScreen('app');
-
     // Macro panel + P/C + Earnings (parallel, non-blocking)
     fetchMacro();
     renderMarketInternals();
