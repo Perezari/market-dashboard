@@ -290,7 +290,16 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMobileMenu();c
 
 // ── NEWS ENGINE — מקורות מוגדרים ב-news-sources.js ──────────
 
-function _parseRSSItems(text, sourceName) {
+function _getDomain(feed) {
+  if (feed.domain) return feed.domain;
+  try { return new URL(feed.url).hostname.replace('www.',''); } catch(e) { return ''; }
+}
+
+function _faviconUrl(domain) {
+  return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+}
+
+function _parseRSSItems(text, sourceName, domain) {
   const items = [];
   if (!text?.trim().startsWith('<') || text.includes('<!DOCTYPE html')) return items;
   const xml = new DOMParser().parseFromString(text, 'text/xml');
@@ -304,7 +313,7 @@ function _parseRSSItems(text, sourceName) {
     const img = node.querySelector('enclosure[type^="image"]')?.getAttribute('url')
               || node.querySelector('media\\:content,content')?.getAttribute('url')
               || node.querySelector('image')?.getAttribute('url') || null;
-    if (title && link?.startsWith('http')) items.push({ title, link, pub, source: sourceName, img });
+    if (title && link?.startsWith('http')) items.push({ title, link, pub, source: sourceName, domain, img });
   });
   return items;
 }
@@ -312,11 +321,17 @@ function _parseRSSItems(text, sourceName) {
 async function _fetchFeeds(feeds) {
   const allItems = [];
   await Promise.allSettled(feeds.map(async feed => {
+    const domain = _getDomain(feed);
     try {
       const r = await fetch(`${_proxyUrl}/?url=${encodeURIComponent(feed.url)}`);
+      console.log(`[RSS] ${feed.name}: HTTP ${r.status}`);
       if (!r.ok) return;
-      _parseRSSItems(await r.text(), feed.name).forEach(i => allItems.push(i));
-    } catch(e) {}
+      const text = await r.text();
+      console.log(`[RSS] ${feed.name} (${text.length} chars):`, text.slice(0, 300));
+      const items = _parseRSSItems(text, feed.name, domain);
+      console.log(`[RSS] ${feed.name}: ${items.length} items found`);
+      items.forEach(i => allItems.push(i));
+    } catch(e) { console.error(`[RSS] ${feed.name} error:`, e); }
   }));
   return allItems;
 }
@@ -333,23 +348,34 @@ async function fetchEnglishNews() {
 
 function _renderNewsGrid(items, lang) {
   const grid = $('news-grid');
-  const sorted = [...items].sort((a,b) => new Date(b.pub||0) - new Date(a.pub||0)).slice(0, 16);
+  const sorted = [...items].sort((a,b) => new Date(b.pub||0) - new Date(a.pub||0)).slice(0, 20);
   if (!sorted.length) { grid.innerHTML='<div style="color:var(--dim);font-size:12px;text-align:center;padding:16px">לא נמצאו חדשות.</div>'; return; }
   const isHe = lang === 'he';
-  grid.innerHTML = sorted.map(item => {
+
+  // קיבוץ לפי domain ייחודי לצורך כותרות מקור
+  const seenDomains = new Set();
+  let html = '';
+  sorted.forEach(item => {
+    const isNewDomain = !seenDomains.has(item.domain + item.source);
+    if (isNewDomain) {
+      seenDomains.add(item.domain + item.source);
+      const favicon = item.domain ? `<img src="${_faviconUrl(item.domain)}" class="news-src-favicon" alt="" onerror="this.style.display='none'">` : '';
+      html += `<div class="news-src-header">${favicon}<span>${item.source}</span></div>`;
+    }
     const time = item.pub ? new Date(item.pub).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}) : '';
     const imgHtml = item.img ? `<div class="news-thumb"><img src="${item.img}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'"></div>` : '';
-    return `<a href="${item.link.replace(/"/g,'&quot;')}" target="_blank" rel="noopener noreferrer" class="news-card${item.img?' news-card-img':''}">
+    html += `<a href="${item.link.replace(/"/g,'&quot;')}" target="_blank" rel="noopener noreferrer" class="news-card${item.img?' news-card-img':''}">
       ${imgHtml}
       <div class="news-card-text">
         <div class="news-title"${isHe?'':' style="direction:ltr;text-align:left"'}>${item.title}</div>
         <div class="news-meta"${isHe?'':' style="direction:ltr;justify-content:flex-start;gap:8px"'}>
           <span class="news-time"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${time}</span>
-          <span class="news-source">${item.source}</span>
+          ${item.domain?`<span class="news-source-badge"><img src="${_faviconUrl(item.domain)}" class="news-badge-favicon" alt="" onerror="this.style.display='none'"><span>${item.source}</span></span>`:`<span class="news-source">${item.source}</span>`}
         </div>
       </div>
     </a>`;
-  }).join('');
+  });
+  grid.innerHTML = html;
 }
 
 let _activeNewsTab = 'he';
@@ -360,14 +386,14 @@ function initNewsSection() {
   bar.className = 'news-tab-bar';
   bar.innerHTML = `
     <button class="news-tab-btn active" onclick="switchNewsTab('he')">🇮🇱 עברית</button>
-    <button class="news-tab-btn" onclick="switchNewsTab('en')">📈 Benzinga</button>`;
+    <button class="news-tab-btn" onclick="switchNewsTab('en')">📈 חדשות בעולם</button>`;
   section.insertBefore(bar, $('news-grid'));
   fetchHebrewNews();
 }
 function switchNewsTab(lang) {
   _activeNewsTab = lang;
   document.querySelectorAll('.news-tab-btn').forEach(b =>
-    b.classList.toggle('active', b.textContent.includes(lang==='he'?'עברית':'Benzinga')));
+    b.classList.toggle('active', b.textContent.includes(lang==='he'?'עברית':'חדשות בעולם')));
   if (lang==='he') fetchHebrewNews(); else fetchEnglishNews();
 }
 

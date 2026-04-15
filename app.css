@@ -1161,6 +1161,16 @@ body.light .macro-chg.down{background:rgba(204,26,58,.1)}
 .news-tab-btn{background:var(--bg3);border:1px solid var(--border);color:var(--dim);border-radius:7px;padding:5px 14px;font-size:11px;font-weight:600;font-family:var(--sans);cursor:pointer;transition:all .15s}
 .news-tab-btn:hover{border-color:var(--blue);color:var(--text)}
 .news-tab-btn.active{background:var(--blue);border-color:var(--blue);color:#000;font-weight:700}
+
+/* ── News source header (logo + name) ── */
+.news-src-header{display:flex;align-items:center;gap:7px;padding:10px 4px 4px;margin-top:4px;border-top:1px solid var(--border);font-size:11px;font-weight:700;color:var(--dim);letter-spacing:.3px;grid-column:1/-1}
+.news-src-header:first-child{border-top:none;margin-top:0;padding-top:0}
+.news-src-favicon{width:16px;height:16px;border-radius:3px;object-fit:contain}
+
+/* ── Source badge in each card ── */
+.news-source-badge{display:inline-flex;align-items:center;gap:4px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600;color:var(--dim)}
+.news-badge-favicon{width:12px;height:12px;border-radius:2px;object-fit:contain}
+
 /* ── News card with image ── */
 .news-card-img{flex-direction:row;align-items:center;gap:10px;padding:10px 12px}
 .news-thumb{flex-shrink:0;width:72px;height:52px;border-radius:6px;overflow:hidden;background:var(--bg3)}
