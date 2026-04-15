@@ -2562,6 +2562,14 @@ function startMarketClock() {
     lblEl.className = `market-label ${cls}`;
     lblEl.textContent = status;
     cntEl.innerHTML = countdownText;
+    // עדכון צבע גבול הכרטיסייה לפי מצב השוק
+    const card = $('market-clock-card');
+    if (card) {
+      const borderColor = cls==='open' ? 'rgba(0,232,122,.5)'
+                        : cls==='pre'||cls==='after' ? 'rgba(245,158,11,.5)'
+                        : 'var(--border2)';
+      card.style.borderColor = borderColor;
+    }
   }
   tick();
   setInterval(tick, 1000);
