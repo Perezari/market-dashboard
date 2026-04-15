@@ -2530,33 +2530,51 @@ function startMarketClock() {
     if (!dotEl) return;
     const isWeekend = day === 0 || day === 6;
     let status, cls, countdownText = '';
+    // שעון ישראל (ET + 7 בקיץ, +8 בחורף — DST אמריקאי)
+    const ilDate = new Date(et.getTime());
+    // מחשב הפרש: ישראל היא UTC+3 (קיץ) או UTC+2 (חורף)
+    // ET היא UTC-4 (קיץ) או UTC-5 (חורף) — ההפרש הוא תמיד 7 שעות בקיץ אמריקאי, 8 בחורף
+    const nowUTC = new Date();
+    const ilStr = nowUTC.toLocaleTimeString('he-IL', {timeZone:'Asia/Jerusalem', hour:'2-digit', minute:'2-digit'});
+    const formatIL = (etH, etM) => {
+      const target = new Date(et);
+      target.setHours(etH, etM, 0, 0);
+      const diffMs = target - et;
+      const future = new Date(nowUTC.getTime() + diffMs);
+      return future.toLocaleTimeString('he-IL', {timeZone:'Asia/Jerusalem', hour:'2-digit', minute:'2-digit'});
+    };
+
     if (isWeekend) {
       status = 'סגור (סוף שבוע)'; cls = 'closed';
       const daysTo = day === 6 ? 2 : 1;
       countdownText = `נפתח בעוד ${daysTo} ימים`;
-    } else if (totalMin < 4*60) {       // לפני 04:00
+    } else if (totalMin < 4*60) {
       status = 'סגור'; cls = 'closed';
       const rem = 4*60 - totalMin;
-      countdownText = `פרי-מרקט בעוד ${String(Math.floor(rem/60)).padStart(2,'0')}:${String(rem%60).padStart(2,'0')}`;
-    } else if (totalMin < 9*60+30) {    // פרי-מרקט 04:00–09:30
+      const remS = (60 - s) % 60;
+      const remM = remS > 0 ? rem - 1 : rem;
+      countdownText = `פרי-מרקט בעוד <b>${String(Math.floor(remM/60)).padStart(2,'0')}:${String(remM%60).padStart(2,'0')}:${String(remS).padStart(2,'0')}</b><br><span style="font-size:9px;opacity:.7">ישראל ${formatIL(4,0)}</span>`;
+    } else if (totalMin < 9*60+30) {
       status = 'פרי-מרקט'; cls = 'pre';
       const rem = 9*60+30 - totalMin;
       const remS = (60 - s) % 60;
       const remM = remS > 0 ? rem - 1 : rem;
-      countdownText = `פתיחה בעוד <b>${String(Math.floor(remM/60)).padStart(2,'0')}:${String(remM%60).padStart(2,'0')}:${String(remS).padStart(2,'0')}</b>`;
-    } else if (totalMin < 16*60) {      // פתוח 09:30–16:00
+      countdownText = `פתיחה בעוד <b>${String(Math.floor(remM/60)).padStart(2,'0')}:${String(remM%60).padStart(2,'0')}:${String(remS).padStart(2,'0')}</b><br><span style="font-size:9px;opacity:.7">ישראל ${formatIL(9,30)}</span>`;
+    } else if (totalMin < 16*60) {
       status = 'שוק פתוח'; cls = 'open';
       const rem = 16*60 - totalMin;
       const remS = (60 - s) % 60;
       const remM = remS > 0 ? rem - 1 : rem;
-      countdownText = `סגירה בעוד <b>${String(Math.floor(remM/60)).padStart(2,'0')}:${String(remM%60).padStart(2,'0')}:${String(remS).padStart(2,'0')}</b>`;
-    } else if (totalMin < 20*60) {      // אחרי 16:00–20:00
+      countdownText = `סגירה בעוד <b>${String(Math.floor(remM/60)).padStart(2,'0')}:${String(remM%60).padStart(2,'0')}:${String(remS).padStart(2,'0')}</b><br><span style="font-size:9px;opacity:.7">ישראל ${formatIL(16,0)}</span>`;
+    } else if (totalMin < 20*60) {
       status = 'אפטר-אוורס'; cls = 'after';
       const rem = 20*60 - totalMin;
-      countdownText = `נסגר בעוד ${String(Math.floor(rem/60)).padStart(2,'0')}:${String(rem%60).padStart(2,'0')}`;
+      const remS = (60 - s) % 60;
+      const remM = remS > 0 ? rem - 1 : rem;
+      countdownText = `נסגר בעוד <b>${String(Math.floor(remM/60)).padStart(2,'0')}:${String(remM%60).padStart(2,'0')}:${String(remS).padStart(2,'0')}</b>`;
     } else {
       status = 'סגור'; cls = 'closed';
-      countdownText = 'פרי-מרקט מחר בשעה 04:00 ET';
+      countdownText = `פרי-מרקט מחר<br><span style="font-size:9px;opacity:.7">ישראל ${formatIL(4,0)}</span>`;
     }
     dotEl.className = `market-dot ${cls}`;
     lblEl.className = `market-label ${cls}`;
