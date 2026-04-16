@@ -594,6 +594,21 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 .modal-body{padding:14px 20px;overflow-y:auto;overflow-x:hidden;flex:1;min-width:0}
 .modal-loading{display:flex;align-items:center;justify-content:center;gap:10px;padding:32px;color:var(--dim);font-size:13px}
 .mini-ring{width:20px;height:20px;border:2px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
+/* ── Stock detail loading screen ── */
+.sp-loading-screen{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;min-height:400px;gap:10px;padding:40px;
+}
+.sp-loading-sym{font-family:var(--mono);font-size:32px;font-weight:800;color:var(--text);line-height:1}
+.sp-loading-name{font-size:12px;color:var(--dim);margin-top:-4px;max-width:260px;text-align:center}
+.sp-loading-spinner{width:44px;height:44px;margin:12px 0 4px}
+.sp-loading-svg{width:44px;height:44px}
+.sp-loading-lbl{font-size:11px;color:var(--dim);letter-spacing:.3px}
+.sp-loading-skeletons{display:flex;flex-direction:column;gap:8px;width:200px;margin-top:16px}
+.sp-sk-bar{height:8px;background:var(--bg4);border-radius:4px;animation:skPulse 0.8s ease-in-out infinite}
+.sp-sk-bar:nth-child(2){animation-delay:.1s}
+.sp-sk-bar:nth-child(3){animation-delay:.2s}
+@keyframes skPulse{0%,100%{opacity:.3}50%{opacity:.7}}
 /* holdings table */
 /* ── MACRO CONTEXT (stock detail) ── */
 .sp-macro{padding:12px 16px;border-top:1px solid var(--border)}

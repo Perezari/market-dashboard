@@ -1112,7 +1112,27 @@ async function openStockDetail(sym, name) {
   // ניקוי סיידברים לפני טעינה
   const sb = $('sp-sidebar'); if (sb) sb.innerHTML = '';
   const sbr = $('sp-sidebar-right'); if (sbr) sbr.innerHTML = '';
-  $('sp-body').innerHTML = '<div class="modal-loading" style="padding:40px"><div class="mini-ring" style="margin:0 auto 10px"></div>טוען '+sym+'...</div>';
+  $('sp-body').innerHTML = `
+    <div class="sp-loading-screen">
+      <div class="sp-loading-sym">${sym}</div>
+      <div class="sp-loading-name">${name !== sym ? name : ''}</div>
+      <div class="sp-loading-spinner">
+        <svg class="sp-loading-svg" viewBox="0 0 50 50">
+          <circle cx="25" cy="25" r="20" fill="none" stroke="var(--border2)" stroke-width="3"/>
+          <circle cx="25" cy="25" r="20" fill="none" stroke="var(--blue)" stroke-width="3"
+            stroke-dasharray="40 90" stroke-linecap="round" stroke-dashoffset="0">
+            <animateTransform attributeName="transform" type="rotate"
+              from="0 25 25" to="360 25 25" dur="0.6s" repeatCount="indefinite"/>
+          </circle>
+        </svg>
+      </div>
+      <div class="sp-loading-lbl">טוען נתונים...</div>
+      <div class="sp-loading-skeletons">
+        <div class="sp-sk-bar" style="width:60%"></div>
+        <div class="sp-sk-bar" style="width:40%"></div>
+        <div class="sp-sk-bar" style="width:75%"></div>
+      </div>
+    </div>`;
 
   try {
     const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=1d&interval=5m&includePrePost=true`;
