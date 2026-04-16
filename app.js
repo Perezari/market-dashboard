@@ -822,9 +822,11 @@ function _doSyncFrozenRows() {
   const frozenRows = document.querySelectorAll('#sector-frozen .tbl-frozen-row');
   const th = document.querySelector('.t th');
   const fh = document.querySelector('.tbl-frozen-hdr');
-  if (th && fh) fh.style.height = th.offsetHeight + 'px';
+  // Account for CSS zoom on body
+  const zoomLevel = document.body.classList.contains('zoomed') ? 1.4 : 1;
+  if (th && fh) fh.style.height = (th.getBoundingClientRect().height / zoomLevel) + 'px';
   rows.forEach((tr, i) => {
-    if (frozenRows[i]) frozenRows[i].style.height = tr.offsetHeight + 'px';
+    if (frozenRows[i]) frozenRows[i].style.height = (tr.getBoundingClientRect().height / zoomLevel) + 'px';
   });
 }
 // ResizeObserver fires whenever table re-layouts — works on all devices
@@ -968,6 +970,30 @@ function toggleTheme(){
   $('theme-btn').innerHTML=isDark?sunSVG:moonSVG;
   drawChart();
 }
+
+// ── ZOOM TOGGLE ─────────────────────────────────────
+const zoomInSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>`;
+const zoomOutSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>`;
+
+function applyZoom(isZoomed) {
+  document.body.classList.toggle('zoomed', isZoomed);
+  const btn = $('zoom-btn');
+  if (btn) {
+    btn.innerHTML = isZoomed ? zoomOutSVG : zoomInSVG;
+    btn.title = isZoomed ? 'מצב רגיל' : 'מצב מוגדל';
+    btn.style.color = isZoomed ? 'var(--blue)' : '';
+  }
+}
+function toggleZoom() {
+  const isZoomed = !document.body.classList.contains('zoomed');
+  localStorage.setItem('app_zoom', isZoomed ? '1' : '0');
+  applyZoom(isZoomed);
+}
+// Restore zoom on load
+(function(){
+  const saved = localStorage.getItem('app_zoom');
+  if (saved === '1') applyZoom(true);
+})();
 
 // ── SECTOR HOLDINGS — נטען מ-etf-holdings.js ─────────────────
 
@@ -1172,9 +1198,31 @@ async function openStockDetail(sym, name) {
       const d = await nRes.value.json(); news=d.news||[];
     }
     if (macroData.status==='fulfilled') macro = macroData.value;
+    // Company description — Wikipedia Hebrew (search by name) + Yahoo fallback
+    let companyDesc = '';
+    // Try Wikipedia Hebrew — search by company name
+    try {
+      const companyName = meta.longName || meta.shortName || name || sym;
+      const wikiSearchUrl = `https://he.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(companyName)}&format=json&origin=*&srlimit=1&srprop=snippet`;
+      const wsRes = await fetch(wikiSearchUrl); // direct — Wikipedia allows CORS
+      if (wsRes.ok) {
+        const wsData = await wsRes.json();
+        const pageTitle = wsData.query?.search?.[0]?.title;
+        if (pageTitle) {
+          const wUrl = `https://he.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(pageTitle)}`;
+          const wRes = await fetch(wUrl);
+          if (wRes.ok) {
+            const wd = await wRes.json();
+            if (wd.extract && wd.extract.length > 60) companyDesc = wd.extract;
+          }
+        }
+      }
+    } catch(e) {}
+    // Fallback: removed (Yahoo 401)
+    const finalDesc = companyDesc;
     // Store globally for tab switching
     window._spData = {sym, name, meta, chartTs, chartCl, chartVol, news, dq, macro};
-    renderStockDetail(sym, name, meta, chartTs, chartCl, chartVol, news, dq, {}, macro);
+    renderStockDetail(sym, name, meta, chartTs, chartCl, chartVol, news, dq, {}, macro, finalDesc);
     // Reset tabs
     document.querySelectorAll('.sp-tab').forEach(t=>t.classList.remove('active'));
     $('tab-chart')?.classList.add('active');
@@ -1247,8 +1295,16 @@ function buildChartSvg(sym, meta, timestamps, closes, volumes, rangeKey) {
     <line id="sp-xh-h" x1="0" y1="0" x2="${W}" y2="0" stroke="rgba(200,216,234,.3)" stroke-width="1" stroke-dasharray="3 2" opacity="0" pointer-events="none"/>
     <circle id="sp-xh-dot" cx="0" cy="0" r="4" fill="${col}" stroke="#0e1a2a" stroke-width="1.5" opacity="0" pointer-events="none"/>
     <rect id="sp-xh-overlay" x="0" y="0" width="${W}" height="${CHART_H}" fill="transparent"
-      onmousemove="_chartMove(event,this)" onmouseleave="_chartLeave()" ontouchmove="_chartMove(event,this)" ontouchend="_chartLeave()"/>`;
+      onmousemove="_chartMove(event,this)" onmouseleave="_chartLeave()"/>`;
 
+  // Add touch listeners passively after render (avoids violation warning)
+  window._chartAttachTouch = () => {
+    const el = document.getElementById('sp-xh-overlay');
+    if (!el) return;
+    el.addEventListener('touchmove', e => _chartMove(e, el), {passive:true});
+    el.addEventListener('touchend', () => _chartLeave(), {passive:true});
+  };
+  setTimeout(() => window._chartAttachTouch && window._chartAttachTouch(), 50);
   // Price labels (right side)
   const tyPct = v => (ty(v)/(CHART_H+VOL_H)*100).toFixed(1);
   const priceLbls = [maxC,(maxC+minC)/2,minC].map(v=>
@@ -1398,6 +1454,30 @@ function _rebuildSpBody(newChartHtml) {
 
   window._spChartHtml = bodyHtml;
   $('sp-body').innerHTML = bodyHtml;
+}
+
+async function _translateDesc(btn) {
+  const text = btn.dataset.text; if (!text) return;
+  btn.textContent = 'מתרגם...';
+  btn.style.pointerEvents = 'none';
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:400,
+        messages:[{role:'user', content:`תרגם את הטקסט הבא לעברית תמציתית (3-4 משפטים מקסימום). ענה רק בעברית, ללא הקדמה:\n\n${text}`}]
+      })
+    });
+    const d = await res.json();
+    const translated = d.content?.[0]?.text || '';
+    if (translated) {
+      const p = btn.previousElementSibling;
+      if (p) { p.textContent = translated; p.classList.add('sp-desc-translated'); }
+      btn.remove();
+    } else { btn.textContent = 'שגיאה בתרגום'; }
+  } catch(e) { btn.textContent = 'שגיאה בתרגום'; }
 }
 
 const _ZOOM_LEVELS = [1, 0.75, 0.5, 0.25];
@@ -1551,7 +1631,7 @@ async function switchChartRange(rangeKey) {
   }
 }
 
-function renderStockDetail(sym, name, meta, timestamps, closes, volumes, news, dq, fundData={}, macro={series:[],results:{},sector:null}) {
+function renderStockDetail(sym, name, meta, timestamps, closes, volumes, news, dq, fundData={}, macro={series:[],results:{},sector:null}, companyDesc='') {
   const fmt2 = v => v!=null ? Number(v).toFixed(2) : '–';
   const fmtB = v => {
     if (!v) return '–';
@@ -1611,6 +1691,10 @@ function renderStockDetail(sym, name, meta, timestamps, closes, volumes, news, d
     { label:'Symbol',    val: sym },
     { label:'Exchange',  val: exch },
     { label:'Currency',  val: meta.currency || 'USD' },
+    ...(meta.sector    ? [{ label:'Sector',    val: meta.sector }] : []),
+    ...(meta.industry  ? [{ label:'Industry',  val: meta.industry }] : []),
+    ...(meta.location  ? [{ label:'Location',  val: meta.location }] : []),
+    ...(meta.fullTimeEmployees ? [{ label:'Employees', val: Number(meta.fullTimeEmployees).toLocaleString() }] : []),
     { label:'Market Cap',val: meta.marketCap ? fmtB(meta.marketCap) : '–' },
     { label:'P/E',       val: meta.trailingPE ? fmt2(meta.trailingPE) : '–' },
     { label:'EPS',       val: meta.trailingEps ? '$'+fmt2(meta.trailingEps) : '–' },
@@ -1635,13 +1719,23 @@ function renderStockDetail(sym, name, meta, timestamps, closes, volumes, news, d
       </a>
     </div>`;
 
+  // Company description card (if available)
+  const descCard = companyDesc ? `
+    <div class="sp-section-card" style="margin:12px 0 0">
+      <div class="sp-section-hdr">אודות החברה</div>
+      <div class="sp-desc-body">
+        <p class="sp-desc-en">${companyDesc}</p>
+      </div>
+    </div>` : '';
+
   // Sidebar: section cards with header INSIDE the card
   const sidebarHtml = `
     <div class="sp-section-card" style="margin:0 0 12px">
       <div class="sp-section-hdr">פרופיל</div>
       <div style="padding:10px 12px">${profileCardHtml}</div>
     </div>
-    <div class="sp-section-card" style="margin:0">
+    ${descCard}
+    <div class="sp-section-card" style="margin:12px 0 0">
       <div class="sp-section-hdr">הקשר מאקרו</div>
       ${macroHtml}
     </div>
@@ -1820,16 +1914,8 @@ async function init(){
     }
     renderTicker();
     renderCards('idx-main',  INDICES, ['יום'], ['d1']);
-    renderCards('idx-other', OTHER,   ['יום'], ['d1']);
-    // כרטיסיית שעון שוק מקווקוות
-    if(!$('market-clock-card')){
-      const mc=document.createElement('div');
-      mc.id='market-clock-card'; mc.className='market-clock-card';
-      mc.innerHTML='<div class="mc-status-row"><div class="market-dot closed" id="market-dot"></div><span class="market-label closed" id="market-label">טוען...</span></div>'
-        +'<div class="market-countdown" id="market-countdown"></div>'
-        +'<div class="mc-bottom">NYSE 09:30–16:00 ET</div>';
-      $('idx-other').appendChild(mc);
-    }
+    renderCards('idx-other', OTHER, ['יום'], ['d1']);
+    // שעון השוק עבר לכותרת — אין צורך בכרטיסיית גריד
 
     renderPositivity();
     renderSectorsWithSkeleton();
@@ -1958,14 +2044,6 @@ function startMarketClock() {
     lblEl.className = `market-label ${cls}`;
     lblEl.textContent = status;
     cntEl.innerHTML = countdownText;
-    // עדכון צבע גבול הכרטיסייה לפי מצב השוק
-    const card = $('market-clock-card');
-    if (card) {
-      const borderColor = cls==='open' ? 'rgba(0,232,122,.5)'
-                        : cls==='pre'||cls==='after' ? 'rgba(245,158,11,.5)'
-                        : 'var(--border2)';
-      card.style.borderColor = borderColor;
-    }
   }
   tick();
   setInterval(tick, 1000);

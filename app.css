@@ -14,6 +14,39 @@
 body, button, input, select, div, span, td, th {
   font-family: var(--sans) !important;
 }
+/* ── ZOOM MODE ── */
+body.zoomed{zoom:1.4}
+/* When body is zoomed, panel must compensate (fixed elements get re-measured) */
+body.zoomed .stock-panel{
+  zoom:1!important;
+  width:calc(100vw / 1.4)!important;
+  height:calc(100vh / 1.4)!important;
+}
+/* Modals in zoomed mode */
+body.zoomed .modal-overlay{padding:0}
+body.zoomed .modal{
+  max-width:calc(100vw / 1.4)!important;
+  max-height:calc(100vh / 1.4)!important;
+  width:calc(100vw / 1.4)!important;
+  border-radius:0!important;
+}
+/* Fix sector table row alignment in zoom */
+body.zoomed .t td, body.zoomed .t th{height:auto!important;line-height:1.4}
+/* ── Header inline clock ── */
+.hdr-clock-inline{
+  display:flex;flex-direction:column;gap:1px;
+  padding:4px 10px;border-right:1px solid var(--border);
+  margin-right:4px;
+}
+.hdr-clock-status{display:flex;align-items:center;gap:5px}
+.hdr-clock-time{font-size:9px;color:var(--dim);font-family:var(--mono);direction:ltr;white-space:nowrap}
+/* Mobile: show only dot + status label, hide countdown */
+@media(max-width:700px){
+  #zoom-btn{display:none}
+  .hdr-clock-inline{padding:3px 8px;border-right:none}
+  .hdr-clock-time{display:none}
+  .market-label{font-size:10px}
+}
 
 /* ── CUSTOM SCROLLBARS ── */
 ::-webkit-scrollbar {
@@ -641,6 +674,12 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 /* Desktop: three columns */
 @media(min-width:900px){
   .sp-panel-inner{max-width:1400px;margin:0 auto}
+  /* Panel zoom:1.4 only when body is NOT zoomed (body.zoomed handles zoom itself) */
+  body:not(.zoomed) .stock-panel{
+    zoom:1.4;
+    width:calc(100vw / 1.4)!important;
+    height:calc(100vh / 1.4)!important;
+  }
   .sp-sidebar{
     display:block;width:240px;flex-shrink:0;
     border-right:1px solid var(--border);
@@ -654,12 +693,8 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
     background:var(--bg);
     overflow-y:auto;
   }
-  /* Stats grid 2 columns in narrow sidebar */
-  .sp-sidebar-right .sp-stats-grid{
-    grid-template-columns:repeat(2,1fr);
-  }
+  .sp-sidebar-right .sp-stats-grid{grid-template-columns:repeat(2,1fr)}
   .sp-body{background:var(--bg2)}
-  .sp-section-card .sp-chart-hdr{padding:5px 8px}
 }
 /* Chart fullscreen overlay */
 .chart-fs-overlay{
@@ -721,6 +756,10 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
   border-radius:7px;padding:8px;text-decoration:none;
   color:var(--text);font-size:10px;font-weight:600;
 }
+/* Company description */
+.sp-desc-body{padding:10px 12px}
+.sp-desc-en{font-size:11px;color:var(--dim);line-height:1.6;margin:0;direction:rtl}
+.sp-desc-en:lang(he){font-family:var(--sans)}
 .sp-hdr{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
 .sp-close-btn{background:var(--bg3);border:1px solid var(--border);color:var(--dim);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s;order:-1}
 .sp-close-btn:hover{background:var(--bg4)}
