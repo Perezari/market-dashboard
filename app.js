@@ -323,20 +323,29 @@ async function _fetchFeeds(feeds) {
   await Promise.allSettled(feeds.map(async feed => {
     const domain = _getDomain(feed);
     try {
-      const r = await fetch(`${_proxyUrl}/?url=${encodeURIComponent(feed.url)}`);
-      console.log(`[RSS] ${feed.name}: HTTP ${r.status}`);
-      if (!r.ok) return;
-      const text = await r.text();
-      console.log(`[RSS] ${feed.name} (${text.length} chars):`, text.slice(0, 300));
+      // נסה ישירות (rss.app תומך CORS) — אחרת Worker
+      let text = null;
+      try {
+        const rd = await fetch(feed.url, {signal: AbortSignal.timeout(4000)});
+        if (rd.ok) text = await rd.text();
+      } catch(e) {}
+      if (!text) {
+        try {
+          const rp = await fetch(`${_proxyUrl}/?url=${encodeURIComponent(feed.url)}`);
+          if (rp.ok) text = await rp.text();
+        } catch(e) {}
+      }
+      if (!text) return;
       const items = _parseRSSItems(text, feed.name, domain);
-      console.log(`[RSS] ${feed.name}: ${items.length} items found`);
       items.forEach(i => allItems.push(i));
-    } catch(e) { console.error(`[RSS] ${feed.name} error:`, e); }
+    } catch(e) { }
   }));
   return allItems;
 }
 
-async function fetchHebrewNews() {
+const _newsCache={he:null,en:null,heTm:0,enTm:0};
+const NEWS_CACHE_TTL=10*60*1000;
+async function fetchHebrewNews(force=false) {
   $('news-grid').innerHTML = '<div class="modal-loading" style="color:var(--dim);font-size:12px"><div class="mini-ring" style="margin:0 auto 8px"></div>טוען חדשות...</div>';
   _renderNewsGrid(await _fetchFeeds(HEBREW_NEWS_FEEDS), 'he', HEBREW_NEWS_FEEDS);
 }
@@ -498,7 +507,6 @@ async function fetchHistoricalReturns(sym) {
     const avgVol = volumes.length >= 5 ? Math.round(volumes.slice(-20).reduce((a,b)=>a+b,0) / Math.min(20, volumes.slice(-20).length)) : null;
     return { w1:getPct(5), m1:getPct(21), m3:getPct(63), m6:getPct(126), y1:getPct(252), fromHi, fromLo, ytd, rawPrices, avgVol };
   } catch (e) {
-    console.error("Error fetching history for " + sym, e);
     return {};
   }
 }
@@ -553,7 +561,6 @@ async function fetchYahooQuotesBatch(symbolsArray) {
         };
       }
     } catch (e) {
-      console.error("Error fetching Yahoo chunk", e);
     }
   }));
 
@@ -1434,8 +1441,6 @@ async function init(){
     initSyncObserver(); // observe table for automatic height sync // skeleton מיידי עם יום% אמיתי
     renderSummary();
     renderFearGreed();
-    initNewsSection();
-    fetchAndRenderMovers();
     drawChart();
     // הצג skeleton ל-YTD ו-Correlation מיד
     const ytdSec=$('ytd-section'); if(ytdSec) ytdSec.style.display='block';
@@ -1465,6 +1470,9 @@ async function init(){
     // רנדור אחד אחרי שהכל מוכן
     await fetchFredColData();
     renderSectors();
+    setTimeout(() => fetchAndRenderMovers(), 500);
+    setTimeout(() => initNewsSection(), 3000);
+
     // Double RAF ensures DOM is fully painted before measuring row heights
     syncFrozenRows();
     renderFearGreed();
@@ -1476,7 +1484,6 @@ async function init(){
     $('footer').textContent=`${pos}/${SECTORS.length} סקטורים חיוביים • Yahoo Finance • ${now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}`;
 
   }catch(e){
-    console.error(e);
     $('err-msg').textContent='שגיאה בטעינת נתונים.';
     $('err-code').textContent=e.message;$('err-code').style.display='block';
     showScreen('screen-error');
@@ -1801,7 +1808,7 @@ async function fetchMacro() {
       chgEl.textContent = (c>0?'+':'')+c.toFixed(2)+'%';
       chgEl.classList.add(c>0.05?'up':c<-0.05?'down':'flat');
     });
-  } catch(e) { console.error('macro fetch error',e); }
+  } catch(e) { }
 }
 
 // ── VOLUME in fetchYahooQuotesBatch & renderSectors ──
@@ -1978,7 +1985,7 @@ async function fetchEarningsCalendar() {
         ${priceStr?`<div class="earn-eps" style="font-family:var(--mono)">${priceStr}</div>`:''}
       </div>`;
     }).join('');
-  } catch(e) { console.error('earnings error', e); }
+  } catch(e) { }
 }
 
 // ── MARKET INSIGHTS (auto, no API) ──────────────────────

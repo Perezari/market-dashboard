@@ -12,7 +12,6 @@ const HEBREW_NEWS_FEEDS = [
   { name: 'חדשות בעולם',   url: 'https://rss.walla.co.il/feed/2',     domain: 'walla.co.il' },
   { name: 'דעות כסף',      url: 'https://rss.walla.co.il/feed/4997',  domain: 'walla.co.il' },
   { name: 'רשתות חברתיות', url: 'https://rss.walla.co.il/feed/13019', domain: 'walla.co.il' },
-  { name: 'Donald Trump',  url: 'https://rss.app/feeds/pmmyLkzKSZZLcau2.xml', domain: 'x.com' },
 ];
 
 // ── English ───────────────────────────────────────────────────
