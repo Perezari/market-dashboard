@@ -1109,6 +1109,9 @@ async function openStockDetail(sym, name) {
   }
   overlay.classList.add('open');
   document.body.style.overflow = 'hidden';
+  // ניקוי סיידברים לפני טעינה
+  const sb = $('sp-sidebar'); if (sb) sb.innerHTML = '';
+  const sbr = $('sp-sidebar-right'); if (sbr) sbr.innerHTML = '';
   $('sp-body').innerHTML = '<div class="modal-loading" style="padding:40px"><div class="mini-ring" style="margin:0 auto 10px"></div>טוען '+sym+'...</div>';
 
   try {
@@ -1260,7 +1263,7 @@ function buildChartSvg(sym, meta, timestamps, closes, volumes, rangeKey) {
       <button class="sp-tool-btn" onclick="_chartZoom(1)" title="Zoom In"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
       <button class="sp-tool-btn" onclick="_chartZoom(-1)" title="Zoom Out"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
       <button class="sp-tool-btn" onclick="_chartScreenshot('${sym}')" title="Screenshot"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
-      <button class="sp-tool-btn" onclick="_chartFullscreen()" id="sp-fs-btn" title="Fullscreen"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+      <button class="sp-tool-btn" onclick="_chartExpandFull()" title="Expand chart"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
     </div>
   </div>`;
 
@@ -1341,6 +1344,42 @@ function _chartLeave() {
   const tip=$('sp-chart-tooltip'); if(tip) tip.style.display='none';
 }
 
+/* ── Helper: rebuild sp-body (center: chart only on desktop, all on mobile) ── */
+function _rebuildSpBody(newChartHtml) {
+  // Desktop center: just the chart card
+  // Mobile: everything in one scroll (stats+macro+profile+news in body)
+  const mobileExtra = `
+    <div class="sp-mobile-section">
+      <div class="sp-section-card">
+        <div class="sp-section-hdr">נתוני שוק</div>
+        ${window._spStatsHtml || ''}
+      </div>
+      <div class="sp-section-card">
+        <div class="sp-section-hdr">הקשר מאקרו</div>
+        ${window._macroHtml || ''}
+      </div>
+      <div class="sp-section-card">
+        <div class="sp-section-hdr">פרופיל</div>
+        <div style="padding:10px 12px">${window._profileCardHtml || ''}</div>
+      </div>
+      <div class="sp-section-card">
+        <div class="sp-section-hdr">חדשות</div>
+        ${window._spNewsHtml || ''}
+      </div>
+    </div>`;
+
+  const bodyHtml = `
+    <div class="sp-section-card" style="margin:12px">
+      <div class="sp-section-hdr">גרף</div>
+      ${newChartHtml}
+    </div>
+    ${mobileExtra}
+    <div style="height:max(env(safe-area-inset-bottom),20px)"></div>`;
+
+  window._spChartHtml = bodyHtml;
+  $('sp-body').innerHTML = bodyHtml;
+}
+
 const _ZOOM_LEVELS = [1, 0.75, 0.5, 0.25];
 window._chartZoomIdx = 0;
 window._chartOrigPts = null; // שמירת הנתונים המקוריים לפני זום
@@ -1370,8 +1409,7 @@ function _chartZoom(dir) {
   );
   // שחזר את הנתונים המקוריים שבuildChartSvg מחק
   window._chartAllPts = origPts;
-  window._spChartHtml = newChart + (window._spStatsHtml||'');
-  $('sp-body').innerHTML = window._spChartHtml;
+  _rebuildSpBody(newChart);
 }
 
 function _chartScreenshot(sym) {
@@ -1449,14 +1487,20 @@ function _ssDlPng(sym) {
   img.src = window._ssSvgUrl;
 }
 
-function _chartFullscreen() {
-  // טיפול ב-overlay ולא בפאנל עצמו
-  const overlay = $('stock-overlay'); if (!overlay) return;
-  const isFs = overlay.classList.toggle('sp-fs');
-  const btn = $('sp-fs-btn'); if (!btn) return;
-  btn.innerHTML = isFs
-    ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>`
-    : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`;
+function _chartExpandFull() {
+  const existing = document.getElementById('chart-fs-overlay');
+  if (existing) { existing.remove(); return; }
+  const wrap = document.querySelector('.sp-chart-wrap');
+  if (!wrap) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'chart-fs-overlay';
+  overlay.className = 'chart-fs-overlay';
+  overlay.innerHTML = `
+    <button class="chart-fs-close" onclick="document.getElementById('chart-fs-overlay').remove()">×</button>
+    <div class="chart-fs-inner">${wrap.outerHTML}</div>`;
+  overlay.addEventListener('keydown', e=>{ if(e.key==='Escape') overlay.remove(); });
+  document.body.appendChild(overlay);
+  overlay.focus();
 }
 
 async function switchChartRange(rangeKey) {
@@ -1481,8 +1525,7 @@ async function switchChartRange(rangeKey) {
     const cl  = res.indicators?.quote?.[0]?.close||[];
     const vol = res.indicators?.quote?.[0]?.volume||[];
     const newChart = buildChartSvg(d.sym, d.meta, ts, cl, vol, rangeKey);
-    window._spChartHtml = newChart + (window._spStatsHtml||'');
-    $('sp-body').innerHTML = window._spChartHtml;
+    _rebuildSpBody(newChart);
   } catch(e) {
     if (wrap) wrap.style.opacity='1';
   }
@@ -1541,11 +1584,57 @@ function renderStockDetail(sym, name, meta, timestamps, closes, volumes, news, d
   // ── Chart ─────────────────────────────────────────────
   const chartHtml = buildChartSvg(sym, meta, timestamps, closes, volumes, '1M');
 
-  window._spStatsHtml = statsHtml + renderMacroContext(macro) + '<div style="height:max(env(safe-area-inset-bottom),20px)"></div>';
-  window._spChartHtml = chartHtml + window._spStatsHtml;
+  // ── Sidebar (desktop only) ─────────────────────────────
+  const macroHtml = renderMacroContext(macro);
+  const exch = meta.exchangeName || meta.fullExchangeName || '–';
+  const profileRows = [
+    { label:'Symbol',    val: sym },
+    { label:'Exchange',  val: exch },
+    { label:'Currency',  val: meta.currency || 'USD' },
+    { label:'Market Cap',val: meta.marketCap ? fmtB(meta.marketCap) : '–' },
+    { label:'P/E',       val: meta.trailingPE ? fmt2(meta.trailingPE) : '–' },
+    { label:'EPS',       val: meta.trailingEps ? '$'+fmt2(meta.trailingEps) : '–' },
+    { label:'Div. Yield',val: divYield },
+    { label:'Avg Volume',val: fmtV(meta.averageDailyVolume3Month||dq.avgVol) },
+  ];
+  // ── Profile card HTML (shared by sidebar and mobile) ──
+  const profileCardHtml = `
+    <div class="sp-profile-card">
+      ${profileRows.map((r,i)=>`
+        <div class="sp-profile-row${i===profileRows.length-1?' last':''}">
+          <dt class="sp-profile-lbl">${r.label}</dt>
+          <dd class="sp-profile-val">${r.val}</dd>
+        </div>`).join('')}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;padding:0 0 4px">
+      <a href="https://finance.yahoo.com/quote/${sym}/financials" target="_blank" class="sp-sb-link">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 7 13.5 15.5 8.5 10.5 1 18"/><polyline points="16 7 22 7 22 13"/></svg>Yahoo Finance
+      </a>
+      <a href="https://stockanalysis.com/stocks/${sym.toLowerCase()}/" target="_blank" class="sp-sb-link">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Stock Analysis
+      </a>
+    </div>`;
 
-  // ── News tab ──────────────────────────────────────────
-  window._spNewsHtml = news.length
+  // Sidebar: section cards with header INSIDE the card
+  const sidebarHtml = `
+    <div class="sp-section-card" style="margin:0 0 12px">
+      <div class="sp-section-hdr">פרופיל</div>
+      <div style="padding:10px 12px">${profileCardHtml}</div>
+    </div>
+    <div class="sp-section-card" style="margin:0">
+      <div class="sp-section-hdr">הקשר מאקרו</div>
+      ${macroHtml}
+    </div>
+    <div style="height:max(env(safe-area-inset-bottom),20px)"></div>`;
+
+  window._spSidebarHtml = sidebarHtml;
+  window._macroHtml = macroHtml;
+  window._profileCardHtml = profileCardHtml;
+  const sidebar = $('sp-sidebar');
+  if (sidebar) sidebar.innerHTML = sidebarHtml;
+
+  // ── News items HTML — must be before right sidebar ────
+  const newsItemsHtml = news.length
     ? news.slice(0,6).map(n=>{
         const ago=n.providerPublishTime?Math.round((Date.now()/1000-n.providerPublishTime)/3600):null;
         const t=(n.title||'').toLowerCase();
@@ -1553,35 +1642,39 @@ function renderStockDetail(sym, name, meta, timestamps, closes, volumes, news, d
         const neg=['fall','drop','miss','loss','weak','cut','crash','decline','plunge','slump','disappoint','warning','concern','below','down'];
         const p=pos.filter(w=>t.includes(w)).length, ng=neg.filter(w=>t.includes(w)).length;
         const sent=p>ng?'positive':ng>p?'negative':'neutral';
-        const badge=sent==='positive'?'<span style="display:inline-flex;align-items:center;font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:var(--gd);color:var(--green);text-transform:uppercase">▲ חיובי</span>'
-          :sent==='negative'?'<span style="display:inline-flex;align-items:center;font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:var(--rd);color:var(--red);text-transform:uppercase">▼ שלילי</span>'
-          :'<span style="display:inline-flex;align-items:center;font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:var(--bg4);color:var(--dim);text-transform:uppercase">● ניטרלי</span>';
+        const badge=sent==='positive'?'<span style="display:inline-flex;font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:var(--gd);color:var(--green)">▲ חיובי</span>'
+          :sent==='negative'?'<span style="display:inline-flex;font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:var(--rd);color:var(--red)">▼ שלילי</span>'
+          :'<span style="display:inline-flex;font-size:8px;font-weight:700;padding:1px 6px;border-radius:3px;background:var(--bg4);color:var(--dim)">● ניטרלי</span>';
         return `<a class="sp-news-item" href="${n.link||'#'}" target="_blank" rel="noopener" style="display:flex;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);text-decoration:none;color:inherit">
-          <div style="flex:1">
-            <div class="sp-news-title">${n.title||''}</div>
-            <div style="display:flex;align-items:center;gap:6px;margin-top:5px">
-              ${badge}
-              <span class="sp-news-meta">${n.publisher||''} ${ago!=null?'· '+(ago<1?'עכשיו':ago+'h ago'):''}</span>
-            </div>
-          </div>
-        </a>`;
-      }).join('') + '<div style="height:max(env(safe-area-inset-bottom),20px)"></div>'
-    : '<div style="padding:30px;text-align:center;color:var(--dim);font-size:12px">אין חדשות זמינות</div>';
+          <div style="flex:1"><div class="sp-news-title">${n.title||''}</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:5px">${badge}
+            <span class="sp-news-meta">${n.publisher||''} ${ago!=null?'· '+(ago<1?'עכשיו':ago+'h ago'):''}</span>
+          </div></div></a>`;
+      }).join('')
+    : '<div style="padding:24px;text-align:center;color:var(--dim);font-size:12px">אין חדשות זמינות</div>';
+  window._spNewsHtml = newsItemsHtml + '<div style="height:max(env(safe-area-inset-bottom),20px)"></div>';
 
-  // ── Fundamentals tab — Perplexity-style profile card ──
-  const exch = meta.exchangeName || meta.fullExchangeName || '–';
-  const profileRows = [
-    { label:'Symbol',   val: sym },
-    { label:'Exchange', val: exch },
-    { label:'Currency', val: meta.currency || 'USD' },
-    { label:'Prev Close',val: meta.chartPreviousClose ? '$'+fmt2(meta.chartPreviousClose) : '–' },
-    { label:'Market Cap',val: meta.marketCap ? fmtB(meta.marketCap) : '–' },
-    { label:'P/E',       val: meta.trailingPE ? fmt2(meta.trailingPE) : '–' },
-    { label:'EPS',       val: meta.trailingEps ? '$'+fmt2(meta.trailingEps) : '–' },
-    { label:'Div. Yield',val: divYield },
-    { label:'Avg Volume',val: fmtV(meta.averageDailyVolume3Month||dq.avgVol) },
-  ];
+  // Right sidebar: stats + news (desktop)
+  const rightSidebarHtml = `
+    <div class="sp-section-card" style="margin:12px 12px 6px">
+      <div class="sp-section-hdr">נתוני שוק</div>
+      ${statsHtml}
+    </div>
+    <div class="sp-section-card" style="margin:6px 12px 12px">
+      <div class="sp-section-hdr">חדשות</div>
+      ${newsItemsHtml}
+    </div>
+    <div style="height:20px"></div>`;
+  window._spRightSidebarHtml = rightSidebarHtml;
+  const rightSidebar = $('sp-sidebar-right');
+  if (rightSidebar) rightSidebar.innerHTML = rightSidebarHtml;
 
+  // Desktop: stats+chart in body, macro in sidebar. Mobile: macro in body too.
+  window._spStatsHtml = statsHtml + '<div style="height:max(env(safe-area-inset-bottom),20px)"></div>';
+  window._spStatsHtmlMobile = statsHtml + macroHtml + '<div style="height:max(env(safe-area-inset-bottom),20px)"></div>';
+  window._spChartHtml = chartHtml + (window.innerWidth >= 900 ? window._spStatsHtml : window._spStatsHtmlMobile);
+
+  // Fundamentals tab (mobile) — same profile card
   window._spFundHtml = `
     <div style="padding:14px 16px">
       <div class="sp-profile-card">
@@ -1594,26 +1687,56 @@ function renderStockDetail(sym, name, meta, timestamps, closes, volumes, news, d
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
         <a href="https://finance.yahoo.com/quote/${sym}/financials" target="_blank"
           style="display:flex;align-items:center;justify-content:center;gap:5px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;text-decoration:none;color:var(--text);font-size:11px;font-weight:600">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 7 13.5 15.5 8.5 10.5 1 18"/><polyline points="16 7 22 7 22 13"/></svg>
           Yahoo Finance
         </a>
         <a href="https://stockanalysis.com/stocks/${sym.toLowerCase()}/" target="_blank"
           style="display:flex;align-items:center;justify-content:center;gap:5px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;text-decoration:none;color:var(--text);font-size:11px;font-weight:600">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           Stock Analysis
         </a>
       </div>
     </div>
     <div style="height:max(env(safe-area-inset-bottom),20px)"></div>`;
 
-  $('sp-body').innerHTML = window._spChartHtml;
+  // ── Build body: section cards ────────────────────────
+  const bodyHtml = `
+    <div class="sp-section-card" style="margin:12px">
+      <div class="sp-section-hdr">גרף</div>
+      ${chartHtml}
+    </div>
+    <div class="sp-mobile-section">
+      <div class="sp-section-card">
+        <div class="sp-section-hdr">נתוני שוק</div>
+        ${statsHtml}
+      </div>
+      <div class="sp-section-card">
+        <div class="sp-section-hdr">הקשר מאקרו</div>
+        ${macroHtml}
+      </div>
+      <div class="sp-section-card">
+        <div class="sp-section-hdr">פרופיל</div>
+        <div style="padding:10px 12px">${profileCardHtml}</div>
+      </div>
+      <div class="sp-section-card">
+        <div class="sp-section-hdr">חדשות</div>
+        ${newsItemsHtml}
+      </div>
+    </div>
+    <div style="height:max(env(safe-area-inset-bottom),20px)"></div>`;
+
+  window._spChartHtml = bodyHtml;
+  window._spStatsHtml = statsHtml;
+  $('sp-body').innerHTML = bodyHtml;
 }
 
 function switchStockTab(tab) {
   document.querySelectorAll('.sp-tab').forEach(t=>t.classList.remove('active'));
   $('tab-'+tab)?.classList.add('active');
-  $('sp-body').innerHTML = (tab==='fundamentals'?window._spFundHtml:tab==='news'?window._spNewsHtml:window._spChartHtml)
-    || '<div style="padding:30px;text-align:center;color:var(--dim)">טוען...</div>';
+  // Mobile only — desktop has no tabs
+  if (window.innerWidth < 900) {
+    $('sp-body').innerHTML = (tab==='fundamentals' ? window._spFundHtml :
+      tab==='news' ? window._spNewsHtml : window._spChartHtml)
+      || '<div style="padding:30px;text-align:center;color:var(--dim)">טוען...</div>';
+  }
 }
 
 function closeStockDetail(e) {
@@ -2574,10 +2697,9 @@ function renderMacroContext(macroData) {
   }).filter(Boolean).join('');
 
   if (!items) return '';
-  const sectorLabel = sector ? ` · סקטור ${sector}` : '';
+  const sectorLabel = sector ? `<div class="sp-macro-sector">סקטור: ${sector}</div>` : '';
   return `<div class="sp-macro">
-    <div class="sp-macro-title">הקשר מאקרו${sectorLabel}</div>
-    <div class="sp-macro-grid">${items}</div>
+    ${sectorLabel}<div class="sp-macro-grid">${items}</div>
   </div>`;
 }
 

@@ -597,8 +597,7 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 /* holdings table */
 /* ── MACRO CONTEXT (stock detail) ── */
 .sp-macro{padding:12px 16px;border-top:1px solid var(--border)}
-.sp-macro-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin-bottom:8px;display:flex;align-items:center;gap:5px}
-.sp-macro-title::before{content:'';width:3px;height:11px;border-radius:2px;background:#f59e0b;display:inline-block}
+.sp-macro-sector{font-size:9px;color:var(--dim);padding:4px 10px 0;opacity:.7}
 .sp-macro-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
 .sp-macro-item{background:var(--bg3);border-radius:6px;padding:8px 10px;border:1px solid var(--border)}
 .sp-macro-item-name{font-size:9px;color:var(--dim);margin-bottom:2px}
@@ -606,21 +605,106 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 .sp-macro-item-chg{font-size:9px;font-family:var(--mono);font-weight:700;margin-top:1px}
 .sp-macro-item-chg.up{color:var(--green)}.sp-macro-item-chg.down{color:var(--red)}.sp-macro-item-chg.flat{color:var(--dim)}
 .sp-macro-item-he{font-size:8px;color:var(--dim);margin-top:2px;line-height:1.3}
-.stock-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px)}
+.stock-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:400;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
 .stock-overlay.open{display:flex;animation:fadeIn .15s ease}
 .stock-panel{
-  background:var(--bg2);width:100%;max-width:560px;
-  max-height:90vh;border-radius:16px 16px 0 0;
+  background:var(--bg2);
+  width:100vw;height:100vh;
+  max-width:100vw;max-height:100vh;
+  border-radius:0;
   display:flex;flex-direction:column;overflow:hidden;
-  animation:slideUp .22s cubic-bezier(.4,0,.2,1);
-  box-shadow:0 -8px 40px rgba(0,0,0,.4);
+  animation:fadeIn .18s ease;
 }
-@media(min-width:600px){
+/* Layout container */
+.sp-layout{display:flex;flex:1;overflow:hidden;min-height:0;direction:ltr}
+.sp-body{flex:1;overflow-y:auto;min-width:0;direction:rtl}
+.sp-sidebar{display:none;width:0;overflow-y:auto;direction:rtl}
+.sp-sidebar-right{display:none;width:0;overflow-y:auto;direction:rtl}
+/* Hide tabs everywhere */
+.sp-tabs{display:none!important}
+
+/* Desktop: three columns */
+@media(min-width:900px){
+  .sp-panel-inner{max-width:1400px;margin:0 auto}
+  .sp-sidebar{
+    display:block;width:240px;flex-shrink:0;
+    border-right:1px solid var(--border);
+    background:var(--bg);
+    padding:12px;
+    overflow-y:auto;
+  }
+  .sp-sidebar-right{
+    display:block;width:280px;flex-shrink:0;
+    border-left:1px solid var(--border);
+    background:var(--bg);
+    overflow-y:auto;
+  }
+  /* Stats grid 2 columns in narrow sidebar */
+  .sp-sidebar-right .sp-stats-grid{
+    grid-template-columns:repeat(2,1fr);
+  }
+  .sp-body{background:var(--bg2)}
+  .sp-section-card .sp-chart-hdr{padding:5px 8px}
+}
+/* Chart fullscreen overlay */
+.chart-fs-overlay{
+  position:fixed;inset:0;z-index:20000;
+  background:var(--bg);
+  display:flex;flex-direction:column;
+  animation:fadeIn .15s ease;
+}
+.chart-fs-overlay .chart-fs-inner{
+  flex:1;display:flex;flex-direction:column;overflow:hidden;
+}
+.chart-fs-overlay .sp-chart-wrap{
+  flex:1;display:flex;flex-direction:column;border-bottom:none;
+}
+.chart-fs-overlay .sp-chart-hdr{flex-shrink:0}
+.chart-fs-overlay #sp-chart-container{flex:1;position:relative}
+.chart-fs-overlay #sp-chart-svg{height:100%!important}
+.chart-fs-close{
+  position:absolute;top:12px;right:12px;z-index:10;
+  background:var(--bg3);border:1px solid var(--border);
+  color:var(--dim);width:30px;height:30px;border-radius:50%;
+  cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;
+}
+.chart-fs-close:hover{background:var(--bg4);color:var(--text)}
+/* Desktop section cards */
+.sp-section-card{
+  margin:12px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  overflow:hidden;
+  background:var(--bg2);
+}
+.sp-section-hdr{
+  padding:9px 14px;
+  font-size:10px;font-weight:700;
+  color:var(--dim);
+  text-transform:uppercase;letter-spacing:0.8px;
+  border-bottom:1px solid var(--border);
+  background:var(--bg3);
+}
+/* Override chart/stats margins inside section cards */
+.sp-section-card .sp-chart-wrap{border-bottom:none}
+.sp-section-card .sp-stats-grid{border-top:none;border-bottom:none}
+/* Macro+profile only visible on mobile (sidebar shows them on desktop) */
+.sp-mobile-section{display:block}
+@media(min-width:900px){.sp-mobile-section{display:none}}
+/* Tablet */
+@media(min-width:600px) and (max-width:899px){
   .stock-overlay{align-items:center}
   .stock-panel{border-radius:14px;max-height:88vh;box-shadow:0 24px 60px rgba(0,0,0,.5)}
 }
 @media(max-width:480px){
   .stock-panel{max-height:100%!important;height:100%!important;border-radius:0!important;padding-top:env(safe-area-inset-top)}
+}
+/* Sidebar sections */
+.sp-sb-link{
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:7px;padding:8px;text-decoration:none;
+  color:var(--text);font-size:10px;font-weight:600;
 }
 .sp-hdr{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
 .sp-close-btn{background:var(--bg3);border:1px solid var(--border);color:var(--dim);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s;order:-1}
@@ -685,18 +769,9 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 .sp-tool-btn{background:var(--bg3);border:1px solid var(--border);color:var(--dim);width:26px;height:26px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s;flex-shrink:0}
 .sp-tool-btn:hover{color:var(--text);background:var(--bg4);border-color:var(--border2)}
 .sp-tool-btn:active{transform:scale(.9)}
-/* Fullscreen chart mode — על ה-overlay */
+/* Fullscreen (already full screen, just ensure overlay covers) */
 .stock-overlay.sp-fs{padding:0!important}
-.stock-overlay.sp-fs .stock-panel{
-  position:absolute!important;
-  top:0!important;left:0!important;right:0!important;bottom:0!important;
-  max-width:100%!important;width:100%!important;
-  height:100%!important;max-height:100%!important;
-  border-radius:0!important;transform:none!important;
-}
-.stock-overlay.sp-fs .sp-body{
-  max-height:calc(100% - 160px)!important;
-}
+.stock-overlay.sp-fs .stock-panel{border-radius:0!important}
 /* Screenshot modal */
 .sp-ss-modal{
   position:fixed;inset:0;z-index:20000;
