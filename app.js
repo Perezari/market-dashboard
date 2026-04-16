@@ -223,7 +223,9 @@ async function runTechScreener() {
     // 1. הגדרות המומנטום (RSI)
     const isOversold = s.rsi < 40;
     const rsiText = isOversold ? 'מכירת יתר' : 'קניית יתר';
-    const rsiIcon = isOversold ? '🟢' : '🔴';
+    const rsiIcon = isOversold
+      ? `<svg width="9" height="9" viewBox="0 0 10 10"><circle cx="5" cy="5" r="5" fill="var(--green)"/></svg>`
+      : `<svg width="9" height="9" viewBox="0 0 10 10"><circle cx="5" cy="5" r="5" fill="var(--red)"/></svg>`;
     const badgeClass = isOversold ? 'oversold' : 'overbought';
 
     // 2. הגדרות המגמה (ממוצע 20)
@@ -399,8 +401,8 @@ function initNewsSection() {
   const tabs = document.createElement('div');
   tabs.className = 'news-tabs';
   tabs.innerHTML = `
-    <button class="news-tab active" onclick="switchNewsTab('he')">🇮🇱 עברית</button>
-    <button class="news-tab" onclick="switchNewsTab('en')">📈 בעולם</button>`;
+    <button class="news-tab active" onclick="switchNewsTab('he')">עברית</button>
+    <button class="news-tab" onclick="switchNewsTab('en')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> בעולם</button>`;
   hdr.appendChild(tabs);
   fetchHebrewNews();
 }
@@ -460,11 +462,11 @@ function renderMovers(holdingsSet) {
 
   $('movers-grid').innerHTML = `
     <div>
-      <div class="mover-col-title green">🚀 מזנקות</div>
+      <div class="mover-col-title green"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg> מזנקות</div>
       <div class="mover-col-inner">${buildRows(topGainers, true)}</div>
     </div>
     <div>
-      <div class="mover-col-title red">📉 צוללות</div>
+      <div class="mover-col-title red"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg> צוללות</div>
       <div class="mover-col-inner">${buildRows(topLosers, false)}</div>
     </div>
   `;
@@ -662,8 +664,8 @@ function runSimulator() {
   yEl.className = 'lab-result ' + (yearReturn >= 0 ? 'green' : 'red');
 
   // פסיכולוגיה של פיזור
-  let riskMsg = "🛡️ פיזור טוב: התיק שלך משלב נכסים שונים.";
-  if (techCount >= 2) riskMsg = "⚠️ סכנת חפיפה: בחרת נכסים עם קורלציה גבוהה (הטיית טכנולוגיה). התנודתיות תהיה חזקה.";
+  let riskMsg = "✓ פיזור טוב: התיק שלך משלב נכסים שונים.";
+  if (techCount >= 2) riskMsg = "! סכנת חפיפה: בחרת נכסים עם קורלציה גבוהה (הטיית טכנולוגיה). התנודתיות תהיה חזקה.";
   if (totalW < 100) riskMsg += ` (נשאר במזומן: ${100 - totalW}%)`;
   $('sim-risk').textContent = riskMsg;
 }
@@ -796,7 +798,7 @@ function renderSectors(){
     const todayVol = d.vol, avgVol20 = h.avgVol;
     if (todayVol && avgVol20 && avgVol20 > 0) {
       const vr = todayVol / avgVol20;
-      const vi = vr > 1.5 ? '🔥' : vr > 1.1 ? '▲' : vr < 0.6 ? '💤' : vr < 0.9 ? '▼' : '●';
+      const vi = vr > 1.5 ? '▲▲' : vr > 1.1 ? '▲' : vr < 0.6 ? '▼▼' : vr < 0.9 ? '▼' : '●';
       const vc = vr > 1.5 ? 'vol-high' : vr < 0.7 ? 'vol-low' : 'vol-norm';
       volTd = `<td class="${vc}" title="${(vr*100).toFixed(0)}% מהממוצע">${vi} ${(vr*100).toFixed(0)}%</td>`;
     }
@@ -1751,7 +1753,7 @@ async function runBreadth() {
   $('breadth-fill').style.background = color;
   $('breadth-above').textContent = `${above} מניות מעל`;
   $('breadth-total').textContent = `מתוך ${total}`;
-  $('breadth-sub').textContent = pct >= 60 ? '📈 שוק בריא' : pct >= 40 ? '⚖️ מעורב' : '📉 שוק חלש';
+  $('breadth-sub').textContent = pct >= 60 ? '↑ שוק בריא' : pct >= 40 ? '≈ מעורב' : '↓ שוק חלש';
 }
 
 // ══════════════════════════════════════
@@ -1890,7 +1892,7 @@ function renderMarketInternals() {
   $('mi-bar').style.width = (pctUp * 100) + '%';
   $('mi-bar').style.background = pctUp >= 0.7 ? 'var(--green)' : pctUp >= 0.5 ? '#5bc27f' : pctUp >= 0.3 ? '#f59e0b' : 'var(--red)';
 
-  const mood = pctUp >= 0.7 ? '📈 שוק חיובי מאוד' : pctUp >= 0.5 ? '↗ מעורב-חיובי' : pctUp >= 0.3 ? '↘ מעורב-שלילי' : '📉 שוק שלילי';
+  const mood = pctUp >= 0.7 ? '↑↑ שוק חיובי מאוד' : pctUp >= 0.5 ? '↗ מעורב-חיובי' : pctUp >= 0.3 ? '↘ מעורב-שלילי' : '↓ שוק שלילי';
   $('mi-mood').textContent = mood;
 }
 
@@ -2194,7 +2196,7 @@ tr:nth-child(even) td{background:#fafafa}
   </div>
 </div>
 <div class="action-bar">
-  <button class="action-btn" onclick="window.print()">🖨️ הדפס / שמור PDF</button>
+  <button class="action-btn" onclick="window.print()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> הדפס / שמור PDF</button>
   <button class="action-btn sec" onclick="window.close()">← סגור</button>
 </div>
 </body></html>`;
