@@ -395,20 +395,20 @@ function _renderNewsGrid(items, lang, feeds) {
 let _activeNewsTab = 'he';
 function initNewsSection() {
   const hdr = document.querySelector('.news-section-hdr');
-  if (!hdr || hdr.querySelector('.news-tab-bar')) return;
-  const bar = document.createElement('div');
-  bar.className = 'news-tab-bar';
-  bar.innerHTML = `
-    <button class="news-tab-btn active" onclick="switchNewsTab('he')">🇮🇱 עברית</button>
-    <button class="news-tab-btn" onclick="switchNewsTab('en')">📈 חדשות בעולם</button>`;
-  hdr.appendChild(bar);
+  if (!hdr || hdr.querySelector('.news-tabs')) return;
+  const tabs = document.createElement('div');
+  tabs.className = 'news-tabs';
+  tabs.innerHTML = `
+    <button class="news-tab active" onclick="switchNewsTab('he')">חדשות בישראל</button>
+    <button class="news-tab" onclick="switchNewsTab('en')">חדשות בעולם</button>`;
+  hdr.appendChild(tabs);
   fetchHebrewNews();
 }
 function switchNewsTab(lang) {
   _activeNewsTab = lang;
-  document.querySelectorAll('.news-tab-btn').forEach(b =>
-    b.classList.toggle('active', b.textContent.includes(lang==='he'?'עברית':'חדשות בעולם')));
-  if (lang==='he') fetchHebrewNews(); else fetchEnglishNews();
+  document.querySelectorAll('.news-tab').forEach(b =>
+    b.classList.toggle('active', b.textContent.includes(lang === 'he' ? 'חדשות בישראל' : 'חדשות בעולם')));
+  if (lang === 'he') fetchHebrewNews(); else fetchEnglishNews();
 }
 
 async function fetchAndRenderMovers() {
