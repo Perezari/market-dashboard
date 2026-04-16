@@ -40,7 +40,7 @@ body.zoomed .t td, body.zoomed .t th{height:auto!important;line-height:1.4}
 }
 .hdr-clock-status{display:flex;align-items:center;gap:5px}
 .hdr-clock-time{font-size:9px;color:var(--dim);font-family:var(--mono);direction:ltr;white-space:nowrap}
-/* Mobile: show only dot + status label, hide countdown */
+/* Mobile: show only dot + status label, hide countdown, hide zoom icon */
 @media(max-width:700px){
   #zoom-btn{display:none}
   .hdr-clock-inline{padding:3px 8px;border-right:none}
@@ -558,13 +558,9 @@ canvas{display:block;width:100%!important}
 .mob-footer{padding:8px 14px 10px;border-top:1px solid var(--border)}
 .mob-ts{font-size:9px;color:var(--dim);font-family:var(--mono);text-align:center}
 
-/* Only show on mobile */
-.hdr-btn-desktop{display:flex}
-.hdr-menu-btn{display:none}
-@media(max-width:480px){
-  .hdr-btn-desktop{display:none!important}
-  .hdr-menu-btn{display:flex!important}
-}
+/* Hamburger always visible, no text buttons */
+.hdr-btn-desktop{display:none!important}
+.hdr-menu-btn{display:flex}
 /* ── כותרת אחידה בתוך כרטיסים ── */
 .card-hdr{padding:8px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .card-hdr .section-label{margin-bottom:0}

@@ -278,6 +278,10 @@ function toggleMobileMenu(){
   if(mobTs) mobTs.textContent=now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})+' · '+now.toLocaleDateString('he-IL');
   const themeLbl=$('mob-theme-label');
   if(themeLbl) themeLbl.textContent=document.body.classList.contains('light')?'מצב כהה':'מצב בהיר';
+  const zoomLbl=$('mob-zoom-label');
+  if(zoomLbl) zoomLbl.textContent=document.body.classList.contains('zoomed')?'בטל מצב מוגדל':'מצב מוגדל';
+  const zoomItem=$('mob-zoom-item');
+  if(zoomItem) zoomItem.style.color=document.body.classList.contains('zoomed')?'var(--blue)':'';
 }
 function closeMobileMenu(){
   const m=$('mobile-menu');
