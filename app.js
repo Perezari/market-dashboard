@@ -399,15 +399,15 @@ function initNewsSection() {
   const tabs = document.createElement('div');
   tabs.className = 'news-tabs';
   tabs.innerHTML = `
-    <button class="news-tab active" onclick="switchNewsTab('he')">חדשות בישראל</button>
-    <button class="news-tab" onclick="switchNewsTab('en')">חדשות בעולם</button>`;
+    <button class="news-tab active" onclick="switchNewsTab('he')">🇮🇱 עברית</button>
+    <button class="news-tab" onclick="switchNewsTab('en')">📈 בעולם</button>`;
   hdr.appendChild(tabs);
   fetchHebrewNews();
 }
 function switchNewsTab(lang) {
   _activeNewsTab = lang;
   document.querySelectorAll('.news-tab').forEach(b =>
-    b.classList.toggle('active', b.textContent.includes(lang === 'he' ? 'חדשות בישראל' : 'חדשות בעולם')));
+    b.classList.toggle('active', b.textContent.includes(lang === 'he' ? 'עברית' : 'בעולם')));
   if (lang === 'he') fetchHebrewNews(); else fetchEnglishNews();
 }
 
@@ -907,7 +907,7 @@ const sunSVG=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-
 function toggleTheme(){
   isDark=!isDark;
   document.body.classList.toggle('light',!isDark);
-  $('theme-btn').innerHTML=isDark?moonSVG:sunSVG;
+  $('theme-btn').innerHTML=isDark?sunSVG:moonSVG;
   drawChart();
 }
 
@@ -983,16 +983,18 @@ function renderHoldings(sym, name, data) {
     return `<tr class="hrow2" data-idx="${i}" onclick="openStockDetail('${h.s}','${(h.n||h.s).replace(/'/g,"\\'")}')">
       <td class="hc hc-num">${i + 1}</td>
       <td class="hc hc-holding">
-        <span class="hc-dot" style="background:${col}"></span>
-        <div class="hc-info">
-          <span class="hc-sym">${h.s}</span>
-          <span class="hc-name">${h.n || ''}</span>
+        <div class="hc-hold-inner">
+          <span class="hc-dot" style="background:${col}"></span>
+          <div class="hc-info">
+            <span class="hc-sym">${h.s}</span>
+            <span class="hc-name">${h.n || ''}</span>
+          </div>
         </div>
       </td>
-      <td class="hc hc-price">${priceStr}</td>
+      <td class="hc hc-price"><span class="hc-price-val">${priceStr}</span></td>
       <td class="hc hc-chg"><span class="hrow-chg ${chgCls}">${chgStr}</span></td>
       <td class="hc hc-weight">
-        <div class="hc-wbar-wrap">
+        <div class="hc-weight-inner">
           <div class="hc-wbar"><div class="hc-wbar-fill" style="width:${barPct}%;background:${col}"></div></div>
           <span class="hc-wpct">${h.w.toFixed(1)}%</span>
         </div>

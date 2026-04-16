@@ -585,7 +585,7 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 .modal-search-input::placeholder{color:var(--dim);font-family:var(--sans)!important;font-size:11px;direction:rtl}
 .modal-search-go{background:var(--blue);border:none;color:#000;font-weight:700;font-size:14px;width:28px;height:28px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .15s}
 .modal-search-go:hover{opacity:.85}
-.modal-body{padding:14px 20px;overflow-y:auto;flex:1}
+.modal-body{padding:14px 20px;overflow-y:auto;overflow-x:hidden;flex:1;min-width:0}
 .modal-loading{display:flex;align-items:center;justify-content:center;gap:10px;padding:32px;color:var(--dim);font-size:13px}
 .mini-ring{width:20px;height:20px;border:2px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
 /* holdings table */
@@ -669,32 +669,61 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 /* ── Holdings redesign ───────────────────────────── */
 .hbar-wrap{display:flex;height:38px;border-radius:6px;overflow:hidden;margin-bottom:14px;gap:2px}
 .hbar-seg{position:relative;display:flex;align-items:center;justify-content:center;min-width:0;transition:opacity .15s;overflow:hidden}
-.hbar-seg:first-child{border-radius:5px 0 0 5px}
 .hbar-seg:hover{opacity:.8;cursor:default}
 .hbar-seg--active{filter:brightness(1.35) !important;outline:2px solid rgba(255,255,255,.55);outline-offset:-1px;z-index:1;opacity:1 !important}
 .hbar-seg-lbl{font-size:9px;font-weight:700;color:rgba(255,255,255,.9);font-family:var(--mono);white-space:nowrap;pointer-events:none;padding:0 4px}
 body.light .hbar-seg-lbl{color:rgba(0,0,0,.7)}
 
-.htbl2{width:100%;border-collapse:collapse;font-size:12px}
+/* ── Holdings table ───────────────────────────────── */
+.htbl2{width:100%;border-collapse:collapse;table-layout:fixed}
 .htbl2 thead tr{border-bottom:2px solid var(--border)}
-.htbl2 thead th{color:var(--dim);font-size:9px;text-transform:uppercase;letter-spacing:.8px;padding:7px 10px;font-weight:600;white-space:nowrap}
+.htbl2 thead th{color:var(--dim);font-size:9px;text-transform:uppercase;letter-spacing:.8px;padding:7px 8px;font-weight:600;white-space:nowrap;text-align:right}
 .htbl2 tbody tr.hrow2{border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s}
 .htbl2 tbody tr.hrow2:last-child{border-bottom:none}
 .htbl2 tbody tr.hrow2:hover{background:var(--bg3)}
-.hc{padding:9px 10px;vertical-align:middle}
-.hc-num{color:var(--dim);font-family:var(--mono);font-size:10px;width:22px;text-align:center;padding-right:4px}
-.hc-holding{display:flex;align-items:center;gap:9px;min-width:0}
-.hc-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
-.hc-info{display:flex;flex-direction:column;min-width:0}
-.hc-sym{font-family:var(--mono);font-size:13px;font-weight:800;color:var(--text);line-height:1.2}
-.hc-name{font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;margin-top:1px}
-.hc-price{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;text-align:right}
-.hc-chg{text-align:right;white-space:nowrap}
-.hc-weight{min-width:110px;text-align:right}
-.hc-wbar-wrap{display:flex;align-items:center;gap:7px;justify-content:flex-end}
-.hc-wbar{width:64px;height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;flex-shrink:0}
+
+/* Column widths (fixed layout) */
+.hc        {padding:9px 8px;vertical-align:middle;overflow:hidden;text-align:right}
+.hc-num    {width:28px;font-family:var(--mono);font-size:10px;color:var(--dim);text-align:center}
+.hc-holding{width:38%}
+.hc-price  {width:18%}
+.hc-chg    {width:18%}
+.hc-weight {width:20%}
+
+/* Holding cell internals */
+.hc-hold-inner{display:flex;align-items:center;gap:8px;min-width:0}
+.hc-dot   {width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.hc-info  {display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.hc-sym   {font-family:var(--mono);font-size:12px;font-weight:800;color:var(--text);line-height:1.3;white-space:nowrap}
+.hc-name  {font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+
+/* Price & change */
+.hc-price-val{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text);display:block;white-space:nowrap}
+
+/* Weight cell */
+.hc-weight-inner{display:inline-flex;align-items:center;gap:6px}
+.hc-wbar  {width:52px;height:3px;background:var(--bg4);border-radius:2px;overflow:hidden;flex-shrink:0}
 .hc-wbar-fill{height:100%;border-radius:2px;opacity:.85;transition:width .3s ease}
-.hc-wpct{font-size:10px;color:var(--dim);font-family:var(--mono);width:38px;text-align:right}
+.hc-wpct  {font-family:var(--mono);font-size:10px;color:var(--dim);min-width:32px;text-align:right}
+
+/* ── Mobile: compact, no scroll ─────────────────── */
+@media(max-width:540px){
+  .htbl2 thead th{padding:5px 5px;font-size:8px;letter-spacing:0}
+  .hc        {padding:9px 5px}
+  .hc-num    {width:20px;font-size:9px}
+  .hc-hold-inner{gap:5px}
+  .hc-dot    {width:7px;height:7px}
+  .hc-sym    {font-size:11px}
+  .hc-name   {font-size:9px}
+  .hc-price-val{font-size:11px}
+  .hc-wbar   {display:none}
+  .hc-weight-inner{display:block;text-align:right}
+  .hc-wpct   {font-size:10px;color:var(--text);font-weight:600;min-width:28px}
+  .hbar-wrap {height:28px;margin-bottom:8px}
+  .hbar-seg-lbl{font-size:8px}
+  .modal-body{padding:10px 0!important}
+  .hbar-wrap,.htbl2{padding-left:10px;padding-right:10px}
+}
 
 /* legacy hrow still used elsewhere */
 .htbl{width:100%;border-collapse:collapse;font-size:12px}
