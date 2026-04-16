@@ -531,7 +531,7 @@ async function fetchYahooQuotesBatch(symbolsArray) {
     const symbolsStr = yahooSymbols.join(',');
     const cb = Math.floor(Date.now() / 10000); 
     
-    const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/spark?symbols=${symbolsStr}&range=1d&interval=1d&cb=${cb}`;
+    const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/spark?symbols=${symbolsStr}&range=1d&interval=5m&cb=${cb}`;
     const proxyUrl = `${_proxyUrl}/?url=${encodeURIComponent(yahooUrl)}`;
 	
     try {
@@ -553,6 +553,7 @@ async function fetchYahooQuotesBatch(symbolsArray) {
         }
 
         const originalSym = chunk.find(s => s.replace('/', '-').replace('.', '-') === res.symbol) || res.symbol;
+        const closes = (res.response?.[0]?.indicators?.quote?.[0]?.close || []).filter(v => v != null && !isNaN(v));
         
         allQuotes[originalSym] = {
           price: price,
@@ -560,6 +561,7 @@ async function fetchYahooQuotesBatch(symbolsArray) {
           prev: prev,
           vol: meta.regularMarketVolume || null,
           avgVol: meta.averageDailyVolume3Month || meta.averageDailyVolume10Day || null,
+          spark: closes,
         };
       }
     } catch (e) {
@@ -583,15 +585,57 @@ function renderTicker(){
   $('ticker').innerHTML=items+items;
 }
 
-function renderCards(elId,items,labels,keys){
-  $(elId).innerHTML=items.map(s=>{
-    const d=qmap[s.sym]||{};
-    const col=(d.d1||0)>0?'var(--green)':(d.d1||0)<0?'var(--red)':'var(--text)';
-    const badges=labels.map((l,i)=>{
-      const v=d[keys[i]];
-      return`<div class="b ${badgeCls(v)}"><span class="bl">${l}</span>${pct(v)}</div>`;
-    }).join('');
-    return`<div class="idx"><div class="idx-sym">${s.sym}</div><div class="idx-name">${s.name}</div><div class="idx-price" style="color:${col}">${fmtPrice(d.price,s.sym)}</div><div class="badges">${badges}</div></div>`;
+function buildSparkSvg(closes, isUp) {
+  if (!closes || closes.length < 2) return '';
+  const min = Math.min(...closes), max = Math.max(...closes);
+  const range = max - min || 1;
+  const W = 100, H = 36;
+  const pts = closes.map((v, i) => {
+    const x = (i / (closes.length - 1)) * W;
+    const y = H - ((v - min) / range) * (H - 2) - 1;
+    return [x, y];
+  });
+  const linePath = 'M' + pts.map(p => p[0].toFixed(1)+','+p[1].toFixed(1)).join(' L');
+  const fillPath = `M0,${H} L` + pts.map(p => p[0].toFixed(1)+','+p[1].toFixed(1)).join(' L') + ` L${W},${H} Z`;
+  const id = 'sg'+Math.random().toString(36).slice(2,7);
+  const col = isUp ? 'var(--green)' : 'var(--red)';
+  return `<svg viewBox="0 0 ${W} ${H}" class="idx-spark" preserveAspectRatio="none">
+    <defs><linearGradient id="${id}" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="${col}" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="${col}" stop-opacity="0"/>
+    </linearGradient></defs>
+    <path d="${fillPath}" fill="url(#${id})"/>
+    <path d="${linePath}" stroke="${col}" stroke-width="1.5" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+
+function renderCards(elId, items, labels, keys) {
+  $(elId).innerHTML = items.map(s => {
+    const d = qmap[s.sym] || {};
+    const isUp = (d.d1 || 0) >= 0;
+    const col = isUp ? 'var(--green)' : 'var(--red)';
+    const pctTxt = d.d1 != null ? (isUp ? '+' : '') + d.d1.toFixed(2) + '%' : '–';
+    const absTxt = (d.price && d.prev)
+      ? (isUp ? '+' : '') + '$' + Math.abs(d.price - d.prev).toFixed(2)
+      : '';
+    const arrowSvg = isUp
+      ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>`
+      : `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="7" x2="17" y2="17"/><polyline points="17 7 17 17 7 17"/></svg>`;
+    const spark = buildSparkSvg(d.spark, isUp);
+    return `<div class="idx-card" onclick="openStockDetail('${s.sym}','${s.name.replace(/'/g,"\\'")}')">
+      <div class="idx-card-top">
+        <div class="idx-card-meta">
+          <div class="idx-card-sym">${s.sym}</div>
+          <div class="idx-card-name">${s.name}</div>
+        </div>
+        <div class="idx-card-badge" style="color:${col}">
+          ${arrowSvg}<span>${pctTxt}</span>
+        </div>
+      </div>
+      <div class="idx-card-price">${fmtPrice(d.price, s.sym)}</div>
+      ${absTxt ? `<div class="idx-card-abs" style="color:${col}">${absTxt}</div>` : ''}
+      ${spark ? `<div class="idx-card-chart">${spark}</div>` : ''}
+    </div>`;
   }).join('');
 }
 
@@ -1232,47 +1276,59 @@ function renderStockDetail(sym, name, meta, timestamps, closes, volumes, news, d
   const fmt2 = v => v!=null ? Number(v).toFixed(2) : '–';
   const fmtB = v => {
     if (!v) return '–';
-    if (v>=1e12) return (v/1e12).toFixed(2)+'T';
-    if (v>=1e9)  return (v/1e9).toFixed(1)+'B';
-    if (v>=1e6)  return (v/1e6).toFixed(1)+'M';
+    if (v>=1e12) return '$'+(v/1e12).toFixed(2)+'T';
+    if (v>=1e9)  return '$'+(v/1e9).toFixed(2)+'B';
+    if (v>=1e6)  return '$'+(v/1e6).toFixed(1)+'M';
     return v.toLocaleString();
   };
+  const fmtV = v => {
+    if (!v) return '–';
+    if (v>=1e9) return (v/1e9).toFixed(2)+'B';
+    if (v>=1e6) return (v/1e6).toFixed(1)+'M';
+    if (v>=1e3) return (v/1e3).toFixed(0)+'K';
+    return v.toLocaleString();
+  };
+
   const price = meta.regularMarketPrice || dq.price || 0;
   if (price) $('sp-price').textContent = '$'+Number(price).toFixed(2);
   if (meta.longName || meta.shortName) $('sp-name').textContent = meta.longName||meta.shortName;
 
-  // Ranges
   const dayLo=meta.regularMarketDayLow, dayHi=meta.regularMarketDayHigh;
   const wLo=meta.fiftyTwoWeekLow, wHi=meta.fiftyTwoWeekHigh;
-  const dot = (lo,hi) => (lo&&hi&&hi>lo) ? ((price-lo)/(hi-lo)*100).toFixed(0) : 50;
-  const rangeBar = (lo,hi) => lo ? `
-    <div class="sp-range-bar"><div class="sp-range-dot" style="left:${dot(lo,hi)}%;margin-left:-4px;right:auto"></div></div>
-    <div class="sp-range-labels"><span>${fmt2(lo)}</span><span>${fmt2(hi)}</span></div>` : '';
 
-  const statsHtml = `<div class="sp-stats">
-    <div class="sp-stat"><div class="sp-stat-label">Day Range</div>
-      <div class="sp-stat-val">${dayLo?fmt2(dayLo)+'–'+fmt2(dayHi):'–'}</div>${rangeBar(dayLo,dayHi)}</div>
-    <div class="sp-stat"><div class="sp-stat-label">52W Range</div>
-      <div class="sp-stat-val">${wLo?fmt2(wLo)+'–'+fmt2(wHi):'–'}</div>${rangeBar(wLo,wHi)}</div>
-    <div class="sp-stat"><div class="sp-stat-label">Volume</div>
-      <div class="sp-stat-val">${fmtB(meta.regularMarketVolume||dq.vol)}</div></div>
-    <div class="sp-stat"><div class="sp-stat-label">Avg Volume</div>
-      <div class="sp-stat-val">${fmtB(meta.averageDailyVolume3Month||meta.averageDailyVolume10Day||dq.avgVol)}</div></div>
-    <div class="sp-stat"><div class="sp-stat-label">Prev Close</div>
-      <div class="sp-stat-val">${meta.chartPreviousClose?'$'+fmt2(meta.chartPreviousClose):'–'}</div></div>
-    <div class="sp-stat"><div class="sp-stat-label">Exchange</div>
-      <div class="sp-stat-val" style="font-size:10px">${meta.exchangeName||'–'}</div></div>
-  </div>`;
+  // ── Perplexity-style 3×3 stats grid ──────────────────
+  const divYield = meta.dividendYield
+    ? (meta.dividendYield < 1 ? (meta.dividendYield*100).toFixed(2)+'%' : meta.dividendYield.toFixed(2)+'%')
+    : '–';
 
-  // ── CHART — delegate to buildChartSvg ──
+  const statsData = [
+    { label:'Prev Close', val: meta.chartPreviousClose ? '$'+fmt2(meta.chartPreviousClose) : '–' },
+    { label:'Market Cap',  val: meta.marketCap ? fmtB(meta.marketCap) : '–' },
+    { label:'Open',        val: meta.regularMarketOpen ? '$'+fmt2(meta.regularMarketOpen) : '–' },
+    { label:'P/E Ratio',   val: meta.trailingPE ? fmt2(meta.trailingPE) : '–' },
+    { label:'Day Range',   val: dayLo ? '$'+fmt2(dayLo)+'–$'+fmt2(dayHi) : '–' },
+    { label:'Div. Yield',  val: divYield },
+    { label:'52W Range',   val: wLo ? '$'+fmt2(wLo)+'–$'+fmt2(wHi) : '–' },
+    { label:'EPS',         val: meta.trailingEps ? '$'+fmt2(meta.trailingEps) : '–' },
+    { label:'Volume',      val: fmtV(meta.regularMarketVolume||dq.vol) },
+  ];
+
+  const statsHtml = `
+    <div class="sp-stats-grid">
+      ${statsData.map(s=>`
+        <div class="sp-stat-cell">
+          <dt class="sp-stat-lbl">${s.label}</dt>
+          <dd class="sp-stat-val">${s.val}</dd>
+        </div>`).join('')}
+    </div>`;
+
+  // ── Chart ─────────────────────────────────────────────
   const chartHtml = buildChartSvg(sym, meta, timestamps, closes, volumes, '1M');
 
-  // Save tab content globally
   window._spStatsHtml = statsHtml + renderMacroContext(macro) + '<div style="height:max(env(safe-area-inset-bottom),20px)"></div>';
   window._spChartHtml = chartHtml + window._spStatsHtml;
 
-
-
+  // ── News tab ──────────────────────────────────────────
   window._spNewsHtml = news.length
     ? news.slice(0,6).map(n=>{
         const ago=n.providerPublishTime?Math.round((Date.now()/1000-n.providerPublishTime)/3600):null;
@@ -1296,37 +1352,38 @@ function renderStockDetail(sym, name, meta, timestamps, closes, volumes, news, d
       }).join('') + '<div style="height:max(env(safe-area-inset-bottom),20px)"></div>'
     : '<div style="padding:30px;text-align:center;color:var(--dim);font-size:12px">אין חדשות זמינות</div>';
 
-  // Fundamentals
-  // Fundamentals from meta (v8/chart) — available fields only
-  const f2 = v => v!=null ? Number(v).toFixed(2) : '–';
-  const fmtB2 = v => { if(!v&&v!==0)return'–'; if(v>=1e12)return(v/1e12).toFixed(2)+'T'; if(v>=1e9)return(v/1e9).toFixed(1)+'B'; if(v>=1e6)return(v/1e6).toFixed(1)+'M'; return v.toLocaleString(); };
-  const fundItems = [
-    {label:'52W High',     he:'שיא 52 שבועות',          val: meta.fiftyTwoWeekHigh ? '$'+f2(meta.fiftyTwoWeekHigh) : '–'},
-    {label:'52W Low',      he:'שפל 52 שבועות',          val: meta.fiftyTwoWeekLow  ? '$'+f2(meta.fiftyTwoWeekLow)  : '–'},
-    {label:'Prev Close',   he:'סגירה אתמול',             val: meta.chartPreviousClose ? '$'+f2(meta.chartPreviousClose) : '–'},
-    {label:'Day High',     he:'שיא יומי',                val: meta.regularMarketDayHigh ? '$'+f2(meta.regularMarketDayHigh) : '–'},
-    {label:'Day Low',      he:'שפל יומי',                val: meta.regularMarketDayLow  ? '$'+f2(meta.regularMarketDayLow)  : '–'},
-    {label:'Volume',       he:'נפח מסחר היום',          val: fmtB2(meta.regularMarketVolume || dq.vol)},
-    {label:'Avg Volume',   he:'ממוצע נפח יומי (20י)',   val: fmtB2(dq.avgVol)},
-    {label:'Exchange',     he:'בורסה',                   val: meta.exchangeName || '–'},
+  // ── Fundamentals tab — Perplexity-style profile card ──
+  const exch = meta.exchangeName || meta.fullExchangeName || '–';
+  const profileRows = [
+    { label:'Symbol',   val: sym },
+    { label:'Exchange', val: exch },
+    { label:'Currency', val: meta.currency || 'USD' },
+    { label:'Prev Close',val: meta.chartPreviousClose ? '$'+fmt2(meta.chartPreviousClose) : '–' },
+    { label:'Market Cap',val: meta.marketCap ? fmtB(meta.marketCap) : '–' },
+    { label:'P/E',       val: meta.trailingPE ? fmt2(meta.trailingPE) : '–' },
+    { label:'EPS',       val: meta.trailingEps ? '$'+fmt2(meta.trailingEps) : '–' },
+    { label:'Div. Yield',val: divYield },
+    { label:'Avg Volume',val: fmtV(meta.averageDailyVolume3Month||dq.avgVol) },
   ];
+
   window._spFundHtml = `
-    <div class="sp-fund-grid">${fundItems.map(f=>`
-      <div class="sp-fund-item">
-        <div class="sp-fund-label">${f.label}</div>
-        <div class="sp-fund-val">${f.val}</div>
-        <div class="sp-fund-sub">${f.he}</div>
-      </div>`).join('')}
-    </div>
-    <div style="padding:14px 16px;border-top:1px solid var(--border)">
-      <div style="font-size:10px;color:var(--dim);margin-bottom:10px">לנתוני פונדמנטלס מלאים (P/E, EPS, הכנסות, מאזן):</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <a href="https://finance.yahoo.com/quote/${sym}/financials" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:5px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:9px;text-decoration:none;color:var(--text);font-size:11px;font-weight:700">
+    <div style="padding:14px 16px">
+      <div class="sp-profile-card">
+        ${profileRows.map((r,i)=>`
+          <div class="sp-profile-row${i===profileRows.length-1?' last':''}">
+            <dt class="sp-profile-lbl">${r.label}</dt>
+            <dd class="sp-profile-val">${r.val}</dd>
+          </div>`).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+        <a href="https://finance.yahoo.com/quote/${sym}/financials" target="_blank"
+          style="display:flex;align-items:center;justify-content:center;gap:5px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;text-decoration:none;color:var(--text);font-size:11px;font-weight:600">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 7 13.5 15.5 8.5 10.5 1 18"/><polyline points="16 7 22 7 22 13"/></svg>
           Yahoo Finance
         </a>
-        <a href="https://stockanalysis.com/stocks/${sym.toLowerCase()}/financials/" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:5px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:9px;text-decoration:none;color:var(--text);font-size:11px;font-weight:700">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <a href="https://stockanalysis.com/stocks/${sym.toLowerCase()}/" target="_blank"
+          style="display:flex;align-items:center;justify-content:center;gap:5px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;text-decoration:none;color:var(--text);font-size:11px;font-weight:600">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           Stock Analysis
         </a>
       </div>
