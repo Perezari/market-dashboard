@@ -1392,6 +1392,30 @@ function closeModal(e){
 function closeModalDirect(){
   $('modal-overlay').classList.remove('open');
   document.body.style.overflow='';
+  // reset search
+  const wrap = $('modal-search-wrap');
+  if (wrap) wrap.classList.remove('open');
+}
+
+function toggleModalSearch() {
+  const wrap = $('modal-search-wrap');
+  const isOpen = wrap.classList.contains('open');
+  if (isOpen) {
+    wrap.classList.remove('open');
+  } else {
+    wrap.classList.add('open');
+    const inp = $('modal-search-input');
+    inp.value = '';
+    setTimeout(() => inp.focus(), 50);
+  }
+}
+
+function searchFromModal() {
+  const inp = $('modal-search-input');
+  const sym = inp.value.trim().toUpperCase().replace(/\s+/g,'');
+  if (!sym) return;
+  $('modal-search-wrap').classList.remove('open');
+  openStockDetail(sym, sym);
 }
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModalDirect()});
 

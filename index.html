@@ -460,7 +460,19 @@
         <div class="modal-title" id="modal-title">אחזקות סקטור</div>
         <div class="modal-sub" id="modal-sub"></div>
       </div>
-      <button class="modal-close" onclick="closeModalDirect()">×</button>
+      <div class="modal-hdr-actions">
+        <div class="modal-search-wrap" id="modal-search-wrap">
+          <input class="modal-search-input" id="modal-search-input" type="text"
+            placeholder="סמל מניה (e.g. TSLA)"
+            onkeydown="if(event.key==='Enter')searchFromModal();if(event.key==='Escape')toggleModalSearch()"
+            autocomplete="off" autocapitalize="characters" />
+          <button class="modal-search-go" onclick="searchFromModal()">→</button>
+        </div>
+        <button class="modal-search-btn" id="modal-search-btn" onclick="toggleModalSearch()" title="חיפוש מניה">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </button>
+        <button class="modal-close" onclick="closeModalDirect()">×</button>
+      </div>
     </div>
     <div class="modal-body" id="modal-body">
       <div class="modal-loading"><div class="mini-ring"></div>טוען אחזקות...</div>
