@@ -184,47 +184,53 @@
 
   <div class="content">
     <div>
-      <div class="section-label">ביצועי סקטורים — SPDR ETFs</div>
-	  <div class="tbl-scroll-hint">← גלול לצד לכל העמודות →</div>
-	<div class="tbl-container">
-        <div class="tbl-frozen" id="sector-frozen">
-          <div class="tbl-frozen-hdr">סקטור</div>
-        </div>
-        <div class="tbl-wrap">
-        <table class="t">
-          <thead>
-            <tr><th>יום %</th><th>שבוע</th><th>חודש</th><th>3 חד׳</th><th>6 חד׳</th><th>שנה</th><th>שיא 52W</th><th>שפל 52W</th><th>נפח</th><th style="border-left:2px solid var(--border2)">מאקרו</th><th>ממוצע</th></tr>
-          </thead>
-          <tbody id="sector-tbody"></tbody>
-        </table>
+      <div class="sectors-card">
+        <div class="card-hdr"><div class="section-label">ביצועי סקטורים — SPDR ETFs</div></div>
+        <div class="tbl-scroll-hint">← גלול לצד לכל העמודות →</div>
+        <div class="tbl-container">
+          <div class="tbl-frozen" id="sector-frozen">
+            <div class="tbl-frozen-hdr">סקטור</div>
+          </div>
+          <div class="tbl-wrap">
+          <table class="t">
+            <thead>
+              <tr><th>יום %</th><th>שבוע</th><th>חודש</th><th>3 חד׳</th><th>6 חד׳</th><th>שנה</th><th>שיא 52W</th><th>שפל 52W</th><th>נפח</th><th style="border-left:2px solid var(--border2)">מאקרו</th><th>ממוצע</th></tr>
+            </thead>
+            <tbody id="sector-tbody"></tbody>
+          </table>
+          </div>
         </div>
       </div>
 
       <!-- YTD + Correlation — inline below sectors table -->
       <div id="ytd-section" style="display:none;margin-top:10px">
-        <div class="section-label">תשואה מתחילת השנה (YTD)</div>
         <div class="ytd-card">
+          <div class="card-hdr"><div class="section-label">תשואה מתחילת השנה (YTD)</div></div>
           <div class="ytd-bars" id="ytd-bars"></div>
         </div>
       </div>
 
       <div id="corr-section" style="display:none;margin-top:10px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <div class="section-label" style="margin-bottom:0">מתאם בין סקטורים</div>
-          <div style="font-size:9px;color:var(--dim)">1=מתאם מלא | 0=עצמאי | &#x2212;1=הפוך</div>
+        <div class="sectors-card">
+          <div class="card-hdr">
+            <div class="section-label">מתאם בין סקטורים</div>
+            <div style="font-size:9px;color:var(--dim)">1=מתאם מלא | 0=עצמאי | &#x2212;1=הפוך</div>
+          </div>
+          <div class="corr-wrap"><div id="corr-table-wrap"></div></div>
         </div>
-        <div class="corr-wrap"><div id="corr-table-wrap"></div></div>
       </div>
 
       <!-- מזנקות והצוללות — inside left column -->
       <div style="margin-top:10px">
-        <div class="section-label">המזנקות והצוללות (S&P 500)</div>
         <div class="movers-card" id="movers-section">
-          <div class="movers-grid" id="movers-grid">
+          <div class="card-hdr"><div class="section-label">המזנקות והצוללות (S&P 500)</div></div>
+          <div class="card-cnt" style="padding:10px 14px">
+            <div class="movers-grid" id="movers-grid">
             <div style="grid-column:1/-1;text-align:center;color:var(--dim);font-size:11px;padding:12px">
               <div class="mini-ring" style="margin:0 auto 8px"></div>
               סורק 220 מניות ברקע...
             </div>
+          </div>
           </div>
         </div>
       </div>
@@ -316,75 +322,85 @@
     </div><!-- /left-col -->
     <div class="right-col">
       <div>
-        <div class="section-label">ביצוע יומי</div>
-        <div class="chart-box"><canvas id="chart" width="266" height="264"></canvas></div>
+        <div class="chart-box">
+          <div class="card-hdr"><div class="section-label">ביצוע יומי</div></div>
+          <canvas id="chart" width="266" height="264"></canvas>
+        </div>
       </div>
       <div>
-        <div class="section-label">סיכום יום</div>
         <div class="pos-card" id="pos-card">
-          <div class="pos-card-top">
-            <span class="pos-card-label">חיוביות יומית</span>
-            <span class="pos-pct" id="pos-pct">–</span>
+          <div class="card-hdr"><div class="section-label">סיכום יום</div></div>
+          <div class="card-cnt">
+            <div class="pos-card-top">
+              <span class="pos-card-label">חיוביות יומית</span>
+              <span class="pos-pct" id="pos-pct">–</span>
+            </div>
+            <div class="pos-mini-bar"><div class="pos-fill" id="pos-fill"></div></div>
+            <div class="pos-mood" id="pos-mood"></div>
           </div>
-          <div class="pos-mini-bar"><div class="pos-fill" id="pos-fill"></div></div>
-          <div class="pos-mood" id="pos-mood"></div>
         </div>
         <div class="sum-grid" id="summary"></div>
       </div>
       <!-- Fear & Greed -->
       <div>
-        <div class="section-label">מדד פחד &amp; חמדנות</div>
         <div class="fg-card">
-          <div class="fg-gauge-wrap">
-            <canvas id="fg-canvas" width="160" height="88"></canvas>
-            <div class="fg-center">
-              <div class="fg-num" id="fg-num">–</div>
-              <div class="fg-lbl" id="fg-lbl">ממתין...</div>
+          <div class="card-hdr"><div class="section-label">מדד פחד &amp; חמדנות</div></div>
+          <div class="card-cnt">
+            <div class="fg-gauge-wrap">
+              <canvas id="fg-canvas" width="160" height="88"></canvas>
+              <div class="fg-center">
+                <div class="fg-num" id="fg-num">–</div>
+                <div class="fg-lbl" id="fg-lbl">ממתין...</div>
+              </div>
             </div>
+            <div class="fg-components" id="fg-components"></div>
           </div>
-          <div class="fg-components" id="fg-components"></div>
         </div>
       </div>
       <!-- Breadth Indicator -->
       <div>
-        <div class="section-label">בריאות שוק (Breadth)</div>
         <div class="breadth-card">
-          <div class="breadth-header">
-            <span class="breadth-title">מניות מעל ממוצע 200 יום</span>
+          <div class="card-hdr">
+            <div class="section-label">בריאות שוק (Breadth)</div>
             <button class="breadth-btn" onclick="runBreadth()">סרוק</button>
           </div>
-          <div class="breadth-big" id="breadth-big">–</div>
-          <div class="breadth-bar-wrap"><div class="breadth-bar-fill" id="breadth-fill" style="width:0%"></div></div>
-          <div class="breadth-stats"><span id="breadth-above">–</span><span id="breadth-sub">לחץ סרוק</span><span id="breadth-total">–</span></div>
+          <div class="card-cnt">
+            <div class="breadth-title" style="font-size:11px;color:var(--dim);margin-bottom:8px">מניות מעל ממוצע 200 יום</div>
+            <div class="breadth-big" id="breadth-big">–</div>
+            <div class="breadth-bar-wrap"><div class="breadth-bar-fill" id="breadth-fill" style="width:0%"></div></div>
+            <div class="breadth-stats"><span id="breadth-above">–</span><span id="breadth-sub">לחץ סרוק</span><span id="breadth-total">–</span></div>
+          </div>
         </div>
       </div>
       <!-- Market Internals -->
       <div>
-        <div class="section-label">פנים השוק (Market Internals)</div>
         <div class="pc-card" id="pc-card">
-          <div class="mi-row">
-            <div class="mi-item">
-              <div class="mi-label">עולים / יורדים</div>
-              <div class="mi-val" id="mi-adv">–</div>
-              <div class="mi-sub" id="mi-adv-sub">סקטורים</div>
+          <div class="card-hdr"><div class="section-label">פנים השוק (Market Internals)</div></div>
+          <div class="card-cnt">
+            <div class="mi-row">
+              <div class="mi-item">
+                <div class="mi-label">עולים / יורדים</div>
+                <div class="mi-val" id="mi-adv">–</div>
+                <div class="mi-sub" id="mi-adv-sub">סקטורים</div>
+              </div>
+              <div class="mi-divider"></div>
+              <div class="mi-item">
+                <div class="mi-label">ממוצע יומי</div>
+                <div class="mi-val" id="mi-avg">–</div>
+                <div class="mi-sub">כל הסקטורים</div>
+              </div>
+              <div class="mi-divider"></div>
+              <div class="mi-item">
+                <div class="mi-label">קרבה לשיא 52W</div>
+                <div class="mi-val" id="mi-hi52">–</div>
+                <div class="mi-sub">ממוצע מרחק</div>
+              </div>
             </div>
-            <div class="mi-divider"></div>
-            <div class="mi-item">
-              <div class="mi-label">ממוצע יומי</div>
-              <div class="mi-val" id="mi-avg">–</div>
-              <div class="mi-sub">כל הסקטורים</div>
+            <div class="mi-bar-wrap">
+              <div class="mi-bar-fill" id="mi-bar" style="width:50%"></div>
             </div>
-            <div class="mi-divider"></div>
-            <div class="mi-item">
-              <div class="mi-label">קרבה לשיא 52W</div>
-              <div class="mi-val" id="mi-hi52">–</div>
-              <div class="mi-sub">ממוצע מרחק</div>
-            </div>
+            <div class="mi-mood" id="mi-mood">ממתין לנתונים...</div>
           </div>
-          <div class="mi-bar-wrap">
-            <div class="mi-bar-fill" id="mi-bar" style="width:50%"></div>
-          </div>
-          <div class="mi-mood" id="mi-mood">ממתין לנתונים...</div>
         </div>
       </div>
     </div>
@@ -395,7 +411,7 @@
   <div class="econ-section">
     <div class="econ-section-card">
       <div class="econ-section-hdr">
-        <div class="section-label" style="margin-bottom:0">לוח אירועים כלכליים — 30 ימים קרובים</div>
+        <div class="section-label">לוח אירועים כלכליים — 30 ימים קרובים</div>
       </div>
       <div class="econ-wrap" id="econ-wrap">
         <div class="modal-loading" style="padding:20px;font-size:11px"><div class="mini-ring" style="margin:0 auto 8px"></div>טוען...</div>
@@ -405,19 +421,25 @@
 
   <!-- לוח רווחים -->
   <div class="earnings-section" id="earnings-section" style="display:none">
-    <div class="section-label">לוח רווחים — S&P 500 (7 ימים קרובים)</div>
-    <div class="earnings-grid" id="earnings-grid"></div>
+    <div class="sectors-card">
+      <div class="card-hdr"><div class="section-label">לוח רווחים — S&P 500 (7 ימים קרובים)</div></div>
+      <div style="padding:10px 12px">
+        <div class="earnings-grid" id="earnings-grid"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Market Insights (auto) -->
   <div class="insights-section">
-    <div class="insights-header">
-      <div class="section-label" style="margin-bottom:0">תובנות שוק</div>
-    </div>
-    <div class="insights-disclaimer">לצורך מידע בלבד — אינו מהווה ייעוץ השקעות</div>
-    <div class="insights-wrap">
-      <div id="insights-grid" class="insights-grid">
-        <div class="insight-empty">טוען נתונים...</div>
+    <div class="insights-card">
+      <div class="card-hdr">
+        <div class="section-label">תובנות שוק</div>
+        <span class="insights-disclaimer">לצורך מידע בלבד — אינו מהווה ייעוץ השקעות</span>
+      </div>
+      <div class="insights-wrap">
+        <div id="insights-grid" class="insights-grid">
+          <div class="insight-empty">טוען נתונים...</div>
+        </div>
       </div>
     </div>
   </div>
