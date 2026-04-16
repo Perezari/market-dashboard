@@ -669,6 +669,7 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 /* ── Holdings redesign ───────────────────────────── */
 .hbar-wrap{display:flex;height:38px;border-radius:6px;overflow:hidden;margin-bottom:14px;gap:2px}
 .hbar-seg{position:relative;display:flex;align-items:center;justify-content:center;min-width:0;transition:opacity .15s;overflow:hidden}
+.hbar-seg:first-child{border-radius:5px 0 0 5px}
 .hbar-seg:hover{opacity:.8;cursor:default}
 .hbar-seg--active{filter:brightness(1.35) !important;outline:2px solid rgba(255,255,255,.55);outline-offset:-1px;z-index:1;opacity:1 !important}
 .hbar-seg-lbl{font-size:9px;font-weight:700;color:rgba(255,255,255,.9);font-family:var(--mono);white-space:nowrap;pointer-events:none;padding:0 4px}
@@ -1226,7 +1227,33 @@ body.light .macro-chg.down{background:rgba(204,26,58,.1)}
 .insight-empty{text-align:center;color:var(--dim);font-size:12px;padding:24px;opacity:.7}
 @media(max-width:480px){.insights-grid{grid-template-columns:1fr}.insights-section{padding:0 16px 16px}}
 /* ── ECONOMIC CALENDAR ── */
-.econ-section{padding:0 16px 20px}
+/* ── Bottom row: 3 columns on desktop ── */
+.bottom-row{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:16px;
+  padding:0 16px 20px;
+  align-items:start;
+}
+/* Remove outer padding when inside bottom-row (grid handles spacing) */
+.bottom-row .econ-section,
+.bottom-row .insights-section,
+.bottom-row .news-section { padding:0; }
+
+/* Cap heights so columns stay even */
+.bottom-row .econ-wrap,
+.bottom-row .news-grid { max-height:440px }
+.bottom-row .insights-wrap { max-height:440px; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--border2) transparent }
+
+/* Mobile: stack vertically */
+@media(max-width:900px){
+  .bottom-row{
+    grid-template-columns:1fr;
+    padding:0 16px 16px;
+  }
+  .bottom-row .econ-wrap,
+  .bottom-row .news-grid { max-height:480px }
+}
 .econ-section-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden}
 .econ-section-hdr{padding:10px 14px;border-bottom:1px solid var(--border)}
 .econ-wrap{max-height:480px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
