@@ -585,32 +585,42 @@ function renderTicker(){
   $('ticker').innerHTML=items+items;
 }
 
-function buildSparkSvg(closes, isUp) {
+function buildSparkSvg(closes, isUp, prev) {
   if (!closes || closes.length < 2) return '';
-  const min = Math.min(...closes), max = Math.max(...closes);
+  const allVals = prev != null ? [...closes, prev] : closes;
+  const min = Math.min(...allVals), max = Math.max(...allVals);
   const range = max - min || 1;
   const W = 100, H = 36;
+  const yOf = v => H - ((v - min) / range) * (H - 2) - 1;
   const pts = closes.map((v, i) => {
     const x = (i / (closes.length - 1)) * W;
-    const y = H - ((v - min) / range) * (H - 2) - 1;
-    return [x, y];
+    return [x, yOf(v)];
   });
   const linePath = 'M' + pts.map(p => p[0].toFixed(1)+','+p[1].toFixed(1)).join(' L');
   const fillPath = `M0,${H} L` + pts.map(p => p[0].toFixed(1)+','+p[1].toFixed(1)).join(' L') + ` L${W},${H} Z`;
   const id = 'sg'+Math.random().toString(36).slice(2,7);
   const col = isUp ? 'var(--green)' : 'var(--red)';
+  // קו ייחוס מקווקוו ב-Y של הסגירה הקודמת
+  const baselineY = prev != null ? yOf(prev).toFixed(1) : null;
+  const baseline = baselineY != null
+    ? `<line x1="0" x2="${W}" y1="${baselineY}" y2="${baselineY}" stroke="var(--dim)" stroke-dasharray="2 2" stroke-width="0.7" opacity="0.5" vector-effect="non-scaling-stroke"/>`
+    : '';
   return `<svg viewBox="0 0 ${W} ${H}" class="idx-spark" preserveAspectRatio="none">
     <defs><linearGradient id="${id}" x1="0" x2="0" y1="0" y2="1">
       <stop offset="0%" stop-color="${col}" stop-opacity="0.25"/>
       <stop offset="100%" stop-color="${col}" stop-opacity="0"/>
     </linearGradient></defs>
+    ${baseline}
     <path d="${fillPath}" fill="url(#${id})"/>
     <path d="${linePath}" stroke="${col}" stroke-width="1.5" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
   </svg>`;
 }
 
 function renderCards(elId, items, labels, keys) {
-  $(elId).innerHTML = items.map(s => {
+  const container = $(elId);
+  // שמור את כרטיסיית השעון לפני איפוס ה-innerHTML
+  const clock = container.querySelector('#market-clock-card');
+  container.innerHTML = items.map(s => {
     const d = qmap[s.sym] || {};
     const isUp = (d.d1 || 0) >= 0;
     const col = isUp ? 'var(--green)' : 'var(--red)';
@@ -621,7 +631,7 @@ function renderCards(elId, items, labels, keys) {
     const arrowSvg = isUp
       ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>`
       : `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="7" x2="17" y2="17"/><polyline points="17 7 17 17 7 17"/></svg>`;
-    const spark = buildSparkSvg(d.spark, isUp);
+    const spark = buildSparkSvg(d.spark, isUp, d.prev);
     return `<div class="idx-card" onclick="openStockDetail('${s.sym}','${s.name.replace(/'/g,"\\'")}')">
       <div class="idx-card-top">
         <div class="idx-card-meta">
@@ -637,6 +647,8 @@ function renderCards(elId, items, labels, keys) {
       ${spark ? `<div class="idx-card-chart">${spark}</div>` : ''}
     </div>`;
   }).join('');
+  // שחזר את כרטיסיית השעון במקומה — מונע קפיצה בגריד
+  if (clock) container.appendChild(clock);
 }
 
 function renderPositivity(){
@@ -1163,92 +1175,296 @@ function buildChartSvg(sym, meta, timestamps, closes, volumes, rangeKey) {
   const pts = closes.map((c,i)=>({c,t:timestamps[i],v:volumes[i]||0})).filter(p=>p.c!=null);
   if (pts.length < 2) return '';
 
-  const W=600, CHART_H=130, VOL_H=30, PAD_T=10, PAD_B=2;
+  const W=600, CHART_H=130, VOL_H=28, PAD_T=10, PAD_B=2;
   const cA = CHART_H - PAD_T - PAD_B;
   const minC = Math.min(...pts.map(p=>p.c));
   const maxC = Math.max(...pts.map(p=>p.c));
   const rng  = (maxC-minC)||maxC*0.01||1;
+  const prev = meta?.chartPreviousClose || null;
+
+  // Expand range to include prev close so baseline is always visible
+  const allVals = prev!=null ? [minC,maxC,prev] : [minC,maxC];
   const padV = rng*0.12;
-  const lo = minC-padV, hi = maxC+padV, vRng = hi-lo;
+  const lo = Math.min(...allVals)-padV, hi = Math.max(...allVals)+padV, vRng = hi-lo;
+
   const lastC  = pts[pts.length-1].c;
   const firstC = pts[0].c;
-  const isUp = lastC >= firstC;
+  const isUp = lastC >= (prev||firstC);
   const col    = isUp ? '#00e87a' : '#ff3a5c';
-  const colDim = isUp ? 'rgba(0,232,122,.15)' : 'rgba(255,58,92,.15)';
+  const colDim = isUp ? 'rgba(0,232,122,.13)' : 'rgba(255,58,92,.13)';
 
   const tx = i => (i/(pts.length-1))*W;
   const ty = v => PAD_T + cA - ((v-lo)/vRng)*cA;
 
   const linePts = pts.map((p,i)=>`${tx(i).toFixed(1)},${ty(p.c).toFixed(1)}`).join(' ');
-  const areaD   = `M0,${(PAD_T+cA).toFixed(1)} `+pts.map((p,i)=>`L${tx(i).toFixed(1)},${ty(p.c).toFixed(1)}`).join(' ')+` L${W},${(PAD_T+cA).toFixed(1)} Z`;
+  const areaD   = `M0,${ty(pts[0].c).toFixed(1)} `+pts.map((p,i)=>`L${tx(i).toFixed(1)},${ty(p.c).toFixed(1)}`).join(' ')+` L${tx(pts.length-1)},${(PAD_T+cA).toFixed(1)} L0,${(PAD_T+cA).toFixed(1)} Z`;
+
+  // Volume bars
   const maxVol  = Math.max(...pts.map(p=>p.v),1);
   const volBars = pts.map((p,i)=>{
     const bw=Math.max(2,(W/pts.length)*0.68), bh=Math.max(1,(p.v/maxVol)*VOL_H);
-    return `<rect x="${(tx(i)-bw/2).toFixed(1)}" y="${(VOL_H-bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" fill="${col}" opacity=".32"/>`;
+    return `<rect x="${(tx(i)-bw/2).toFixed(1)}" y="${(VOL_H-bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" fill="${col}" opacity=".28"/>`;
   }).join('');
-  const gridSvg = [0,0.33,0.66,1].map(f=>`<line x1="0" y1="${(PAD_T+cA*(1-f)).toFixed(1)}" x2="${W}" y2="${(PAD_T+cA*(1-f)).toFixed(1)}" stroke="rgba(255,255,255,.045)" stroke-width="1"/>`).join('');
 
-  // Price labels (% positioning in the chart+vol container — 130+30=160px)
-  const tyPct = v => ((PAD_T+cA-((v-lo)/vRng)*cA)/(CHART_H+VOL_H)*100).toFixed(1);
+  // Grid lines
+  const gridSvg = [0,0.33,0.66,1].map(f=>`<line x1="0" y1="${(PAD_T+cA*(1-f)).toFixed(1)}" x2="${W}" y2="${(PAD_T+cA*(1-f)).toFixed(1)}" stroke="rgba(255,255,255,.04)" stroke-width="1"/>`).join('');
+
+  // Prev close dashed reference line
+  let prevLineEl = '', prevBadgeEl = '';
+  if (prev != null) {
+    const py = ty(prev).toFixed(1);
+    prevLineEl = `<line x1="0" y1="${py}" x2="${W}" y2="${py}" stroke="rgba(200,200,200,.35)" stroke-dasharray="4 3" stroke-width="0.8"/>`;
+    const tyPct2 = ((+py)/(CHART_H+VOL_H)*100).toFixed(1);
+    prevBadgeEl = `<div style="position:absolute;top:${tyPct2}%;left:8px;transform:translateY(-50%);font-size:8px;color:rgba(200,200,200,.55);font-family:var(--mono);line-height:1;pointer-events:none;white-space:nowrap">Prev close: $${prev.toFixed(2)}</div>`;
+  }
+
+  // Crosshair SVG elements (hidden initially)
+  const xhairEl = `
+    <line id="sp-xh-v" x1="0" y1="${PAD_T}" x2="0" y2="${PAD_T+cA}" stroke="rgba(200,216,234,.5)" stroke-width="1" stroke-dasharray="3 2" opacity="0" pointer-events="none"/>
+    <line id="sp-xh-h" x1="0" y1="0" x2="${W}" y2="0" stroke="rgba(200,216,234,.3)" stroke-width="1" stroke-dasharray="3 2" opacity="0" pointer-events="none"/>
+    <circle id="sp-xh-dot" cx="0" cy="0" r="4" fill="${col}" stroke="#0e1a2a" stroke-width="1.5" opacity="0" pointer-events="none"/>
+    <rect id="sp-xh-overlay" x="0" y="0" width="${W}" height="${CHART_H}" fill="transparent"
+      onmousemove="_chartMove(event,this)" onmouseleave="_chartLeave()" ontouchmove="_chartMove(event,this)" ontouchend="_chartLeave()"/>`;
+
+  // Price labels (right side)
+  const tyPct = v => (ty(v)/(CHART_H+VOL_H)*100).toFixed(1);
   const priceLbls = [maxC,(maxC+minC)/2,minC].map(v=>
-    `<div style="position:absolute;top:${tyPct(v)}%;right:4px;transform:translateY(-50%);font-size:8px;color:rgba(204,216,234,.38);font-family:var(--mono);line-height:1;pointer-events:none">${v.toFixed(2)}</div>`
+    `<div style="position:absolute;top:${tyPct(v)}%;right:4px;transform:translateY(-50%);font-size:8px;color:rgba(204,216,234,.32);font-family:var(--mono);line-height:1;pointer-events:none">${v.toFixed(2)}</div>`
   ).join('');
   const curBadge = `<div style="position:absolute;top:${tyPct(lastC)}%;right:0;transform:translateY(-50%);background:${col};color:#000;font-size:8px;font-weight:800;font-family:var(--mono);padding:2px 5px;border-radius:2px 0 0 2px;line-height:1.4;pointer-events:none">${lastC.toFixed(2)}</div>`;
-
-  // Change badge top-left
-  const chgPct = ((lastC-firstC)/firstC*100);
+  const chgPct = ((lastC-(prev||firstC))/(prev||firstC)*100);
   const chgBadge = `<div style="position:absolute;top:7px;left:8px;font-size:9px;font-weight:700;font-family:var(--mono);color:${col};background:${colDim};padding:2px 7px;border-radius:3px;line-height:1.4;pointer-events:none">${chgPct>=0?'+':''}${chgPct.toFixed(2)}%</div>`;
 
-  // Axis labels (time or date)
-  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const axPts  = [0, Math.floor(pts.length*0.25), Math.floor(pts.length*0.5), Math.floor(pts.length*0.75), pts.length-1];
+  // Axis labels
+  const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const axPts=[0,Math.floor(pts.length*.25),Math.floor(pts.length*.5),Math.floor(pts.length*.75),pts.length-1];
   const axLabels = axPts.map((i,j)=>{
-    const ts = pts[i]?.t; if (!ts) return '';
-    const d  = new Date(ts*1000);
-    let lbl;
-    if (cfg.isIntraday) {
-      if (rangeKey==='1W') {
-        lbl = DAYS[d.getDay()];
-      } else {
-        const h=d.getUTCHours()-4, m=d.getUTCMinutes();
-        const hh=(h+24)%24, h12=hh%12||12, sfx=hh<12?'AM':'PM';
-        lbl = `${h12}${m?':'+String(m).padStart(2,'0'):''}${sfx}`;
-      }
-    } else {
-      lbl = `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
-    }
-    const pct = (i/(pts.length-1)*100).toFixed(1);
-    const xf  = j===0?'translateX(0)':j===axPts.length-1?'translateX(-100%)':'translateX(-50%)';
-    return `<span style="position:absolute;left:${pct}%;transform:${xf};font-size:8px;color:rgba(204,216,234,.35);font-family:var(--sans);white-space:nowrap">${lbl}</span>`;
+    const ts=pts[i]?.t; if(!ts) return '';
+    const d=new Date(ts*1000); let lbl;
+    if(cfg.isIntraday){ if(rangeKey==='1W'){lbl=DAYS[d.getDay()];}else{const h=d.getUTCHours()-4,m=d.getUTCMinutes(),hh=(h+24)%24,h12=hh%12||12,sfx=hh<12?'AM':'PM';lbl=`${h12}${m?':'+String(m).padStart(2,'0'):''}${sfx}`;}}
+    else{lbl=`${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;}
+    const pct=(i/(pts.length-1)*100).toFixed(1);
+    const xf=j===0?'translateX(0)':j===axPts.length-1?'translateX(-100%)':'translateX(-50%)';
+    return `<span style="position:absolute;left:${pct}%;transform:${xf};font-size:8px;color:rgba(204,216,234,.32);font-family:var(--sans);white-space:nowrap">${lbl}</span>`;
   }).join('');
 
-  // Range selector bar
-  const rangeBar = `<div class="sp-chart-ranges">${
-    Object.keys(CHART_RANGE_CFG).map(k=>
-      `<button class="sp-rng-btn${k===rangeKey?' active':''}" onclick="switchChartRange('${k}')">${k}</button>`
-    ).join('')
-  }</div>`;
+  // Range buttons + tool buttons
+  const rangeBar = `<div class="sp-chart-hdr">
+    <div class="sp-chart-ranges">${
+      Object.keys(CHART_RANGE_CFG).map(k=>
+        `<button class="sp-rng-btn${k===rangeKey?' active':''}" onclick="switchChartRange('${k}')">${k}</button>`
+      ).join('')
+    }</div>
+    <div class="sp-chart-tools">
+      <button class="sp-tool-btn" onclick="_chartZoom(1)" title="Zoom In"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
+      <button class="sp-tool-btn" onclick="_chartZoom(-1)" title="Zoom Out"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
+      <button class="sp-tool-btn" onclick="_chartScreenshot('${sym}')" title="Screenshot"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
+      <button class="sp-tool-btn" onclick="_chartFullscreen()" id="sp-fs-btn" title="Fullscreen"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+    </div>
+  </div>`;
+
+  // Dot grid background pattern (Perplexity style)
+  const dotPat = `<pattern id="spd${sym}" patternUnits="userSpaceOnUse" width="6" height="6"><circle cx="3" cy="3" r="0.55" fill="rgba(200,210,230,.2)"/></pattern>`;
+
+  // Store chart data for crosshair JS
+  window._chartPts = pts.map((p,i)=>({c:p.c, t:p.t, v:p.v, svgY:ty(p.c), svgX:tx(i)}));
+  window._chartAllPts = pts; // full dataset for zoom
+  window._chartMeta = {W, CHART_H, col, prev, cfg, rangeKey, sym};
 
   return `<div class="sp-chart-wrap">
     ${rangeBar}
-    <div style="position:relative">
-      <svg width="100%" viewBox="0 0 ${W} ${CHART_H}" preserveAspectRatio="none" style="display:block;height:128px">
-        <defs><linearGradient id="spg${sym}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${col}" stop-opacity=".2"/><stop offset="88%" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+    <div style="position:relative" id="sp-chart-container">
+      <div id="sp-chart-tooltip" class="sp-chart-tooltip" style="display:none"></div>
+      <svg id="sp-chart-svg" width="100%" viewBox="0 0 ${W} ${CHART_H}" preserveAspectRatio="none" style="display:block;height:128px;overflow:visible">
+        <defs>
+          <linearGradient id="spg${sym}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${col}" stop-opacity=".22"/><stop offset="90%" stop-color="${col}" stop-opacity="0"/></linearGradient>
+          ${dotPat}
+        </defs>
+        <rect width="${W}" height="${CHART_H}" fill="url(#spd${sym})"/>
         ${gridSvg}
+        ${prevLineEl}
         <path d="${areaD}" fill="url(#spg${sym})"/>
         <polyline points="${linePts}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        ${xhairEl}
       </svg>
-      <svg width="100%" viewBox="0 0 ${W} ${VOL_H}" preserveAspectRatio="none" style="display:block;height:28px">${volBars}</svg>
-      ${priceLbls}${curBadge}${chgBadge}
+      <svg width="100%" viewBox="0 0 ${W} ${VOL_H}" preserveAspectRatio="none" style="display:block;height:26px">${volBars}</svg>
+      ${priceLbls}${curBadge}${chgBadge}${prevBadgeEl}
       <div style="position:relative;height:18px;margin:2px 4px 0">${axLabels}</div>
     </div>
   </div>`;
 }
 
+/* ── Chart crosshair handlers ──────────────────────── */
+function _chartMove(e, overlay) {
+  if (e.cancelable) e.preventDefault();
+  const pts = window._chartPts; if (!pts || pts.length < 2) return;
+  const m = window._chartMeta; if (!m) return;
+
+  const svg = overlay.closest('svg');
+  const rect = svg.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const relX = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  const idx = Math.max(0, Math.min(pts.length-1, Math.round(relX*(pts.length-1))));
+  const pt = pts[idx];
+
+  const vl=$('sp-xh-v'), hl=$('sp-xh-h'), dt=$('sp-xh-dot');
+  if (vl) { vl.setAttribute('x1',pt.svgX.toFixed(1)); vl.setAttribute('x2',pt.svgX.toFixed(1)); vl.setAttribute('opacity','1'); }
+  if (hl) { hl.setAttribute('y1',pt.svgY.toFixed(1)); hl.setAttribute('y2',pt.svgY.toFixed(1)); hl.setAttribute('opacity','1'); }
+  if (dt) { dt.setAttribute('cx',pt.svgX.toFixed(1)); dt.setAttribute('cy',pt.svgY.toFixed(1)); dt.setAttribute('opacity','1'); }
+
+  const tip = $('sp-chart-tooltip'); if (!tip) return;
+  const d = new Date(pt.t*1000);
+  const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let dateLbl;
+  if (m.cfg?.isIntraday) {
+    const h=d.getUTCHours()-4, mn=d.getUTCMinutes(), hh=(h+24)%24, h12=hh%12||12, sfx=hh<12?'AM':'PM';
+    dateLbl=`${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${h12}:${String(mn).padStart(2,'0')} ${sfx}`;
+  } else {
+    dateLbl=`${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  }
+  const chg = m.prev ? ((pt.c - m.prev)/m.prev*100) : 0;
+  const chgCol = chg >= 0 ? '#00e87a' : '#ff3a5c';
+  const fmtV = v => v>=1e9?(v/1e9).toFixed(2)+'B':v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(0)+'K':v;
+  tip.innerHTML = `<div class="sp-tip-date">${dateLbl}</div><div class="sp-tip-price">$${pt.c.toFixed(2)}</div><div class="sp-tip-chg" style="color:${chgCol}">${chg>=0?'+':''}${chg.toFixed(2)}%</div>${pt.v?`<div class="sp-tip-vol">Vol: ${fmtV(pt.v)}</div>`:''}`;
+  tip.style.display = 'block';
+  // Clamp tooltip horizontally
+  const tipW = 100; // approx px
+  const containerRect = tip.parentElement.getBoundingClientRect();
+  let leftPx = (clientX - containerRect.left) - tipW/2;
+  leftPx = Math.max(4, Math.min(containerRect.width - tipW - 4, leftPx));
+  tip.style.left = leftPx+'px';
+  tip.style.top = '6px';
+}
+function _chartLeave() {
+  ['sp-xh-v','sp-xh-h','sp-xh-dot'].forEach(id=>{ const el=$(id); if(el) el.setAttribute('opacity','0'); });
+  const tip=$('sp-chart-tooltip'); if(tip) tip.style.display='none';
+}
+
+const _ZOOM_LEVELS = [1, 0.75, 0.5, 0.25];
+window._chartZoomIdx = 0;
+window._chartOrigPts = null; // שמירת הנתונים המקוריים לפני זום
+
+function _chartZoom(dir) {
+  // dir: 1 = zoom in (show less), -1 = zoom out (show more)
+  const d = window._spData; if (!d) return;
+
+  // שמור נתונים מקוריים פעם אחת (לפני זום ראשון)
+  if (!window._chartOrigPts && window._chartAllPts) {
+    window._chartOrigPts = window._chartAllPts.slice();
+  }
+  const origPts = window._chartOrigPts; if (!origPts || origPts.length < 4) return;
+
+  const newIdx = Math.max(0, Math.min(_ZOOM_LEVELS.length-1, (window._chartZoomIdx||0) + dir));
+  if (newIdx === window._chartZoomIdx) return; // כבר בגבול
+  window._chartZoomIdx = newIdx;
+
+  const frac = _ZOOM_LEVELS[newIdx];
+  const start = Math.floor(origPts.length * (1 - frac));
+  const sliced = origPts.slice(start);
+
+  const newChart = buildChartSvg(
+    d.sym, d.meta,
+    sliced.map(p=>p.t), sliced.map(p=>p.c), sliced.map(p=>p.v),
+    window._chartMeta?.rangeKey || '1M'
+  );
+  // שחזר את הנתונים המקוריים שבuildChartSvg מחק
+  window._chartAllPts = origPts;
+  window._spChartHtml = newChart + (window._spStatsHtml||'');
+  $('sp-body').innerHTML = window._spChartHtml;
+}
+
+function _chartScreenshot(sym) {
+  const svg = $('sp-chart-svg'); if (!svg) return;
+
+  // בנה SVG עם רקע כהה
+  const clone = svg.cloneNode(true);
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
+  bg.setAttribute('width','100%'); bg.setAttribute('height','100%');
+  bg.setAttribute('fill','#1e1d1c');
+  clone.insertBefore(bg, clone.firstChild);
+  const svgStr = new XMLSerializer().serializeToString(clone);
+  const svgBlob = new Blob([svgStr], {type:'image/svg+xml;charset=utf-8'});
+  const svgUrl = URL.createObjectURL(svgBlob);
+
+  // הצג modal
+  const existing = $('sp-ss-modal'); if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'sp-ss-modal';
+  modal.className = 'sp-ss-modal';
+  modal.innerHTML = `
+    <div class="sp-ss-inner">
+      <div class="sp-ss-hdr">
+        <span>Save screenshot</span>
+        <button class="sp-ss-close" onclick="document.getElementById('sp-ss-modal').remove()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="sp-ss-preview-wrap">
+        <img src="${svgUrl}" class="sp-ss-preview" alt="chart"/>
+        <div class="sp-ss-sym">${sym||''} Chart</div>
+      </div>
+      <div class="sp-ss-btns">
+        <button class="sp-ss-btn" onclick="_ssDlSvg('${sym}')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download SVG
+        </button>
+        <button class="sp-ss-btn sp-ss-btn-primary" onclick="_ssDlPng('${sym}')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download PNG
+        </button>
+      </div>
+    </div>`;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+  window._ssSvgUrl = svgUrl;
+  window._ssSvg = svg;
+}
+
+function _ssDlSvg(sym) {
+  const a = document.createElement('a');
+  a.href = window._ssSvgUrl; a.download = `${sym||'chart'}.svg`;
+  a.click();
+}
+
+function _ssDlPng(sym) {
+  const svg = window._ssSvg; if (!svg) return;
+  const rect = svg.getBoundingClientRect();
+  const canvas = document.createElement('canvas');
+  const scale = 2;
+  canvas.width = rect.width * scale; canvas.height = rect.height * scale;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#1e1d1c'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  const img = new Image();
+  img.onload = () => {
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const a = document.createElement('a');
+    a.download = `${sym||'chart'}.png`;
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+    const modal = $('sp-ss-modal'); if (modal) modal.remove();
+  };
+  img.onerror = () => { _ssDlSvg(sym); }; // fallback
+  img.src = window._ssSvgUrl;
+}
+
+function _chartFullscreen() {
+  // טיפול ב-overlay ולא בפאנל עצמו
+  const overlay = $('stock-overlay'); if (!overlay) return;
+  const isFs = overlay.classList.toggle('sp-fs');
+  const btn = $('sp-fs-btn'); if (!btn) return;
+  btn.innerHTML = isFs
+    ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>`
+    : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`;
+}
+
 async function switchChartRange(rangeKey) {
   const d = window._spData; if (!d) return;
   const cfg = CHART_RANGE_CFG[rangeKey]; if (!cfg) return;
+  // איפוס מצב זום
+  window._chartZoomIdx = 0;
+  window._chartOrigPts = null;
   // optimistic button highlight
   document.querySelectorAll('.sp-rng-btn').forEach(b=>b.classList.toggle('active', b.textContent===rangeKey));
   // dim chart
