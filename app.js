@@ -431,6 +431,9 @@ async function fetchAndRenderMovers() {
 
   // 3. מרנדרים את הפאנל
   renderMovers(holdingsSet);
+
+  // 4. עכשיו שיש לנו נתוני מניות בודדות — עדכן את ה-AI Brief עם המלצות ספציפיות
+  runAIBrief();
 }
 
 function renderMovers(holdingsSet) {
@@ -662,7 +665,7 @@ function renderPositivity(){
   $('pos-fill').style.cssText=`width:${p}%;background:${p>=50?'var(--green)':'var(--red)'}`;
   $('pos-pct').style.color=p>=50?'var(--green)':'var(--red)';
   $('pos-pct').textContent=p+'%';
-  $('pos-mood').textContent=`(${pos}/${vals.length}) — ${p>=70?'יום חיובי מאוד':p>=50?'מעורב-חיובי':p>=30?'מעורב-שלילי':'שלילי חזק'}`;
+  $('pos-mood').textContent=`(${pos}/${vals.length}) — ${p>=70?'יום ירוק — רוח גבית לשוק':p>=50?'מעורב-חיובי — בחר סקטור ספציפי':p>=30?'מעורב-שלילי — היזהר מפוזיציות חדשות':'שלילי חזק — שמור מזומן'}`;
 }
 
 // --- LAB LOGIC ---
@@ -1965,6 +1968,7 @@ async function init(){
     renderCorrelationMatrix();
     renderMarketInternals();
     runInsights();
+    runAIBrief();
     const pos=SECTORS.filter(s=>(qmap[s.sym]||{}).d1>0).length;
     $('footer').textContent=`${pos}/${SECTORS.length} סקטורים חיוביים • Yahoo Finance • ${now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}`;
 
@@ -2251,7 +2255,7 @@ async function runBreadth() {
   $('breadth-fill').style.background = color;
   $('breadth-above').textContent = `${above} מניות מעל`;
   $('breadth-total').textContent = `מתוך ${total}`;
-  $('breadth-sub').textContent = pct >= 60 ? '↑ שוק בריא' : pct >= 40 ? '≈ מעורב' : '↓ שוק חלש';
+  $('breadth-sub').textContent = pct >= 60 ? '↑ שוק בריא — עלייה רחבה' : pct >= 40 ? '≈ מעורב — בדוק סקטור ספציפי' : '↓ רוב המניות מתחת לממוצע — סימן חולשה';
 }
 
 // ══════════════════════════════════════
@@ -2390,7 +2394,7 @@ function renderMarketInternals() {
   $('mi-bar').style.width = (pctUp * 100) + '%';
   $('mi-bar').style.background = pctUp >= 0.7 ? 'var(--green)' : pctUp >= 0.5 ? '#5bc27f' : pctUp >= 0.3 ? '#f59e0b' : 'var(--red)';
 
-  const mood = pctUp >= 0.7 ? '↑↑ שוק חיובי מאוד' : pctUp >= 0.5 ? '↗ מעורב-חיובי' : pctUp >= 0.3 ? '↘ מעורב-שלילי' : '↓ שוק שלילי';
+  const mood = pctUp >= 0.7 ? '↑↑ שוק חיובי — הצטרף למגמה' : pctUp >= 0.5 ? '↗ מעורב — בחר סקטור חזק' : pctUp >= 0.3 ? '↘ חלשלש — צמצם חשיפה' : '↓ שלילי — שמור מזומן';
   $('mi-mood').textContent = mood;
 }
 
@@ -2575,11 +2579,41 @@ function runInsights() {
     neutral:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>',
     info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
   };
-  grid.innerHTML = cards.map(c=>`
+
+  // Educational "Why" content for each insight type
+  const whyData = {
+    'bull_mood': {why:'שוק ירוק רחב (הרבה סקטורים עולים) הוא סימן ל"בריאות" — העלייה אמיתית ולא תלויה במניה אחת.',action:'הצטרף למגמה דרך הסקטור המוביל. הגדר Trailing Stop ל-2-3% מתחת למחיר.'},
+    'bear_mood': {why:'כשרוב הסקטורים יורדים, אין לאן "להתחבא" בתוך השוק. זה כמו גשם — כולם נרטבים.',action:'שמור מזומן, הקטן חשיפה. חכה ליום שבו 70%+ מהסקטורים יעלו לפני שתיכנס מחדש.'},
+    'mixed_mood': {why:'שוק מפוצל אומר שאין הסכמה בין המשקיעים. חלק קונים, חלק מוכרים — אין כיוון.',action:'בחר סקטור חזק ספציפי במקום ETF רחב. אל תשקיע "בשוק כולו" כשאין כיוון.'},
+    'sector_top': {why:'הסקטור החזק ביותר היום הוא המקום שבו הכסף זורם. "Follow the money".',action:'לחץ על הסקטור בטבלה כדי לראות אילו מניות בתוכו עולות הכי הרבה.'},
+    'sector_weak': {why:'הסקטור החלש = שם אנשים מוכרים. להיכנס לסקטור חלש זה כמו לשחות נגד הזרם.',action:'הימנע מקנייה בסקטור הזה עד שיראה סימני התאוששות (3 ימי עלייה ברצף).'},
+    'vix_signal': {why:'VIX מודד כמה השוק "מפחד" מתנודות. VIX גבוה = אנשים קונים ביטוח → מניות יורדות.',action:'VIX מעל 25? הקטן חשיפה. VIX מתחת 15? סביבה נוחה לקנייה.'},
+    'tactical': {why:'המלצה המבוססת על שילוב של מדד הפחד/חמדנות, רוחב שוק, ומומנטום — לא מדד בודד.',action:'השתמש בהמלצה כ"מצפן" — לא כהוראה. תמיד בדוק שהנתון הספציפי תומך לפני שאתה פועל.'}
+  };
+
+  // Assign why keys to cards
+  const whyKeys = ['bull_mood','sector_top','sector_weak','vix_signal','tactical'];
+  if (pctUp >= 0.7) whyKeys[0] = 'bull_mood';
+  else if (pctUp < 0.45) whyKeys[0] = 'bear_mood';
+  else whyKeys[0] = 'mixed_mood';
+
+  grid.innerHTML = cards.map((c,i)=>{
+    const wKey = whyKeys[i] || 'tactical';
+    const w = whyData[wKey];
+    const whyId = 'why-'+i;
+    const whySection = w ? `
+      <button class="insight-why-btn" onclick="this.nextElementSibling.classList.toggle('open');this.textContent=this.nextElementSibling.classList.contains('open')?'הסתר הסבר':'למה זה חשוב?'">למה זה חשוב?</button>
+      <div class="insight-why-content" id="${whyId}">
+        <div class="why-analogy">${w.why}</div>
+        <div style="margin-top:5px;color:var(--blue)"><b>מה לעשות:</b> ${w.action}</div>
+      </div>` : '';
+    return `
     <div class="insight-card">
       <div class="insight-card-hdr ${c.type}">${icons[c.type]||''}${c.title}</div>
       <div class="insight-card-body">${c.body}</div>
-    </div>`).join('');
+      ${whySection}
+    </div>`;
+  }).join('');
 
   // עדכון כפתור
   if(btn) btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> עדכן';
@@ -2724,13 +2758,13 @@ tr:nth-child(even) td{background:#fafafa}
 
 // ── MACRO CONTEXT (FRED) ──────────────
 const MACRO_SERIES = {
-  DGS10:      {name:'10Y Treasury',    he:'תשואת אג"ח 10 שנים — ריבית בסיס לכל נכסי הסיכון',     suffix:'%'},
-  FEDFUNDS:   {name:'Fed Funds Rate',  he:'ריבית הפד — עולה=לחץ על מכפילים, יורדת=תמיכה בשוק',  suffix:'%'},
-  T10Y2Y:     {name:'Yield Curve',     he:'פרש תשואות 10Y-2Y — שלילי=אזהרת מיתון, חיובי=נורמלי', suffix:'%'},
-  DCOILWTICO: {name:'WTI Crude Oil',   he:'נפט גולמי — משפיע על עלויות ואינפלציה',               suffix:'$'},
-  MORTGAGE30US:{name:'Mortgage 30Y',  he:'ריבית משכנתא 30 שנה — לחץ על שוק הנדל"ן',             suffix:'%'},
-  UMCSENT:    {name:'Consumer Sentiment',he:'סנטימנט צרכני — מחזק את הצריכה הפרטית',             suffix:''},
-  VIXCLS:     {name:'VIX',            he:'מדד פחד — מעל 25=תנודתיות גבוהה, מתחת 15=שקט',        suffix:''},
+  DGS10:      {name:'10Y Treasury',    he:'תשואת אגרות חוב 10 שנים. עולה = מניות בלחץ (במיוחד טכנולוגיה). יורדת = רוח גבית למניות.',     suffix:'%'},
+  FEDFUNDS:   {name:'Fed Funds Rate',  he:'ריבית הבנק המרכזי. עולה = הלוואות יקרות, חברות מרוויחות פחות, מכפילים יורדים. יורדת = דלק לשוק.',  suffix:'%'},
+  T10Y2Y:     {name:'Yield Curve',     he:'הפרש ריבית 10 שנים מינוס 2 שנים. שלילי = אזהרת מיתון! חיובי = כלכלה בריאה.', suffix:'%'},
+  DCOILWTICO: {name:'WTI Crude Oil',   he:'מחיר נפט. עולה = עלויות ייצור עולות, אינפלציה עולה. יורד = הקלה לכלכלה.',               suffix:'$'},
+  MORTGAGE30US:{name:'Mortgage 30Y',  he:'ריבית משכנתא 30 שנה. עולה = אנשים קונים פחות דירות = לחץ על סקטור נדל"ן.',             suffix:'%'},
+  UMCSENT:    {name:'Consumer Sentiment',he:'עד כמה הצרכנים אופטימיים. גבוה = קונים יותר = טוב לסקטור צריכה.',             suffix:''},
+  VIXCLS:     {name:'VIX',            he:'מדד הפחד של וול סטריט. מתחת 15 = רגוע, 15-25 = נורמלי, מעל 25 = חרדה, מעל 35 = פאניקה.',        suffix:''},
 };
 
 // Map sector ETF → relevant FRED series
@@ -2815,13 +2849,13 @@ const FOMC_DATES = {
 };
 
 const FRED_RELEASES = [
-  {id:10,  name:'CPI Report',              he:'מדד המחירים לצרכן — מודד אינפלציה. גבוה מהצפוי = שוק יורד (חשש מריבית גבוהה).', impact:'high',   time:'08:30 ET', url:'https://www.bls.gov/cpi/'},
-  {id:50,  name:'NFP — Non-Farm Payrolls', he:'שכר חוץ-חקלאי — כמה משרות נוצרו. מדד עבודה חזק = כלכלה חזקה (לפעמים שוק יורד מחשש לריבית).', impact:'high',   time:'08:30 ET', url:'https://www.bls.gov/news.release/empsit.toc.htm'},
-  {id:54,  name:'PCE Price Index',         he:'הוצאות צריכה אישית — מדד האינפלציה המועדף על הפד. משפיע ישירות על החלטות ריבית.',  impact:'high',   time:'08:30 ET', url:'https://www.bea.gov/data/personal-consumption-expenditures-price-index'},
-  {id:53,  name:'GDP (Advance)',           he:'תוצר מקומי גולמי — גודל הכלכלה האמריקאית. שני רבעונים שליליים = מיתון.',           impact:'high',   time:'08:30 ET', url:'https://www.bea.gov/data/gdp/gross-domestic-product'},
-  {id:31,  name:'PPI Report',             he:'מדד מחירי יצרנים — אינפלציה מצד ההיצע. מקדים לעיתים את ה-CPI.',                   impact:'medium', time:'08:30 ET', url:'https://www.bls.gov/ppi/'},
-  {id:84,  name:'Retail Sales',           he:'מכירות קמעונאיות — כוח הצרכן. 70% מהכלכלה האמריקאית מבוססת על צריכה.',            impact:'medium', time:'08:30 ET', url:'https://www.census.gov/retail/index.html'},
-  {id:180, name:'Initial Jobless Claims', he:'תביעות אבטלה שבועיות — בריאות שוק העבודה. עלייה = התרופפות.',                      impact:'medium', time:'08:30 ET', url:'https://www.dol.gov/ui/data.pdf'},
+  {id:10,  name:'CPI Report',              he:'מדד המחירים לצרכן = כמה עלו המחירים בסופר ובחנויות. גבוה מהצפוי? הפד יעלה ריבית → מניות יורדות. נמוך? ריבית תרד → מניות עולות.', impact:'high',   time:'08:30 ET', url:'https://www.bls.gov/cpi/'},
+  {id:50,  name:'NFP — Non-Farm Payrolls', he:'כמה משרות חדשות נוצרו בחודש. הרבה = כלכלה חזקה (אבל הפד עלול לשמור ריבית גבוהה). מעט = חולשה (הפד עשוי להוריד ריבית → טוב למניות).', impact:'high',   time:'08:30 ET', url:'https://www.bls.gov/news.release/empsit.toc.htm'},
+  {id:54,  name:'PCE Price Index',         he:'מדד האינפלציה שהפד מסתכל עליו הכי הרבה. זה ה"מבחן" שקובע אם הריבית תעלה או תרד.', impact:'high',   time:'08:30 ET', url:'https://www.bea.gov/data/personal-consumption-expenditures-price-index'},
+  {id:53,  name:'GDP (Advance)',           he:'גודל הכלכלה. עלייה = כלכלה צומחת = טוב למניות. שני רבעונים שליליים ברצף = "מיתון" = שוק יורד חזק.', impact:'high',   time:'08:30 ET', url:'https://www.bea.gov/data/gdp/gross-domestic-product'},
+  {id:31,  name:'PPI Report',             he:'מחירי הייצור — כמה עולה ליצרנים לייצר. אם המחירים עולים, זה יגיע גם אלינו כצרכנים (אינפלציה עתידית).', impact:'medium', time:'08:30 ET', url:'https://www.bls.gov/ppi/'},
+  {id:84,  name:'Retail Sales',           he:'כמה אנשים קונים. 70% מהכלכלה האמריקאית = קניות. אם אנשים מפסיקים לקנות → חברות מרוויחות פחות → מניות יורדות.', impact:'medium', time:'08:30 ET', url:'https://www.census.gov/retail/index.html'},
+  {id:180, name:'Initial Jobless Claims', he:'כמה אנשים הגישו תביעות אבטלה השבוע. עלייה = שוק העבודה מתרופף. ירידה = שוק עבודה חזק.', impact:'medium', time:'08:30 ET', url:'https://www.dol.gov/ui/data.pdf'},
 ];
 
 async function fetchEconCalendarFRED() {
@@ -2847,7 +2881,7 @@ async function fetchEconCalendarFRED() {
   const y = today.getFullYear();
   [...(FOMC_DATES[y]||[]), ...(FOMC_DATES[y+1]||[])].forEach(date => {
     if (date >= start && date <= end)
-      events.push({date, name:'FOMC Decision', he:'ועדת הריבית (פד) — קובעת את שיעור הריבית. עלייה=לחץ על מניות, ירידה=דחיפה לשוק.', impact:'high', time:'14:00 ET', url:'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm', d:new Date(date+'T12:00:00')});
+      events.push({date, name:'FOMC Decision', he:'החלטת ריבית הפד — היום הכי חשוב בלוח השנה! הפד מחליט אם להעלות, להוריד, או להשאיר את הריבית. העלאה = מניות בלחץ. הורדה = מניות עולות. השוק זז חזק ב-30 הדקות אחרי ההודעה.', impact:'high', time:'14:00 ET', url:'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm', d:new Date(date+'T12:00:00')});
   });
 
   return events.sort((a,b) => a.date.localeCompare(b.date));
@@ -2939,6 +2973,432 @@ function getSectorMacroTd(sym) {
   const clr = noChg ? 'var(--dim)' : obs.cur>obs.prev ? 'var(--red)' : 'var(--green)';
   return `<td style="font-family:var(--mono);font-size:9px;white-space:nowrap;border-left:2px solid var(--border2);color:${clr}" title="${conf.label}: ${val}">${val}${arrow}</td>`;
 }
+
+// ══════════════════════════════════════════════════════
+// AI MARKET BRIEF — Smart Dashboard Layer
+// ══════════════════════════════════════════════════════
+
+// ── Education Dictionary ────────────────────────────
+const EDU_DICT = {
+  'ריבית הפד': {
+    title:'ריבית הפד (Fed Funds Rate)',
+    body:'זו הריבית שהבנק המרכזי האמריקאי קובע. היא משפיעה על <b>כל דבר</b> — הלוואות, משכנתאות, והכי חשוב: על מחירי המניות.',
+    example:'כשהריבית עולה, כסף "בטוח" (פיקדון, אגרות חוב) נותן תשואה טובה יותר → אנשים מוציאים כסף ממניות → מחירים יורדים. כשהריבית יורדת → הפוך.'
+  },
+  'VIX': {
+    title:'VIX — מדד הפחד',
+    body:'מודד כמה השוק <b>מפחד מתנודות</b> ב-30 הימים הקרובים. כשה-VIX גבוה, אנשים חוששים. כשנמוך — רגועים.',
+    example:'VIX מתחת ל-15 = שוק רגוע מאוד. VIX מעל 25 = חרדה. VIX מעל 35 = פאניקה (בדר"כ הזדמנות קנייה לאמיצים).'
+  },
+  'מכפיל רווח': {
+    title:'מכפיל רווח (P/E Ratio)',
+    body:'כמה שנים ייקח לחברה "להחזיר" לך את ההשקעה מהרווחים שלה. מכפיל 20 = 20 שנה (בתיאוריה).',
+    example:'ריבית גבוהה → מכפילים יורדים כי "מחר" שווה פחות היום. לכן מניות טכנולוגיה (מכפילים גבוהים) נפגעות יותר מעליית ריבית.'
+  },
+  'RSI': {
+    title:'RSI — מדד כוח יחסי',
+    body:'מודד אם מניה עלתה "יותר מדי מהר" או ירדה "יותר מדי מהר". סולם 0-100.',
+    example:'RSI מתחת ל-30 = מכירת יתר (אולי הזדמנות קנייה). RSI מעל 70 = קניית יתר (אולי כדאי למכור). RSI 50 = ניטרלי.'
+  },
+  'S&P 500': {
+    title:'S&P 500 — מדד 500 הגדולות',
+    body:'מדד שעוקב אחרי 500 החברות הגדולות בארה"ב. נחשב <b>הברומטר של הכלכלה האמריקאית</b>.',
+    example:'כשאומרים "השוק עלה" — בדר"כ מתכוונים ל-S&P 500. SPY הוא קרן שעוקבת אחריו.'
+  },
+  'תשואת אגרות חוב': {
+    title:'תשואת אגרות חוב (10Y Treasury)',
+    body:'הריבית שממשלת ארה"ב משלמת על הלוואה ל-10 שנים. נחשב ל"ריבית הבסיס" של העולם.',
+    example:'כשתשואת ה-10Y עולה → מניות נוטות לרדת (כי אגרות חוב "מתחרות" במניות). תשואה מעל 4.5% = לחץ משמעותי על השוק.'
+  },
+  'רוחב שוק': {
+    title:'רוחב שוק (Market Breadth)',
+    body:'בודק כמה מניות עולות לעומת יורדות. שוק "בריא" הוא כזה שבו <b>הרבה מניות</b> עולות, לא רק כמה ענקיות.',
+    example:'אם S&P 500 עולה אבל רק 5 מניות ענק מושכות אותו (כמו NVIDIA, Apple) — זו אזהרה. עלייה רחבה של 80%+ מהמניות = עלייה אמיתית ובריאה.'
+  },
+  'סקטור': {
+    title:'סקטור — ענף בשוק',
+    body:'השוק מחולק ל-11 ענפים (סקטורים). כל סקטור מגיב אחרת לאירועים כלכליים.',
+    example:'ריבית עולה? טכנולוגיה נפגעת. נפט עולה? אנרגיה מרוויחה. מיתון? תשתיות ובריאות מחזיקים טוב יותר. לדעת איזה סקטור חזק = לדעת לאן ללכת.'
+  },
+  'YTD': {
+    title:'YTD — תשואה מתחילת השנה',
+    body:'כמה אחוזים המניה/הסקטור עלה או ירד מ-1 בינואר עד היום.',
+    example:'אם XLK (טכנולוגיה) ב-YTD של +15% ו-XLE (אנרגיה) ב--5% — הכסף זורם לטכנולוגיה השנה.'
+  },
+  'מומנטום': {
+    title:'מומנטום — כוח המגמה',
+    body:'כשמניה עולה, היא <b>נוטה להמשיך לעלות</b> (ולהפך). זה מומנטום — "אובייקט בתנועה נשאר בתנועה".',
+    example:'סקטור שעולה כבר חודש ברציפות → מומנטום חיובי = רוב הסיכויים שימשיך. מומנטום שלילי = לא הזמן לקנות (תפוס סכין נופלת).'
+  },
+  'Fear & Greed': {
+    title:'מדד פחד וחמדנות',
+    body:'משקלל כמה מדדים לתמונה אחת: האם השוק <b>פוחד</b> (הזדמנות?) או <b>חמדן</b> (סכנה?).',
+    example:'וורן באפט אמר: "היה חמדן כשאחרים פוחדים, ופחדן כשאחרים חמדנים." מדד מתחת ל-25 = פחד קיצוני = לעתים הזדמנות קנייה היסטורית.'
+  },
+  'Stop Loss': {
+    title:'Stop Loss — פקודת הגנה',
+    body:'פקודה אוטומטית שמוכרת את המניה אם היא יורדת למחיר מסוים. <b>ביטוח</b> נגד הפסד גדול.',
+    example:'קנית מניה ב-$100 ושמת Stop Loss ב-$92 → אם המניה יורדת ל-$92, היא נמכרת אוטומטית. ההפסד שלך מוגבל ל-8% במקום 30%+.'
+  },
+  'מתאם': {
+    title:'מתאם (Correlation)',
+    body:'מודד עד כמה שני נכסים זזים ביחד. מתאם 1 = זזים ביחד. מתאם -1 = זזים הפוך. 0 = אין קשר.',
+    example:'טכנולוגיה ותקשורת — מתאם גבוה (שניהם מושפעים מריבית). אנרגיה וטכנולוגיה — מתאם נמוך = פיזור טוב!'
+  },
+};
+
+// ── AI Brief Engine ────────────────────────────────
+function runAIBrief() {
+  const sec = $('ai-brief-section');
+  if (!sec) return;
+
+  // ── Data collection ──
+  const secData = SECTORS.map(s => ({
+    sym:s.sym, name:s.name,
+    d1:(qmap[s.sym]||{}).d1, h:histMap[s.sym]||{}
+  }));
+  const validDay = secData.filter(s=>s.d1!=null&&!isNaN(s.d1));
+  if (!validDay.length) return;
+
+  const avgD1 = validDay.reduce((a,s)=>a+s.d1,0)/validDay.length;
+  const upCount = validDay.filter(s=>s.d1>0).length;
+  const pctUp = upCount/validDay.length;
+  const sorted = [...validDay].sort((a,b)=>b.d1-a.d1);
+  const top = sorted[0], weak = sorted[sorted.length-1];
+  const spy = qmap['SPY']||{}, vix = qmap['VIXY']||{};
+  const fg = calcFearGreed();
+  const tlt = qmap['TLT']||{};
+  const btc = qmap['IBIT']||{};
+
+  sec.style.display = 'block';
+
+  // ═══════════════════════════════════════
+  // 1. SMART ALERT BANNER
+  // ═══════════════════════════════════════
+  const alertEl = $('ai-alert-banner');
+  let alertHtml = '';
+
+  if (vix.d1 != null && vix.d1 > 5) {
+    alertHtml = `<div class="alert-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div><div class="alert-text"><div class="alert-label">זהירות — תנודתיות גבוהה</div>VIX (מדד הפחד) מזנק ${vix.d1>0?'+':''}${vix.d1.toFixed(1)}% — השוק חרד. הקטן פוזיציות, שמור מזומן, והימנע מהחלטות אימפולסיביות.</div>`;
+    alertEl.className = 'ai-alert-banner alert-danger';
+  } else if (fg.total <= 20) {
+    alertHtml = `<div class="alert-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </div><div class="alert-text"><div class="alert-label">פחד קיצוני בשוק</div>מדד הפחד/חמדנות ב-${fg.total} — רמה נמוכה מאוד. היסטורית, רמות כאלה מסמנות <b>הזדמנויות קנייה</b> לטווח ארוך. שקול להתחיל לחקור.</div>`;
+    alertEl.className = 'ai-alert-banner alert-opportunity';
+  } else if (pctUp >= 0.9 && avgD1 > 1) {
+    alertHtml = `<div class="alert-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+    </div><div class="alert-text"><div class="alert-label">ראלי רחב</div>${upCount} מתוך ${validDay.length} סקטורים עולים (ממוצע +${avgD1.toFixed(2)}%). עלייה רחבה כזו מעידה על אופטימיות אמיתית — לא רק מניה אחת שמושכת.</div>`;
+    alertEl.className = 'ai-alert-banner alert-opportunity';
+  }
+
+  if (alertHtml) {
+    alertEl.innerHTML = alertHtml;
+    alertEl.style.display = 'flex';
+  } else {
+    alertEl.style.display = 'none';
+  }
+
+  // ═══════════════════════════════════════
+  // 2. AI VERDICT — one-liner
+  // ═══════════════════════════════════════
+  let verdictIcon, verdictText;
+
+  if (pctUp >= 0.75) {
+    verdictIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="#00e87a" stroke-width="2.5" stroke-linecap="round" width="28" height="28"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>';
+    verdictText = `<b>יום ירוק בשוק.</b> ${upCount} מתוך ${validDay.length} סקטורים חיוביים, עם ממוצע של <span class="ai-highlight green">${avgD1>0?'+':''}${avgD1.toFixed(2)}%</span>.
+      ${top ? ` <b>${top.name}</b> מוביל עם <span class="ai-highlight green">+${top.d1.toFixed(2)}%</span>.` : ''}
+      ${fg.total >= 70 ? ' שים לב — השוק כבר אופטימי מדי, אל תרדוף אחרי עליות.' : ' מומנטום חיובי — המשך מגמה סביר.'}`;
+  } else if (pctUp >= 0.45) {
+    verdictIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" width="28" height="28"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>';
+    verdictText = `<b>שוק מפוצל — אין כיוון ברור.</b> ${upCount} סקטורים עולים, ${validDay.length-upCount} יורדים. ממוצע <span class="ai-highlight amber">${avgD1>0?'+':''}${avgD1.toFixed(2)}%</span>.
+      ${top&&weak ? ` פער גדול: ${top.name} <span class="ai-highlight green">+${top.d1.toFixed(2)}%</span> לעומת ${weak.name} <span class="ai-highlight red">${weak.d1.toFixed(2)}%</span>.` : ''}
+      בשוק מעורב, בחר סקטור מוביל ספציפי — לא "קונים הכל".`;
+  } else {
+    verdictIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="#ff3a5c" stroke-width="2.5" stroke-linecap="round" width="28" height="28"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>';
+    verdictText = `<b>יום אדום — לחץ מכירות רחב.</b> רק ${upCount} סקטורים חיוביים. ממוצע <span class="ai-highlight red">${avgD1.toFixed(2)}%</span>.
+      ${weak ? ` <b>${weak.name}</b> החלש ביותר: <span class="ai-highlight red">${weak.d1.toFixed(2)}%</span>.` : ''}
+      ביום שלילי רחב, <b>אל תנסה "לתפוס תחתית"</b> — עדיף לשמור על מזומן ולחכות.`;
+  }
+
+  $('ai-verdict-icon').innerHTML = verdictIcon;
+  $('ai-verdict-text').innerHTML = verdictText;
+
+  // ═══════════════════════════════════════
+  // 3. THREE KEY SIGNALS
+  // ═══════════════════════════════════════
+  const signals = [];
+
+  // Signal 1: Sector Rotation
+  if (top && weak) {
+    const gap = top.d1 - weak.d1;
+    let rotTag = 'info', rotBody = '';
+    if (gap > 3) {
+      rotTag = 'neutral';
+      rotBody = `פער חריג של <span class="signal-val">${gap.toFixed(1)}%</span> בין הסקטור החזק לחלש. הכסף "זורם" מ-${weak.name} ל-${top.name}. זה נקרא <b>רוטציית סקטורים</b> — עקוב אחרי הכסף.`;
+    } else {
+      rotBody = `<b>${top.name}</b> מוביל (<span class="signal-val up">+${top.d1.toFixed(2)}%</span>), <b>${weak.name}</b> בתחתית (<span class="signal-val down">${weak.d1.toFixed(2)}%</span>). ${gap<1?'פער קטן = השוק נע ביחד.':'פער בינוני — שקול להעדיף את הסקטור החזק.'}`;
+      rotTag = gap<1 ? 'info' : 'neutral';
+    }
+    signals.push({
+      title: 'רוטציית סקטורים',
+      body: rotBody,
+      tag: rotTag,
+      tagText: gap > 3 ? 'רוטציה פעילה' : gap > 1.5 ? 'פער בינוני' : 'שוק מסונכרן'
+    });
+  }
+
+  // Signal 2: Risk level
+  const vixD1 = vix.d1 || 0;
+  const riskScore = Math.round(Math.min(100, Math.max(0, 50 + vixD1*5 - (pctUp-0.5)*40)));
+  let riskTag, riskTagText, riskBody;
+  if (riskScore >= 70) {
+    riskTag='bear'; riskTagText='סיכון גבוה';
+    riskBody=`רמת הסיכון עומדת על <span class="signal-val down">${riskScore}/100</span>. VIX ${vixD1>0?'עולה':'יציב'}, ורוב הסקטורים ${pctUp<0.4?'יורדים':'מעורבים'}. <b>הקטן חשיפה</b> — אל תהיה "גיבור" ביום קשה.`;
+  } else if (riskScore >= 40) {
+    riskTag='neutral'; riskTagText='סיכון בינוני';
+    riskBody=`רמת סיכון <span class="signal-val">${riskScore}/100</span> — טווח נורמלי. אפשר לסחור, אבל עם <b>Stop Loss</b> מוגדר מראש. אל תגדיל פוזיציות ביום מעורב.`;
+  } else {
+    riskTag='bull'; riskTagText='סביבה רגועה';
+    riskBody=`רמת סיכון נמוכה (<span class="signal-val up">${riskScore}/100</span>). VIX ${vixD1<-2?'יורד':'יציב'} ורוב הסקטורים עולים. <b>סביבה נוחה</b> לפתיחת פוזיציות — אבל תמיד עם תכנית יציאה.`;
+  }
+  signals.push({title:'רמת סיכון', body:riskBody, tag:riskTag, tagText:riskTagText});
+
+  // Signal 3: What's driving the market
+  let driverTitle, driverBody, driverTag, driverTagText;
+  const tltD1 = tlt.d1||0;
+  const btcD1 = btc.d1||0;
+  if (Math.abs(tltD1) > 1.5) {
+    driverTitle = 'אגרות חוב זזות חזק';
+    driverBody = `TLT (אגרות חוב ארוכות) ${tltD1>0?'עולה':'יורד'} <span class="signal-val ${tltD1>0?'up':'down'}">${tltD1>0?'+':''}${tltD1.toFixed(2)}%</span>. ${tltD1>0?'ירידת תשואות = תמיכה במניות, במיוחד טכנולוגיה.':'עליית תשואות = לחץ על מכפילים גבוהים, במיוחד טכנולוגיה ונדל"ן.'}`;
+    driverTag = tltD1>0 ? 'bull' : 'bear';
+    driverTagText = tltD1>0 ? 'תשואות יורדות' : 'תשואות עולות';
+  } else if (Math.abs(btcD1) > 3) {
+    driverTitle = 'קריפטו זזים';
+    driverBody = `Bitcoin ETF ${btcD1>0?'מזנק':'צולל'} <span class="signal-val ${btcD1>0?'up':'down'}">${btcD1>0?'+':''}${btcD1.toFixed(1)}%</span>. ${btcD1>0?'תיאבון סיכון עולה — חיובי לנכסי סיכון.':'בריחה מסיכון — שוק מחפש ביטחון.'}`;
+    driverTag = btcD1>0 ? 'bull' : 'bear';
+    driverTagText = btcD1>0 ? 'Risk-On' : 'Risk-Off';
+  } else {
+    const spyD1 = spy.d1 || 0;
+    driverTitle = 'מה מניע את השוק';
+    driverBody = `S&P 500 ${spyD1>0?'עולה':'יורד'} <span class="signal-val ${spyD1>0?'up':'down'}">${spyD1>0?'+':''}${spyD1.toFixed(2)}%</span>. אגרות חוב יציבות (<span class="signal-val">${tltD1>0?'+':''}${tltD1.toFixed(2)}%</span>). ${Math.abs(spyD1)<0.3?'יום שקט יחסית — השוק ממתין לקטליזטור.':'השוק נע על פי מומנטום ולא קטליזטור ספציפי.'}`;
+    driverTag = Math.abs(spyD1)<0.3 ? 'info' : spyD1>0 ? 'bull' : 'bear';
+    driverTagText = Math.abs(spyD1)<0.3 ? 'יום שקט' : spyD1>0 ? 'מומנטום חיובי' : 'מומנטום שלילי';
+  }
+  signals.push({title:driverTitle, body:driverBody, tag:driverTag, tagText:driverTagText});
+
+  $('ai-signals').innerHTML = signals.map((s,i) => `
+    <div class="ai-signal">
+      <div class="ai-signal-num">${i+1}</div>
+      <div class="ai-signal-title">${s.title}</div>
+      <div class="ai-signal-body">${s.body}</div>
+      <div class="ai-signal-tag ${s.tag}">${s.tagText}</div>
+    </div>`).join('');
+
+  // ═══════════════════════════════════════
+  // 4. STOCK-LEVEL INTELLIGENCE + ACTION ITEMS
+  // ═══════════════════════════════════════
+
+  // Scan all holdings for top movers
+  const allStocks = [];
+  Object.entries(ETF_HOLDINGS).forEach(([etf, holdings]) => {
+    const sectorName = (SECTORS.find(s=>s.sym===etf)||{}).name || etf;
+    holdings.forEach(h => {
+      const q = qmap[h.s];
+      if (q && q.d1 != null && !isNaN(q.d1)) {
+        allStocks.push({sym:h.s, name:h.n, d1:q.d1, price:q.price, etf, sectorName, weight:h.w});
+      }
+    });
+  });
+
+  // Deduplicate by symbol, keep highest weight
+  const stockMap = {};
+  allStocks.forEach(s => {
+    if (!stockMap[s.sym] || stockMap[s.sym].weight < s.weight) stockMap[s.sym] = s;
+  });
+  const uniqueStocks = Object.values(stockMap).sort((a,b) => b.d1 - a.d1);
+
+  // Top gainers and losers from individual stocks
+  const topGainers = uniqueStocks.slice(0, 3);
+  const topLosers = uniqueStocks.slice(-3).reverse();
+
+  const actions = [];
+
+  // ACTION: Hot stocks in leading sector
+  if (top && top.d1 > 0.5) {
+    const sectorStocks = allStocks.filter(s => s.etf === top.sym).sort((a,b) => b.d1 - a.d1);
+    const hotInSector = sectorStocks.slice(0, 3).filter(s => s.d1 > 0);
+    if (hotInSector.length > 0) {
+      const stockList = hotInSector.map(s =>
+        `<b>${s.sym}</b> <span class="signal-val up">+${s.d1.toFixed(1)}%</span> ($${s.price?s.price.toFixed(0):'?'})`
+      ).join(' · ');
+      actions.push({
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#00e87a" stroke-width="2" width="18" height="18"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>',
+        text: `<b>מניות חמות ב${top.name}:</b> ${stockList}`,
+        why: `הסקטור החזק ביותר היום (+${top.d1.toFixed(2)}%). המניות האלו מובילות אותו — שקול כניסה עם Stop Loss ב-3% מתחת למחיר הנוכחי.`
+      });
+    }
+  }
+
+  // ACTION: Warning on losing stocks
+  if (weak && weak.d1 < -0.5) {
+    const weakStocks = allStocks.filter(s => s.etf === weak.sym).sort((a,b) => a.d1 - b.d1);
+    const hurtInSector = weakStocks.slice(0, 3).filter(s => s.d1 < 0);
+    if (hurtInSector.length > 0) {
+      const stockList = hurtInSector.map(s =>
+        `<b>${s.sym}</b> <span class="signal-val down">${s.d1.toFixed(1)}%</span>`
+      ).join(' · ');
+      actions.push({
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#ff3a5c" stroke-width="2" width="18" height="18"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>',
+        text: `<b>הימנע מ${weak.name}:</b> ${stockList}`,
+        why: `הסקטור החלש ביותר (${weak.d1.toFixed(2)}%). אל תנסה "לתפוס תחתית" — חכה לאות התייצבות (3 ימים ירוקים ברצף).`
+      });
+    }
+  }
+
+  // ACTION: Biggest overall movers
+  if (topGainers.length > 0 && topGainers[0].d1 > 2) {
+    const bigMover = topGainers[0];
+    actions.push({
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" width="18" height="18"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
+      text: `<b>${bigMover.name} (${bigMover.sym})</b> מזנקת <span class="signal-val up">+${bigMover.d1.toFixed(1)}%</span> — $${bigMover.price?bigMover.price.toFixed(2):'?'}`,
+      why: `המניה החזקה ביותר מ-${bigMover.sectorName}. אחרי זינוק חד ביום אחד, לפעמים כדאי לחכות ליום למחרת (pullback) לפני כניסה, ולא לרדוף.`
+    });
+  }
+
+  // ACTION: Sentiment-based
+  if (fg.total >= 75) {
+    actions.push({
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" width="18" height="18"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+      text: '<b>חמדנות גבוהה</b> — שקול לקחת רווחים על מניות שכבר עלו +10% מהכניסה',
+      why: 'כשכולם אופטימיים (F&G ' + fg.total + '), זה בדיוק הזמן לנעול רווחים. מכור 30-50% מעמדות רווחיות ושמור מזומן.'
+    });
+  } else if (fg.total <= 25) {
+    actions.push({
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#00b4ff" stroke-width="2" width="18" height="18"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>',
+      text: '<b>פחד קיצוני</b> — הזדמנות לחפש מניות איכותיות במחירי הנחה',
+      why: 'כש-Fear & Greed ב-' + fg.total + ', בדוק מניות גדולות (AAPL, MSFT, GOOGL) שירדו 5%+ מהשיא — אלה מועמדות לקנייה הדרגתית.'
+    });
+  }
+
+  // ACTION: Market condition specific
+  if (pctUp >= 0.7 && avgD1 > 0.3) {
+    actions.push({
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#00e87a" stroke-width="2" width="18" height="18"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+      text: '<b>מומנטום חיובי רחב</b> — סביבה מתאימה לפתיחת פוזיציות לונג',
+      why: upCount + ' סקטורים עולים. שים Trailing Stop ב-2% ותן למגמה לרוץ. העדף מניות בסקטורים חזקים עם משקל גבוה ב-ETF.'
+    });
+  } else if (pctUp <= 0.3) {
+    const defStocks = allStocks.filter(s => ['XLU','XLP','XLV'].includes(s.etf) && s.d1 > 0).sort((a,b)=>b.weight-a.weight).slice(0,2);
+    const defList = defStocks.length ? defStocks.map(s=>`<b>${s.sym}</b>`).join(', ') : 'PG, KO, JNJ';
+    actions.push({
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#ff3a5c" stroke-width="2" width="18" height="18"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+      text: `<b>הגנה:</b> אם חייב להיות בשוק, העדף מניות דפנסיביות — ${defList}`,
+      why: 'סקטורים דפנסיביים (תשתיות, צריכה בסיסית, בריאות) מפסידים פחות ביום שלילי. לא הזמן לספקולציה.'
+    });
+  }
+
+  // Always: Calendar check
+  actions.push({
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#8aa0be" stroke-width="2" width="18" height="18"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+    text: '<b>לפני שאתה פועל</b> — גלול למטה ובדוק את לוח האירועים הכלכליים',
+    why: 'CPI, NFP, או החלטת ריבית הפד יכולים להפוך את השוק ב-180° תוך דקות. אל תפתח פוזיציה גדולה יום לפני נתון חשוב.'
+  });
+
+  $('ai-actions').innerHTML = actions.map(a => `
+    <div class="ai-action">
+      <div class="ai-action-icon">${a.icon}</div>
+      <div class="ai-action-text">${a.text}<span class="ai-action-why">${a.why}</span></div>
+    </div>`).join('');
+
+  // ═══════════════════════════════════════
+  // 5. EDUCATION PILLS
+  // ═══════════════════════════════════════
+  renderEduPills();
+}
+
+// ── Education System ────────────────────────────
+let _eduMode = false;
+function toggleEduMode() {
+  _eduMode = !_eduMode;
+  const btn = $('ai-edu-toggle');
+  const panel = $('ai-edu-panel');
+  if (btn) btn.classList.toggle('active', _eduMode);
+  if (panel) panel.style.display = _eduMode ? 'block' : 'none';
+  const label = $('edu-toggle-label');
+  if (label) label.textContent = _eduMode ? 'הסתר הסברים' : 'הסברים';
+}
+
+function renderEduPills() {
+  const grid = $('ai-edu-grid');
+  if (!grid) return;
+  grid.innerHTML = Object.keys(EDU_DICT).map(key =>
+    `<div class="edu-pill" onclick="showEduTooltip(event,'${key}')">${key}</div>`
+  ).join('');
+}
+
+function showEduTooltip(e, key) {
+  const data = EDU_DICT[key];
+  if (!data) return;
+  const tt = $('edu-tooltip');
+  $('edu-tooltip-title').textContent = data.title;
+  $('edu-tooltip-body').innerHTML = data.body;
+  $('edu-tooltip-example').innerHTML = data.example;
+  tt.style.display = 'block';
+
+  // Position near the clicked element — account for CSS zoom
+  const zoomLevel = document.body.classList.contains('zoomed') ? 1.4 : 1;
+  const rect = e.target.getBoundingClientRect();
+  const ttW = 320;
+  // Force layout to get actual height
+  const ttH = tt.offsetHeight || 200;
+  let left = (rect.left + rect.width/2 - ttW/2) / zoomLevel;
+  let top = (rect.bottom + 10) / zoomLevel;
+  // Keep on screen
+  const vw = window.innerWidth / zoomLevel;
+  const vh = window.innerHeight / zoomLevel;
+  if (left < 10) left = 10;
+  if (left + ttW > vw - 10) left = vw - ttW - 10;
+  if (top + ttH > vh - 10) top = (rect.top / zoomLevel) - ttH - 10;
+  tt.style.left = left + 'px';
+  tt.style.top = top + 'px';
+}
+
+// Close tooltip on click outside
+document.addEventListener('click', function(e) {
+  const tt = $('edu-tooltip');
+  if (!tt) return;
+  if (!e.target.closest('.edu-pill') && !e.target.closest('.edu-tooltip')) {
+    tt.style.display = 'none';
+  }
+});
+
+// ── Enhanced Insights with "Why" explanations ──────
+const INSIGHT_WHYS = {
+  bull_trend: {
+    why: 'כמו גלים בים — כשרוב הגלים הולכים לכיוון אחד, קל "לגלוש" עליהם.',
+    action: 'הצטרף למגמה עם Trailing Stop (הגנה שנעה עם המחיר למעלה).'
+  },
+  bear_trend: {
+    why: 'כמו לנהוג נגד כיוון התנועה — אפשר, אבל מסוכן.',
+    action: 'שמור על מזומן, אל תנסה "לתפוס את התחתית" — חכה לאות ירוק.'
+  },
+  mixed: {
+    why: 'כמו רמזור צהוב — לא ירוק ולא אדום. זה הזמן לצפות, לא לפעול.',
+    action: 'עקוב אחרי הסקטור המוביל. אם הוא ממשיך להוביל יום-יומיים — שקול כניסה.'
+  },
+  vix_high: {
+    why: 'VIX גבוה = אנשים קונים "ביטוח" (אופציות Put). זה עולה כסף → אנשים מפסיקים לקנות מניות.',
+    action: 'הקטן חשיפה ל-50%. הגדל רק כש-VIX מתחיל לרדת.'
+  },
+  sector_leader: {
+    why: 'סקטור מוביל = שם הכסף זורם. הכסף הגדול ("Smart Money") נע לפני כולם.',
+    action: 'בדוק את ה-5 אחזקות הגדולות ביותר בסקטור — שם ההזדמנות.'
+  }
+};
 
 // Auto-start if key saved
 startMarketClock(); // שעון שוק פועל תמיד, גם לפני לוגין

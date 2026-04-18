@@ -178,7 +178,60 @@
     <div class="indices-other" id="idx-other"></div>
   </div>
 
+  <!-- AI MARKET BRIEF -->
+  <div class="ai-brief-section" id="ai-brief-section" style="display:none">
+    <!-- Smart Alert Banner -->
+    <div class="ai-alert-banner" id="ai-alert-banner" style="display:none"></div>
+    
+    <div class="ai-brief-card">
+      <div class="ai-brief-hdr">
+        <div class="ai-brief-title-wrap">
+          <div class="ai-brain-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+              <path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"/>
+              <line x1="9" y1="21" x2="15" y2="21"/><line x1="10" y1="24" x2="14" y2="24"/>
+              <path d="M9.5 2.5C10 .5 14 .5 14.5 2.5"/>
+            </svg>
+          </div>
+          <div>
+            <div class="ai-brief-title">ניתוח AI — מה קורה עכשיו?</div>
+            <div class="ai-brief-sub">סריקת שוק אוטומטית • מבוסס על כל הנתונים בזמן אמת</div>
+          </div>
+        </div>
+        <div class="ai-brief-actions">
+          <button class="ai-edu-toggle" id="ai-edu-toggle" onclick="toggleEduMode()" title="מצב הסברים">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+            <span id="edu-toggle-label">הסברים</span>
+          </button>
+        </div>
+      </div>
+      <!-- AI Verdict -->
+      <div class="ai-verdict" id="ai-verdict">
+        <div class="ai-verdict-icon" id="ai-verdict-icon"></div>
+        <div class="ai-verdict-text" id="ai-verdict-text">מחשב...</div>
+      </div>
+      <!-- 3 Key Signals -->
+      <div class="ai-signals" id="ai-signals"></div>
+      <!-- Action Plan -->
+      <div class="ai-actions" id="ai-actions"></div>
+      <!-- Beginner Educational Context (hidden by default) -->
+      <div class="ai-edu-panel" id="ai-edu-panel" style="display:none">
+        <div class="ai-edu-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          מילון מושגים — לחץ על כל מושג להסבר
+        </div>
+        <div class="ai-edu-grid" id="ai-edu-grid"></div>
+      </div>
+    </div>
+  </div>
 
+  <!-- Education Tooltip (global, positioned absolutely) -->
+  <div class="edu-tooltip" id="edu-tooltip" style="display:none">
+    <div class="edu-tooltip-arrow"></div>
+    <div class="edu-tooltip-title" id="edu-tooltip-title"></div>
+    <div class="edu-tooltip-body" id="edu-tooltip-body"></div>
+    <div class="edu-tooltip-example" id="edu-tooltip-example"></div>
+  </div>
 
   <div class="content">
     <div>
