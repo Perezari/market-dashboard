@@ -12,10 +12,14 @@ const INDICES = [
 ];
 const OTHER = [
   {sym:'GLD',  name:'זהב'},
-  {sym:'IBIT', name:'Bitcoin ETF'},
-  {sym:'VIXY', name:'VIX (VIXY)'},
+  {sym:'SLV',  name:'כסף'},
+  {sym:'USO',  name:'נפט'},
+  {sym:'IBIT', name:'ביטקוין'},
+  {sym:'VIXY', name:'VIX'},
   {sym:'TLT',  name:'אג״ח 20Y'},
-  {sym:'UUP',  name:'דולר (UUP)'},
+  {sym:'UUP',  name:'דולר'},
+  {sym:'SMH',  name:'שבבים'},
+  {sym:'EEM',  name:'שווקים מתעוררים'},
 ];
 const SECTORS = [
   {sym:'XLK',  name:'טכנולוגיה'},
@@ -607,17 +611,11 @@ function buildSparkSvg(closes, isUp, prev) {
   const fillPath = `M0,${H} L` + pts.map(p => p[0].toFixed(1)+','+p[1].toFixed(1)).join(' L') + ` L${W},${H} Z`;
   const id = 'sg'+Math.random().toString(36).slice(2,7);
   const col = isUp ? 'var(--green)' : 'var(--red)';
-  // קו ייחוס מקווקוו ב-Y של הסגירה הקודמת
-  const baselineY = prev != null ? yOf(prev).toFixed(1) : null;
-  const baseline = baselineY != null
-    ? `<line x1="0" x2="${W}" y1="${baselineY}" y2="${baselineY}" stroke="var(--dim)" stroke-dasharray="2 2" stroke-width="0.7" opacity="0.5" vector-effect="non-scaling-stroke"/>`
-    : '';
   return `<svg viewBox="0 0 ${W} ${H}" class="idx-spark" preserveAspectRatio="none">
     <defs><linearGradient id="${id}" x1="0" x2="0" y1="0" y2="1">
       <stop offset="0%" stop-color="${col}" stop-opacity="0.25"/>
       <stop offset="100%" stop-color="${col}" stop-opacity="0"/>
     </linearGradient></defs>
-    ${baseline}
     <path d="${fillPath}" fill="url(#${id})"/>
     <path d="${linePath}" stroke="${col}" stroke-width="1.5" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
   </svg>`;
@@ -639,7 +637,7 @@ function renderCards(elId, items, labels, keys) {
       ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>`
       : `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="7" x2="17" y2="17"/><polyline points="17 7 17 17 7 17"/></svg>`;
     const spark = buildSparkSvg(d.spark, isUp, d.prev);
-    return `<div class="idx-card" onclick="openStockDetail('${s.sym}','${s.name.replace(/'/g,"\\'")}')">
+    return `<div class="idx-card ${isUp ? 'idx-up' : 'idx-down'}" onclick="openStockDetail('${s.sym}','${s.name.replace(/'/g,"\\'")}')">
       <div class="idx-card-top">
         <div class="idx-card-meta">
           <div class="idx-card-sym">${s.sym}</div>

@@ -93,8 +93,9 @@ body.light .tick-price{color:#d8eafc!important}
 body.light .tick-sep{background:#2e4e80}
 body.light .live-dot{background:#00dd70;box-shadow:0 0 10px #00dd70}
 body.light .indices-section{background:var(--bg2)}
-body.light .idx-card{background:#fff;border-color:var(--border);box-shadow:0 1px 4px rgba(0,30,80,.08)}
-body.light .idx-card:hover{border-color:var(--blue);box-shadow:0 2px 8px rgba(0,80,160,.12)}
+body.light .idx-card{background:linear-gradient(168deg,#fff 0%,#f8f9fb 100%);border-color:var(--border);box-shadow:0 1px 3px rgba(0,30,80,.05)}
+body.light .idx-card:hover{border-color:var(--blue);box-shadow:0 3px 12px rgba(0,80,160,.1);transform:translateY(-1px)}
+body.light .idx-card .idx-card-badge{background:rgba(0,0,0,.03)}
 body.light .content{background:transparent}
 body.light .t th{background:var(--bg3);color:#4070a0;border-color:var(--border)}
 body.light .t td{border-color:var(--border)}
@@ -275,21 +276,26 @@ body.light .hdr-btn:hover{background:rgba(255,255,255,.22);color:#fff}
 .tick-sym{color:var(--dim)}.tick-price{color:var(--text);font-weight:600}
 .tick-sep{width:1px;height:12px;background:var(--border2)}
 
-.indices-section{border-bottom:1px solid var(--border);padding:10px 16px}
-.indices-main{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
-.indices-other{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
-/* ── Perplexity-style idx cards ── */
-.idx-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px 12px 0;cursor:pointer;transition:border-color .2s,background .2s;overflow:hidden;display:flex;flex-direction:column;gap:2px}
-.idx-card:hover{border-color:var(--border2);background:var(--bg4)}
-.idx-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:2px}
-.idx-card-meta{min-width:0}
-.idx-card-sym{font-family:var(--mono);font-size:9px;color:var(--dim);margin-bottom:1px}
-.idx-card-name{font-size:11px;font-weight:700;color:var(--text);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.idx-card-badge{display:flex;align-items:center;gap:3px;font-family:var(--mono);font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0}
-.idx-card-price{font-family:var(--mono);font-size:18px;font-weight:800;color:var(--text);line-height:1;margin-top:4px}
-.idx-card-abs{font-family:var(--mono);font-size:11px;font-weight:600;margin-top:1px;margin-bottom:4px}
-.idx-card-chart{margin:6px -12px 0;height:36px;display:flex}
-.idx-spark{width:100%;height:36px;display:block}
+.indices-section{border-bottom:1px solid var(--border);padding:8px 16px}
+.indices-main{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px}
+.indices-other{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+/* ── Compact refined idx cards ── */
+.idx-card{background:linear-gradient(168deg,var(--bg3) 0%,var(--bg2) 100%);border:1px solid var(--border);border-radius:8px;padding:8px 10px 0;cursor:pointer;transition:all .2s ease;overflow:hidden;display:flex;flex-direction:column;gap:1px;position:relative}
+.idx-card:hover{border-color:var(--border2);background:linear-gradient(168deg,var(--bg4) 0%,var(--bg3) 100%);transform:translateY(-1px);box-shadow:0 3px 12px rgba(0,0,0,.25)}
+.idx-card-top{display:flex;align-items:center;justify-content:space-between;gap:4px}
+.idx-card-meta{min-width:0;display:flex;align-items:baseline;gap:5px}
+.idx-card-sym{font-family:var(--mono);font-size:8px;color:var(--dim);letter-spacing:.4px;text-transform:uppercase;flex-shrink:0}
+.idx-card-name{font-size:10px;font-weight:600;color:var(--text);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.idx-card-badge{display:flex;align-items:center;gap:2px;font-family:var(--mono);font-size:10px;font-weight:700;white-space:nowrap;flex-shrink:0;padding:1px 5px;border-radius:4px;background:rgba(255,255,255,.04)}
+.idx-card-price{font-family:var(--mono);font-size:15px;font-weight:800;color:var(--text);line-height:1;margin-top:2px;letter-spacing:-.3px}
+.idx-card-abs{font-family:var(--mono);font-size:9px;font-weight:600;margin-top:1px;margin-bottom:2px;opacity:.8}
+.idx-card-chart{margin:4px -10px 0;height:26px;display:flex}
+.idx-spark{width:100%;height:26px;display:block}
+/* Direction border color */
+.idx-card.idx-up{border-color:rgba(83,158,85,.35)}
+.idx-card.idx-up:hover{border-color:rgba(83,158,85,.55)}
+.idx-card.idx-down{border-color:rgba(220,105,115,.35)}
+.idx-card.idx-down:hover{border-color:rgba(220,105,115,.55)}
 /* keep old badge classes for other uses */
 .b{flex:1;text-align:center;padding:3px 2px;border-radius:3px;font-family:var(--mono);font-size:10px;font-weight:700;line-height:1.3}
 .bl{font-size:8px;display:block;font-weight:400;opacity:.75;font-family:var(--sans)}
@@ -375,9 +381,9 @@ canvas{display:block;width:100%!important}
   .hdr{padding:0 14px;height:50px}
   .hdr-sub{display:none}
   .ts-badge{display:none!important}
-  .indices-section{padding:8px 14px}
-  .indices-main{grid-template-columns:repeat(2,1fr);gap:7px}
-  .indices-other{grid-template-columns:repeat(3,1fr);gap:7px}
+  .indices-section{padding:6px 14px}
+  .indices-main{grid-template-columns:repeat(2,1fr);gap:5px}
+  .indices-other{grid-template-columns:repeat(3,1fr);gap:5px}
   .content{padding:10px 16px;gap:8px}
   .news-grid{grid-template-columns:1fr 1fr;gap:10px}
   .modal{max-width:100%!important;max-height:92vh;border-radius:14px 14px 0 0;align-self:flex-end}
@@ -405,13 +411,15 @@ canvas{display:block;width:100%!important}
   .tick-item{padding:0 12px;font-size:10px}
 
   /* Indices */
-  .indices-section{padding:8px 16px}
-  .indices-main{grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:6px}
-  .indices-other{grid-template-columns:repeat(3,1fr);gap:6px}
-  .idx-card{padding:10px 10px 0;border-radius:8px}
-  .idx-card-name{font-size:10px}
-  .idx-card-price{font-size:15px}
-  .idx-card-badge{font-size:10px}
+  .indices-section{padding:6px 10px}
+  .indices-main{grid-template-columns:repeat(2,1fr);gap:5px;margin-bottom:5px}
+  .indices-other{grid-template-columns:repeat(3,1fr);gap:5px}
+  .idx-card{padding:6px 8px 0;border-radius:6px}
+  .idx-card-chart{margin:3px -8px 0;height:22px}
+  .idx-spark{height:22px}
+  .idx-card-name{font-size:9px}
+  .idx-card-price{font-size:13px}
+  .idx-card-badge{font-size:9px;padding:1px 4px}
   .b{font-size:9px;padding:2px 1px}
   .bl{font-size:7px}
 
