@@ -4597,7 +4597,7 @@ body::after{
   .hw-body{flex-wrap:wrap;padding:12px 16px;gap:10px}
   .hw-right{flex-wrap:wrap}
   .page{padding:10px}
-  .term-bar{padding:0 10px}
+  .term-bar{padding-left:10px;padding-right:10px}
 }
 
 /* ═══ LOADING / ERROR OVERLAY ═══ */
