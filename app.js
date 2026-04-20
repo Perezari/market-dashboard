@@ -1113,6 +1113,10 @@ function toggleTheme(){
   try { if (typeof renderSectors==='function') renderSectors(); } catch(e){}
   try { if (typeof renderSummary==='function') renderSummary(); } catch(e){}
   try { if (typeof window.syncSidebarHeatmap==='function') window.syncSidebarHeatmap(); } catch(e){}
+  // YTD bars + correlation matrix bake in theme-specific colors at
+  // render-time; re-run them so they pick up the new theme's palette.
+  try { if (typeof renderYTDChart==='function') renderYTDChart(); } catch(e){}
+  try { if (typeof renderCorrelationMatrix==='function') renderCorrelationMatrix(); } catch(e){}
   // Macro charts have hardcoded-at-build-time axis colors; refresh them.
   try { if (typeof window.rerenderMacroCharts==='function') window.rerenderMacroCharts(); } catch(e){}
   drawChart();
@@ -2301,8 +2305,8 @@ function renderYTDChart() {
     const pct = s.ytd;
     const barW = Math.abs(pct) / maxAbs * 100;
     const isPos = pct >= 0;
-    const color = isPos ? (isL ? '#00904a' : '#00e87a') : (isL ? '#cc1a3a' : '#ff3a5c');
-    const bgColor = isPos ? (isL ? 'rgba(0,144,74,.12)' : 'rgba(0,232,122,.1)') : (isL ? 'rgba(204,26,58,.12)' : 'rgba(255,58,92,.1)');
+    const color = isPos ? (isL ? '#0a7a38' : '#00e87a') : (isL ? '#a31532' : '#ff3a5c');
+    const bgColor = isPos ? (isL ? 'rgba(10,122,56,.28)' : 'rgba(0,232,122,.1)') : (isL ? 'rgba(163,21,50,.28)' : 'rgba(255,58,92,.1)');
     return `<div class="ytd-row">
       <span class="ytd-sym">${s.sym}</span>
       <div class="ytd-bar-track">
@@ -2338,7 +2342,7 @@ function renderCorrelationMatrix() {
       const a = histMap[row.sym].rawPrices;
       const b = histMap[col.sym].rawPrices;
       if (row.sym === col.sym) {
-        html += `<td style="background:var(--border2);color:var(--dim)">1.0</td>`;
+        html += `<td class="corr-self">1.0</td>`;
       } else {
         const r = pearson(a, b);
         if (r == null) { html += `<td style="color:var(--dim)">–</td>`; return; }
@@ -2346,10 +2350,10 @@ function renderCorrelationMatrix() {
         // צבע: ירוק = מתאם גבוה, אדום = הפוך, אפור = ניטרלי
         const intensity = Math.abs(v);
         let bg;
-        if (v > 0.6) bg = isL ? `rgba(0,144,74,${intensity*.35})` : `rgba(0,232,122,${intensity*.25})`;
-        else if (v < -0.2) bg = isL ? `rgba(204,26,58,${intensity*.35})` : `rgba(255,58,92,${intensity*.25})`;
+        if (v > 0.6) bg = isL ? `rgba(10,122,56,${intensity*.22})` : `rgba(0,232,122,${intensity*.25})`;
+        else if (v < -0.2) bg = isL ? `rgba(163,21,50,${intensity*.22})` : `rgba(255,58,92,${intensity*.25})`;
         else bg = 'transparent';
-        const col2 = v > 0.5 ? (isL?'#005828':'#00e87a') : v < -0.1 ? (isL?'#cc1a3a':'#ff3a5c') : (isL?'#4070a0':'#5070a0');
+        const col2 = v > 0.5 ? (isL?'#0a6e34':'#00e87a') : v < -0.1 ? (isL?'#8a1029':'#ff3a5c') : (isL?'#5a6a7a':'#5070a0');
         html += `<td style="background:${bg};color:${col2}">${v.toFixed(2)}</td>`;
       }
     });

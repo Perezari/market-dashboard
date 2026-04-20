@@ -286,7 +286,7 @@ body.light .hdr-btn:hover{background:rgba(255,255,255,.22);color:#fff}
 .indices-other{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
 /* ── Compact refined idx cards ── */
 .idx-card{background:linear-gradient(168deg,var(--bg3) 0%,var(--bg2) 100%);border:1px solid var(--border);border-radius:8px;padding:8px 10px 0;cursor:pointer;transition:all .2s ease;overflow:hidden;display:flex;flex-direction:column;gap:1px;position:relative}
-.idx-card:hover{border-color:var(--border2);background:linear-gradient(168deg,var(--bg4) 0%,var(--bg3) 100%);transform:translateY(-1px);box-shadow:0 3px 12px rgba(0,0,0,.25)}
+.idx-card:hover{border-color:var(--border2);background:linear-gradient(168deg,var(--bg4) 0%,var(--bg3) 100%);transform:translateY(-1px);box-shadow:0 3px 12px rgb(0 0 0 / 0%) !important}
 .idx-card-top{display:flex;align-items:center;justify-content:space-between;gap:4px}
 .idx-card-meta{min-width:0;display:flex;align-items:baseline;gap:5px}
 .idx-card-sym{font-family:var(--mono);font-size:8px;color:var(--dim);letter-spacing:.4px;text-transform:uppercase;flex-shrink:0}
@@ -1853,7 +1853,7 @@ body::after{
   backdrop-filter:blur(16px);
   -webkit-backdrop-filter:blur(16px);
   direction:ltr;
-  box-shadow:0 2px 10px rgba(0,0,0,.25);
+  box-shadow:0 2px 10px rgb(0 0 0 / 0%) !important);
 }
 
 /* LEFT side: clocks + LIVE */
@@ -1987,7 +1987,7 @@ body::after{
 .hw-titlebar{
   display:flex;align-items:center;justify-content:space-between;
   height:34px;padding:0 12px;
-  background:rgba(0,0,0,.25);
+  background:rgb(0 0 0 / 0%) !important;
   border-bottom:1px solid var(--border);
   direction:ltr;
 }
@@ -2549,7 +2549,7 @@ section.compact{}
 .tw-titlebar{
   display:flex;align-items:center;justify-content:space-between;
   height:34px;padding:0 12px;
-  background:rgba(0,0,0,.25);
+  background:rgb(0 0 0 / 0%) !important;
   border-bottom:1px solid var(--border);
   direction:ltr;
 }
@@ -2576,12 +2576,12 @@ section.compact{}
 .col.main .sectors-card .card-hdr{
   display:flex;align-items:center;justify-content:space-between;
   height:34px !important;padding:0 60px 0 12px !important;
-  background:rgba(0,0,0,.25) !important;
+  background:rgb(0 0 0 / 0%) !important;
   border-bottom:1px solid var(--border) !important;
   direction:ltr;
 }
 .col.main .sectors-card .section-label{
-  font-family:var(--mono) !important;font-size:10px !important;color:var(--dim) !important;
+  font-family:var(--mono) !important;font-size:10px !important;color:var(--text) !important;
   letter-spacing:.3px !important;text-transform:none !important;font-weight:400 !important;
   padding:0 !important;background:transparent !important;border:none !important;
   display:flex;align-items:center;gap:10px;
@@ -2598,7 +2598,7 @@ section.compact{}
   line-height:1;box-sizing:border-box;
 }
 .col.main .sectors-card .section-label::after{
-  content:'· stockpulse://sectors/performance-matrix';color:var(--dimmer);font-size:10px;
+  content:'· stockpulse://sectors/performance-matrix';color:var(--text) !important;font-size:10px;
   display:inline;width:auto;height:auto;background:transparent;margin:0 0 0 10px;padding:0;
 }
 .col.main .sectors-card .tbl-scroll-hint{
@@ -2754,7 +2754,7 @@ body.light .col.main .sectors-card .t tbody tr.avgrow td.sec-cell{background:var
 .col.main .ai-brief-hdr{
   display:flex;justify-content:space-between;
   height:34px !important;padding:0 12px !important;gap:10px;
-  background:rgba(0,0,0,.25) !important;
+  background:rgb(0 0 0 / 0%) !important;
   border-bottom:1px solid var(--border) !important;
   direction:ltr;
 }
@@ -2791,7 +2791,7 @@ body.light .col.main .sectors-card .t tbody tr.avgrow td.sec-cell{background:var
 }
 .col.main .ai-brief-sub::after{
   content:'· stockpulse://analysis/market-brief';
-  color:var(--dimmer) !important;font-size:10px !important;
+  color:var(--text) !important;font-size:10px !important;
   overflow:hidden;text-overflow:ellipsis;min-width:0;
 }
 .col.main .ai-brief-actions{display:none !important}
@@ -2811,7 +2811,7 @@ body.light .col.main .sectors-card .t tbody tr.avgrow td.sec-cell{background:var
 .col.main .ai-verdict-icon{
   width:36px !important;height:36px !important;border-radius:8px !important;
   display:flex !important;align-items:center !important;justify-content:center !important;
-  background:rgba(0,0,0,.3) !important;color:var(--green) !important;flex-shrink:0;padding:0 !important;
+  background:var(--green-soft) !important;color:var(--green) !important;flex-shrink:0;padding:0 !important;
 }
 .col.main .ai-verdict.mixed .ai-v-icon,
 .col.main .ai-verdict.mixed .ai-verdict-icon{color:var(--amber) !important}
@@ -2934,7 +2934,7 @@ body.light .col.main .sectors-card .t tbody tr.avgrow td.sec-cell{background:var
 .col.main #corr-section .sectors-card .card-hdr{
   display:flex;align-items:center;justify-content:space-between;
   height:34px !important;padding:0 60px 0 12px !important;
-  background:rgba(0,0,0,.25) !important;
+  background:rgb(0 0 0 / 0%) !important;
   border-bottom:1px solid var(--border) !important;
   direction:ltr;
 }
@@ -2947,7 +2947,7 @@ body.light .col.main .sectors-card .t tbody tr.avgrow td.sec-cell{background:var
 }
 .col.main .ytd-card .section-label,
 .col.main #corr-section .sectors-card .section-label{
-  font-family:var(--mono) !important;font-size:10px !important;color:var(--dim) !important;
+  font-family:var(--mono) !important;font-size:10px !important;color:var(--text) !important;
   letter-spacing:.3px !important;text-transform:none !important;font-weight:400 !important;
   padding:0 !important;background:transparent !important;border:none !important;
   display:flex;align-items:center;gap:10px;
@@ -2975,7 +2975,7 @@ body.light .col.main .sectors-card .t tbody tr.avgrow td.sec-cell{background:var
   line-height:1;box-sizing:border-box;
 }
 .col.main .ytd-card .section-label::after{
-  content:'· stockpulse://analytics/ytd-returns';color:var(--dimmer);font-size:10px;
+  content:'· stockpulse://analytics/ytd-returns';color:var(--text) !important;font-size:10px;
   display:inline;width:auto;height:auto;background:transparent;margin:0 0 0 10px;padding:0;
 }
 .col.main #corr-section .sectors-card .section-label::after{
@@ -3512,7 +3512,7 @@ a{color:inherit;text-decoration:none}
   border-bottom:1px solid var(--border2);
   backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
   direction:ltr;
-  box-shadow:0 2px 10px rgba(0,0,0,.25);
+  box-shadow:0 2px 10px rgb(0 0 0 / 0%) !important;
 }
 .tb-group{display:flex;align-items:center;gap:12px;flex-shrink:0;min-width:0}
 .tb-item{display:flex;align-items:baseline;gap:5px;font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text);white-space:nowrap}
@@ -3747,7 +3747,7 @@ a{color:inherit;text-decoration:none}
   padding:11px 14px;
   background:linear-gradient(180deg,#1a2320 0%,#121a18 100%);
   border:1px solid var(--border2);border-radius:10px;
-  box-shadow:0 4px 14px rgba(0,0,0,.25);
+  box-shadow:0 4px 14px rgb(0 0 0 / 0%) !important;
   display:flex;flex-direction:column;gap:3px;
   position:relative;overflow:hidden;
 }
@@ -3840,13 +3840,13 @@ a{color:inherit;text-decoration:none}
 .tbl-card{
   background:linear-gradient(180deg,#1a2320 0%,#121a18 100%);
   border:1px solid var(--border2);border-radius:10px;overflow:hidden;
-  box-shadow:0 4px 14px rgba(0,0,0,.25);
+  box-shadow:0 4px 14px rgb(0 0 0 / 0%) !important;
 }
 .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table.picks{width:100%;border-collapse:collapse;font-size:12px}
 table.picks thead th{
   position:sticky;top:0;z-index:5;
-  background:rgba(0,0,0,.25);
+  background:rgb(0 0 0 / 0%) !important;
   padding:10px 8px;
   text-align:right;
   font-weight:700;font-size:10px;
@@ -3936,7 +3936,7 @@ td.pct.flat{color:var(--dim)}
 .dt-hdr{
   position:sticky;top:0;z-index:5;
   padding:14px 18px;
-  background:rgba(10,17,15,.96);
+  background:var(--bg2);
   backdrop-filter:blur(12px);
   border-bottom:1px solid var(--border2);
   display:flex;align-items:center;gap:12px;
@@ -3956,7 +3956,7 @@ td.pct.flat{color:var(--dim)}
 .dt-score-hero{
   display:flex;align-items:center;gap:16px;
   padding:16px;margin-bottom:14px;
-  background:linear-gradient(180deg,#1a2320 0%,#121a18 100%);
+  background:var(--bg2);
   border:1px solid var(--border2);border-radius:10px;
 }
 .dt-score-circle{
@@ -4098,7 +4098,7 @@ td.pct.flat{color:var(--dim)}
 }
 .mth-title{font-weight:800;font-size:15px;color:var(--text)}
 .mth-body{padding:20px}
-.mth-body h4{font-size:11px;margin:16px 0 8px;color:var(--green);text-transform:uppercase;letter-spacing:1.4px;font-weight:800;font-family:var(--mono)}
+.mth-body h4{font-size:11px;margin:16px 0 8px;color:var(--green);text-transform:uppercase;letter-spacing:1.4px;font-weight:800;font-family:var(--sans)}
 .mth-body h4:first-child{margin-top:0}
 .mth-body p{font-size:13px;line-height:1.7;color:var(--text);margin-bottom:10px}
 .mth-body ul{padding-right:18px;margin-bottom:10px}
@@ -4187,7 +4187,7 @@ body::after{
   border-bottom:1px solid var(--border2);
   backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
   direction:ltr;
-  box-shadow:0 2px 10px rgba(0,0,0,.25);
+  box-shadow:0 2px 10px rgb(0 0 0 / 0%) !important;
 }
 .tb-group{display:flex;align-items:center;gap:12px;flex-shrink:0;min-width:0}
 .tb-item{display:flex;align-items:baseline;gap:5px;font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text);white-space:nowrap}
@@ -4441,7 +4441,7 @@ body::after{
 .hw-titlebar{
   display:flex;align-items:center;justify-content:space-between;
   height:34px;padding:0 12px;
-  background:rgba(0,0,0,.25);
+  background:rgb(0 0 0 / 0%) !important;
   border-bottom:1px solid var(--border);direction:ltr;
 }
 .hw-tb-left{display:flex;align-items:center;gap:10px}
@@ -4494,8 +4494,9 @@ body::after{
 .kpi-item{
   display:flex;flex-direction:column;gap:2px;
   padding:6px 8px;
-  border-left:2px solid var(--green-dim);
-  background:rgba(0,0,0,.15);border-radius:4px;
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  background:linear-gradient(180deg, #1a2320 0%, #121a18 100%);
 }
 .kpi-item.neg{border-left-color:var(--red-dim)}
 .kpi-item.neu{border-left-color:var(--dimmer)}
@@ -4533,7 +4534,7 @@ body::after{
 .chart-hdr{
   display:flex;align-items:center;justify-content:space-between;
   padding:9px 12px;
-  background:rgba(0,0,0,.25);
+  background:rgb(0 0 0 / 0%) !important;
   border-bottom:1px solid var(--border);
   gap:10px;
 }
@@ -4545,9 +4546,9 @@ body::after{
 }
 .chart-badge{
   font-family:var(--mono);font-size:8px;font-weight:800;
-  color:var(--dim);letter-spacing:1px;
+  color:var(--bg) !important;letter-spacing:1px;
   padding:2px 5px;border-radius:3px;
-  background:rgba(0,0,0,.3);border:1px solid var(--border);
+  background:var(--green);border:1px solid var(--border);
   flex-shrink:0;
 }
 .chart-body{
@@ -4705,7 +4706,7 @@ body.light .mobile-menu,
 body.light .ytd-card,
 body.light .meta-strip,
 body.light .meta-card {
-  background: linear-gradient(180deg,#ffffff 0%,#f4f6fa 100%) !important;
+  background:  var(--bg) !important;
   color: var(--text) !important;
   border-color: var(--border) !important;
   box-shadow: 0 1px 3px rgba(18,35,63,.04) !important;
@@ -4808,8 +4809,9 @@ body.light #view-macro .kpi-strip {
   box-shadow: 0 1px 3px rgba(18,35,63,.04) !important;
 }
 body.light #view-macro .kpi-item {
-  background: rgba(18,35,63,.03) !important;
-  border-left-color: var(--green-dim) !important;
+    background: linear-gradient(180deg, #ffffff 0%, #f4f6fa 100%) !important;
+    border: 1px solid var(--border2) !important;
+    box-shadow: 0 1px 3px rgba(18, 35, 63, .04) !important;
 }
 body.light #view-macro .kpi-item.neg { border-left-color: var(--red-dim) !important; }
 body.light #view-macro .kpi-item.neu { border-left-color: var(--dimmer) !important; }
@@ -4829,8 +4831,32 @@ body.light #view-macro .chart-badge {
   color: var(--green) !important;
   border: 1px solid var(--green-dim) !important;
 }
-body.light #view-macro .chart-title   { color: var(--text) !important; }
+/* Chart card titles ("ריבית הפד" etc.) — default var(--text) still
+   reads a touch soft on white; push to a darker navy and bump weight. */
+body.light #view-macro .chart-title,
+body.light #view-macro .ind-title {
+  color: #0a1320 !important;
+  font-weight: 700;
+}
+/* KPI strip labels above values — var(--dim) @ .58 alpha was too pale. */
+body.light #view-macro .kpi-label {
+  color: rgba(18,35,63,.72) !important;
+}
 body.light #view-macro .chart-loading { color: var(--dim) !important; }
+
+/* ═══ CORRELATION MATRIX ═══ */
+/* Self-correlation cells (the "1.0" diagonal) — previously inline
+   style used var(--border2) which looked washed out on white.
+   Theme both modes explicitly. */
+.corr-table td.corr-self {
+  background: var(--bg3);
+  color: var(--dim);
+  font-weight: 600;
+}
+body.light .corr-table td.corr-self {
+  background: rgba(18,35,63,.05) !important;
+  color: rgba(18,35,63,.5) !important;
+}
 
 /* ═══ ADVISOR VIEW ═══ */
 /* Filter / controls bar — was hardcoded dark gradient */
