@@ -6111,6 +6111,7 @@ function positionCddPanel(cdd) {
   if (!panel || !trigger) return;
   // Desktop: rely on CSS absolute positioning → clear any inline overrides
   if (window.innerWidth > 600) {
+    panel.style.position = '';
     panel.style.top = '';
     panel.style.left = '';
     panel.style.right = '';
@@ -6119,8 +6120,13 @@ function positionCddPanel(cdd) {
     return;
   }
   // Mobile: match the trigger's exact horizontal position + width so the panel
-  // looks like a natural extension of the field (not a full-width overlay)
+  // looks like a natural extension of the field (not a full-width overlay).
+  // We set position:fixed INLINE (not just via the media-query CSS rule keyed
+  // on .open) so it persists through the close transition — preventing the
+  // panel from jumping when .open is removed and position:fixed would revert
+  // to position:absolute mid-animation.
   const rect = trigger.getBoundingClientRect();
+  panel.style.position = 'fixed';
   panel.style.top = `${Math.round(rect.bottom + 4)}px`;
   panel.style.left = `${Math.round(rect.left)}px`;
   panel.style.right = 'auto';
@@ -6129,7 +6135,21 @@ function positionCddPanel(cdd) {
   panel.style.maxHeight = `${Math.max(200, Math.min(spaceBelow, window.innerHeight * 0.6))}px`;
 }
 function closeAllCdd() {
-  document.querySelectorAll('.cdd.open').forEach(e => e.classList.remove('open'));
+  document.querySelectorAll('.cdd.open').forEach(cddEl => {
+    const panel = cddEl.querySelector('.cdd-panel');
+    cddEl.classList.remove('open');
+    // Clear inline positioning immediately. Close is instant (no transition)
+    // so there's no animation window to preserve — panel is already invisible
+    // by the time this executes. Base CSS takes over for future opens.
+    if (panel) {
+      panel.style.position = '';
+      panel.style.top = '';
+      panel.style.left = '';
+      panel.style.right = '';
+      panel.style.width = '';
+      panel.style.maxHeight = '';
+    }
+  });
   detachScrollToCloseCdd();
 }
 
@@ -6137,9 +6157,14 @@ function closeAllCdd() {
 let _cddScrollHandler = null;
 function attachScrollToCloseCdd() {
   if (_cddScrollHandler) return;
-  _cddScrollHandler = () => { closeAllCdd(); };
-  // Capture phase + passive so we catch scrolls on any nested scroll container
-  // (body, #view-advisor, table wrappers) without blocking the scroll itself.
+  _cddScrollHandler = (e) => {
+    // IMPORTANT: ignore scrolls happening INSIDE the dropdown panel itself —
+    // those are the user paging through options, and closing on them would
+    // make the panel uselessly short. Only close on page/body scrolls.
+    const t = e.target;
+    if (t && t.closest && t.closest('.cdd-panel')) return;
+    closeAllCdd();
+  };
   document.addEventListener('scroll', _cddScrollHandler, { passive: true, capture: true });
 }
 function detachScrollToCloseCdd() {

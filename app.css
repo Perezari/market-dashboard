@@ -5143,14 +5143,19 @@ body.light .dt-hdr-logo{background:var(--bg3)}
   overflow:hidden;
   opacity:0;visibility:hidden;
   transform:translateY(-6px);
-  transition:opacity .15s, transform .15s, visibility 0s linear .15s;
+  /* No transition on close — panel vanishes instantly. The 150ms fade we had
+     before exposed a visible "half-opacity" window where page content showed
+     through the panel (especially noticeable with long lists like sectors).
+     Native select elements close instantly for the same reason. Open still
+     has a smooth transition (defined in `.cdd.open .cdd-panel` below). */
+  transition:none;
   max-height:420px;overflow-y:auto;
   scrollbar-width:thin;scrollbar-color:var(--border2) transparent;
 }
 .cdd.open .cdd-panel{
   opacity:1;visibility:visible;
   transform:translateY(0);
-  transition:opacity .15s, transform .15s, visibility 0s;
+  transition:opacity .15s, transform .15s;
 }
 .cdd-panel::-webkit-scrollbar{width:6px}
 .cdd-panel::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
