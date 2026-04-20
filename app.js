@@ -5452,33 +5452,48 @@ function populateMethodologyDropdown() {
 }
 
 /**
- * Switch scoring methodology. Like setUniverse, cache is per-(universe,methodology)
- * so switching is instant if previously scanned. Otherwise user re-scans.
+ * COMMIT a methodology switch — actually changes the active methodology,
+ * updates UI, reloads cache or falls back to welcome.
+ * Called by: the dropdown in the controls bar, or the "בחר במודל זה"
+ * button inside the preview banner of the methodology modal.
  */
 function setMethodology(key) {
   if (!METHODOLOGIES[key] || key === currentMethodology) { closeAllCdd(); return; }
   currentMethodology = key;
+  viewedMethodology = key;   // keep the modal's preview state in sync so the "תצוגה מקדימה" banner disappears after commit
   localStorage.setItem(METHODOLOGY_KEY, key);
 
   scanData = null;
   syncMethodologyUI();
   closeAllCdd();
 
+  // Refresh the methodology modal in-place if it's currently open
+  const mthOverlay = $('mth-overlay');
+  const modalOpen = mthOverlay && mthOverlay.classList.contains('open');
+  if (modalOpen) {
+    renderMethodologyModal();
+    const modal = document.querySelector('.mth-modal');
+    if (modal) modal.scrollTop = 0;
+    const body = $('mth-body');
+    if (body) body.scrollTop = 0;
+  }
+
   // Try cache for this (universe, methodology) combo
   try {
     const cached = JSON.parse(localStorage.getItem(getCacheKey()));
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
       scanData = cached;
-      showResults();
+      if (!modalOpen) showResults();
+      else { renderKPIs(); renderTable(); }
       renderWatchlist();
       return;
     }
   } catch(e){}
 
-  // No cache → reset KPIs, show welcome
+  // No cache → reset KPIs; only show welcome screen if modal is closed
   ['kpi-universe','kpi-avg','kpi-sector','kpi-sector-sub','kpi-time','kpi-cache']
     .forEach(id => { const el = $(id); if (el) el.textContent = '—'; });
-  showScreen('screen-welcome');
+  if (!modalOpen) showScreen('screen-welcome');
   renderWatchlist();
 }
 
@@ -5845,7 +5860,15 @@ function renderWatchlist() {
 }
 
 // ═══ METHODOLOGY MODAL ═══
+// `viewedMethodology` is separate from `currentMethodology` — it only controls
+// which methodology's documentation is shown in the modal. Clicking an alternative
+// inside the modal is a preview action, NOT a commit. To actually switch
+// methodologies the user presses the "בחר במודל זה" button in the preview banner
+// (or picks from the dropdown in the controls bar).
+let viewedMethodology = null;
+
 function openMethodology() {
+  viewedMethodology = currentMethodology;
   renderMethodologyModal();
   $('mth-overlay').classList.add('open');
 }
@@ -5856,17 +5879,43 @@ function closeMethodology(e) {
 function closeMethodologyDirect() { $('mth-overlay').classList.remove('open'); }
 
 /**
- * Regenerate modal body from METHODOLOGIES[currentMethodology].
- * Shows: title, theory, best-when, factor table, and a grid of alternatives
- * the user can switch to directly from the modal.
+ * Preview a different methodology's documentation without switching the app state.
+ * Called by the alternative-methodology buttons at the bottom of the modal.
+ */
+function previewMethodology(key) {
+  if (!METHODOLOGIES[key] || key === viewedMethodology) return;
+  viewedMethodology = key;
+  renderMethodologyModal();
+  const body = $('mth-body');
+  if (body) body.scrollTop = 0;
+  const modal = document.querySelector('.mth-modal');
+  if (modal) modal.scrollTop = 0;
+}
+
+/**
+ * Regenerate modal body from METHODOLOGIES[viewedMethodology].
+ * If the viewed methodology is different from the active one, shows a
+ * preview banner with an "בחר במודל זה" CTA to commit.
  */
 function renderMethodologyModal() {
-  const meth = METHODOLOGIES[currentMethodology];
+  const viewed = viewedMethodology || currentMethodology;
+  const meth = METHODOLOGIES[viewed];
   const title = $('mth-title');
   const body  = $('mth-body');
   if (!title || !body || !meth) return;
 
   title.textContent = `${meth.label} · ${meth.subtitle}`;
+
+  const isPreview = viewed !== currentMethodology;
+  const previewBanner = isPreview ? `
+    <div class="mth-preview-banner">
+      <div class="mth-preview-text">
+        <div class="mth-preview-hd">תצוגה מקדימה</div>
+        <div class="mth-preview-sub">המודל הפעיל כעת: <b>${METHODOLOGIES[currentMethodology].labelHe}</b> · ${METHODOLOGIES[currentMethodology].label}</div>
+      </div>
+      <button class="mth-activate" onclick="setMethodology('${viewed}')">בחר במודל זה</button>
+    </div>
+  ` : '';
 
   const factorRows = meth.factors.map(f => `
     <tr>
@@ -5876,16 +5925,23 @@ function renderMethodologyModal() {
     </tr>
   `).join('');
 
+  // Alternatives: all methodologies except the one currently being viewed.
+  // The active one (if different from viewed) gets an "active" marker.
   const alternatives = Object.entries(METHODOLOGIES)
-    .filter(([k]) => k !== currentMethodology)
-    .map(([k, m]) => `
-      <button class="mth-alt" onclick="setMethodology('${k}')">
-        <div class="mth-alt-title">${m.labelHe} <span class="mth-alt-title-en">· ${m.label}</span></div>
-        <div class="mth-alt-desc">${m.desc}</div>
-      </button>
-    `).join('');
+    .filter(([k]) => k !== viewed)
+    .map(([k, m]) => {
+      const isActive = k === currentMethodology;
+      return `
+        <button class="mth-alt${isActive ? ' mth-alt-active' : ''}" onclick="previewMethodology('${k}')">
+          ${isActive ? '<span class="mth-alt-badge">פעיל</span>' : ''}
+          <div class="mth-alt-title">${m.labelHe} <span class="mth-alt-title-en">· ${m.label}</span></div>
+          <div class="mth-alt-desc">${m.desc}</div>
+        </button>
+      `;
+    }).join('');
 
   body.innerHTML = `
+    ${previewBanner}
     <p>${meth.theory}</p>
 
     <div class="mth-best">
@@ -5893,7 +5949,7 @@ function renderMethodologyModal() {
       <div class="mth-best-val">${meth.bestWhen}</div>
     </div>
 
-    <h4>הפקטורים של המודל הנוכחי</h4>
+    <h4>הפקטורים של המודל</h4>
     <table class="mth-factors">
       <thead>
         <tr><th>פקטור</th><th>מה הוא מודד</th><th>משקל</th></tr>
@@ -5909,7 +5965,7 @@ function renderMethodologyModal() {
     </div>
 
     <h4>מתודולוגיות אחרות</h4>
-    <p style="color:var(--dim);font-size:12px;margin-top:-4px">אפשר לעבור מיד — אם כבר סרקת אותן, התוצאות נטענות מה-cache. אחרת תצטרך לסרוק מחדש.</p>
+    <p style="color:var(--dim);font-size:12px;margin-top:-4px">לחץ על מודל כדי לקרוא על הפקטורים והתיאוריה — ללא החלפה בפועל. כדי להפעיל, השתמש ב-<b>בחר במודל זה</b> שמופיע בראש המסך, או בתפריט "מודל" בשורת הבקרה.</p>
     <div class="mth-alts">${alternatives}</div>
   `;
 }
@@ -5931,7 +5987,7 @@ document.addEventListener('keydown', e => {
   // toggleMobileMenu, closeMobileMenu — these already exist as
   // globals in app.js and we must NOT overwrite those.
   Object.assign(window, {
-    runScan, setMinScore, setView, setUniverse, setMethodology,
+    runScan, setMinScore, setView, setUniverse, setMethodology, previewMethodology,
     toggleCdd, selectSector, sortBy, applyFilters,
     openMethodology, closeMethodology, closeMethodologyDirect,
     openDetail, closeDetail, closeDetailDirect,
