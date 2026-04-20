@@ -5261,3 +5261,69 @@ table.mth-factors tr:last-child td{border-bottom:none}
   .mth-preview-banner{flex-direction:column;align-items:stretch;gap:10px}
   .mth-activate{width:100%}
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ADVISOR · CONTROLS BAR · MOBILE LAYOUT
+   Stack each control group into its own full-width row with:
+     - Label anchored to the right (RTL start)
+     - Controls (chips/dropdown) anchored to the left (RTL end), consistent width
+     - Hairline separator between rows instead of right-border verticals
+     - Action buttons (מתודולוגיה + סריקה) take full-width 50/50 at bottom
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 600px) {
+  .controls-bar{
+    flex-direction:column;
+    align-items:stretch;
+    gap:0;
+    padding:6px 12px;
+  }
+
+  .ctl-group{
+    width:100%;
+    padding:10px 0;
+    min-height:42px;
+    gap:6px;
+  }
+
+  /* Replace vertical right-border with a horizontal hairline between rows */
+  .ctl-group + .ctl-group{
+    border-right:none;
+    border-top:1px solid var(--border);
+    padding-right:0;
+    margin-right:0;
+  }
+
+  /* Label anchored to right (RTL start); `margin-inline-end: auto` pushes it
+     away from the controls which then cluster on the left (RTL end). */
+  .ctl-label{
+    margin-left:0;
+    margin-inline-end:auto;
+  }
+
+  /* Dropdowns — consistent width so Antonacci and "כל הסקטורים" match visually.
+     Both flex to a target width so they never look like random sizes. */
+  .ctl-group .cdd{
+    flex:0 1 220px;
+    max-width:240px;
+  }
+  .ctl-group .cdd .cdd-trigger{
+    width:100%;
+    min-width:0;
+  }
+
+  /* Hide the ctl-spacer on mobile (no flex row stretching anymore) */
+  .ctl-spacer{display:none}
+
+  /* Last ctl-group = action buttons (מתודולוגיה + סריקה).
+     Both get equal 50% width and push apart visually from the rows above. */
+  .controls-bar > .ctl-group:last-child{
+    gap:10px;
+    padding-top:14px;
+  }
+  .controls-bar > .ctl-group:last-child .ctl-btn{
+    flex:1 1 50%;
+    justify-content:center;
+    padding:10px 14px;
+    font-size:12px;
+  }
+}
