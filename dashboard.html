@@ -875,13 +875,14 @@ section.compact{}
   will-change:scroll-position;
 }
 
-/* The table itself. No direction override — inherits RTL from <html>,
-   which mirrors the columns: SECTOR (first HTML) → rightmost visually,
-   1D → next to SECTOR, AVG (last HTML) → leftmost visually.
-   Natural Hebrew reading order: anchor on right (sector name) → short period → long period → summary. */
+/* The table uses direction:ltr — NOT inherited RTL — because iOS Safari has a
+   documented bug where position:sticky right:0 inside RTL scrollable tables
+   breaks after the page is vertically scrolled. We keep the same visual layout
+   (AVG on far left, SECTOR pinned to far right) by reversing the HTML column
+   order: AVG is the FIRST <th>, SECTOR is the LAST <th>, with sticky right:0. */
 .col.main .sectors-card .t{
   width:100%;border-collapse:separate;border-spacing:0;
-  font-size:11px;
+  font-size:11px;direction:ltr;
   min-width:670px;  /* 11 data columns + sector column */
 }
 
@@ -906,17 +907,15 @@ section.compact{}
   box-sizing:border-box;
 }
 
-/* Sticky Sector column — FIRST cell, pinned to right edge (RTL).
-   NOTE: do NOT add will-change:transform or backface-visibility:hidden here.
-   Combined with a composited parent they cause iOS Safari to drop the sticky cells
-   after the page is vertically scrolled. */
+/* Sticky Sector column — LAST cell in LTR, pinned to right edge (physical right).
+   This avoids the iOS Safari "RTL + position:sticky right:0" bug. */
 .col.main .sectors-card .t thead th.sec-col,
-.col.main .sectors-card .t thead th:first-child{
+.col.main .sectors-card .t thead th:last-child{
   position:sticky;right:0;z-index:3;
   width:150px;min-width:150px;
   padding:0 12px !important;
   text-align:right !important;
-  background:rgba(0,0,0,.55) !important;  /* slightly darker so scrolled content doesn't bleed through */
+  background:rgba(0,0,0,.55) !important;
   box-shadow:-1px 0 0 0 var(--border);
 }
 .col.main .sectors-card .t tbody td.sec-cell{
@@ -929,6 +928,9 @@ section.compact{}
   background:#111816 !important;
   box-shadow:-1px 0 0 0 var(--border);
   white-space:nowrap !important;
+  /* Sector cell inner content is flipped back to RTL so Hebrew name reads
+     right-to-left and the symbol chip sits on the left (same visual as before). */
+  direction:rtl;
 }
 /* Symbol tag inside the sector cell — small mono chip, pushed to the left */
 .col.main .sectors-card .t tbody td.sec-cell .sym{
@@ -968,7 +970,7 @@ section.compact{}
 
 /* Light-mode overrides for the new sticky Sector column */
 body.light .col.main .sectors-card .t thead th.sec-col,
-body.light .col.main .sectors-card .t thead th:first-child{
+body.light .col.main .sectors-card .t thead th:last-child{
   background:var(--bg) !important;
 }
 body.light .col.main .sectors-card .t tbody td.sec-cell{
@@ -2087,7 +2089,7 @@ body.light .col.main .sectors-card .t tbody tr.avgrow td.sec-cell{background:var
         <div class="tbl-wrap">
           <table class="t">
             <thead>
-              <tr><th class="sec-col">SECTOR</th><th>1D</th><th>1W</th><th>1M</th><th>3M</th><th>6M</th><th>1Y</th><th>52W HIGH</th><th>52W LOW</th><th>VOL</th><th>MACRO</th><th>AVG</th></tr>
+              <tr><th>AVG</th><th>MACRO</th><th>VOL</th><th>52W LOW</th><th>52W HIGH</th><th>1Y</th><th>6M</th><th>3M</th><th>1M</th><th>1W</th><th>1D</th><th class="sec-col">SECTOR</th></tr>
             </thead>
             <tbody id="sector-tbody"></tbody>
           </table>
@@ -2401,8 +2403,8 @@ window.showKey = function(){
       // הסימבול קריא מ-data-sym attribute (עמודת הסקטור כבר לא חלק מה-tr הזה)
       const sym = row.getAttribute('data-sym');
       if(!sym || !SECTOR_MAP[sym]) return;
-      // תא ה-1D הוא התא הראשון שאינו sec-cell (ה-sec-cell הוא עכשיו ה-td הראשון ב-tr)
-      const dayCell = row.querySelector('td:not(.sec-cell)');
+      // תא ה-1D מזוהה על ידי class="c-d1" (נוסף ב-renderSectors) — אמין בלי תלות במיקום ה-td
+      const dayCell = row.querySelector('td.c-d1');
       const pct = parsePct(dayCell ? dayCell.textContent : '');
       const cell = document.querySelector(`.heat-cell[data-sector-slot="${sym}"]`);
       if(!cell) return;
@@ -2443,7 +2445,7 @@ window.showKey = function(){
     rows.forEach(row => {
       const sym = row.getAttribute('data-sym');
       if (!sym || !SECTOR_NAMES[sym]) return;
-      const td = row.querySelector('td:not(.sec-cell)');
+      const td = row.querySelector('td.c-d1');
       const m = td ? td.textContent.match(/-?\d+\.?\d*/) : null;
       if (!m) return;
       const d1 = parseFloat(m[0]);

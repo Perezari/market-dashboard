@@ -1761,12 +1761,3 @@ body.light .macro-chg.down{background:rgba(204,26,58,.1)}
     box-sizing:border-box !important;
   }
 }
-/* מונע מהעמודה הראשונה להיחתך בגלילה במובייל */
-.sector-performance-section table th:first-child,
-.sector-performance-section table td:first-child {
-    position: sticky;
-    right: 0;
-    background: #0d0d0d; /* או רקע הטבלה שלך */
-    z-index: 5;
-    white-space: nowrap;
-}
