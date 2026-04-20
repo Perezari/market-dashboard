@@ -6004,9 +6004,9 @@ function renderTable() {
     th.classList.remove('sorted');
     th.classList.remove('asc');
   });
-  // Identify the currently sorted header
+  // Identify the currently sorted header (indices reflect new sub-industry column)
   const headerMap = {
-    'sym': 1, 'sector': 2, 'score': 3, 'price': 5, 'y1': 6, 'm3': 7, 'fromHi': 8
+    'sym': 1, 'sector': 2, 'subIndName': 3, 'score': 4, 'price': 6, 'y1': 7, 'm3': 8, 'fromHi': 9
   };
   const idx = headerMap[displayState.sortKey];
   if (idx) {
@@ -6019,7 +6019,7 @@ function renderTable() {
 
   if (list.length === 0) {
     tbody.innerHTML = `
-      <tr><td colspan="10" style="padding:40px;text-align:center;color:var(--dim)">
+      <tr><td colspan="11" style="padding:40px;text-align:center;color:var(--dim)">
         אין מניות שעונות על הקריטריונים.
         ${displayState.view === 'watchlist' ? '<br><small style="font-size:10px;color:var(--dimmer)">הוסף מניות לרשימה שלך מפאנל הפירוט של כל מניה.</small>' : ''}
       </td></tr>`;
@@ -6037,6 +6037,7 @@ function renderTable() {
         <td class="rk ${rkCls}">${s.rank}</td>
         <td class="sym"><img class="sym-logo" src="https://financialmodelingprep.com/image-stock/${s.sym}.png" alt="" loading="lazy" onerror="this.classList.add('sym-logo-err')"><b>${s.sym}</b>${badges.join('')}<span class="name">${s.name}</span></td>
         <td class="sec">${s.sectorName}</td>
+        <td class="subsec hide-m">${s.subIndName || '—'}</td>
         <td><span class="score ${scoreClass(s.score)}">${s.score}</span></td>
         <td class="hide-m">${renderFactorBars(s.scores)}</td>
         <td class="num hide-m">$${fmt(s.price)}</td>

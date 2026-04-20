@@ -4962,23 +4962,35 @@ table.picks{table-layout:fixed}
 /* Explicit widths for the remaining columns.
    th:nth-child(2) (מניה) stays auto → flexes to fill leftover space. */
 table.picks th:nth-child(3){width:110px}   /* סקטור    */
-table.picks th:nth-child(4){width:72px}    /* ציון     */
-table.picks th:nth-child(5){width:72px}    /* פקטורים  */
-table.picks th:nth-child(6){width:88px}    /* מחיר     */
-table.picks th:nth-child(7){width:76px}    /* 1Y       */
-table.picks th:nth-child(8){width:76px}    /* 3M       */
-table.picks th:nth-child(9){width:82px}    /* מ-52שי   */
+table.picks th:nth-child(4){width:130px}   /* תת-סקטור */
+table.picks th:nth-child(5){width:72px}    /* ציון     */
+table.picks th:nth-child(6){width:72px}    /* פקטורים  */
+table.picks th:nth-child(7){width:88px}    /* מחיר     */
+table.picks th:nth-child(8){width:76px}    /* 1Y       */
+table.picks th:nth-child(9){width:76px}    /* 3M       */
+table.picks th:nth-child(10){width:82px}   /* מ-52שי   */
 
 /* Center the ציון (badge) and פקטורים (mini-bars) columns so the
-   header caption lines up directly above the visual element. */
-table.picks thead th:nth-child(4),
-table.picks tbody td:nth-child(4),
+   header caption lines up directly above the visual element.
+   Columns shifted by +1 after adding תת-סקטור. */
 table.picks thead th:nth-child(5),
-table.picks tbody td:nth-child(5){text-align:center}
+table.picks tbody td:nth-child(5),
+table.picks thead th:nth-child(6),
+table.picks tbody td:nth-child(6){text-align:center}
 
-/* Ellipsis for name/sector when the content is long and the column is now fixed. */
+/* Ellipsis for name/sector/sub-industry when content is long. */
 table.picks tbody td.sym,
-table.picks tbody td.sec{overflow:hidden;text-overflow:ellipsis}
+table.picks tbody td.sec,
+table.picks tbody td.subsec{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Sub-industry cell — dim like sector but a touch smaller to create visual
+   hierarchy (sector is primary, sub-industry is supplementary). */
+td.subsec{
+  color:var(--dim);
+  font-size:10px;
+  letter-spacing:.3px;
+  opacity:.85;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════
    ADVISOR · company logo in picks table
