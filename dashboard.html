@@ -870,12 +870,13 @@ section.compact{}
   -webkit-transform:translateZ(0);transform:translateZ(0);
 }
 
-/* The table itself. direction:ltr keeps period order 1D→AVG left→right
-   as in the original design; SECTOR is the LAST <th>/<td> so sticky right:0
-   pins it to the visual right edge (the Hebrew reading anchor). */
+/* The table itself. No direction override — inherits RTL from <html>,
+   which mirrors the columns: SECTOR (first HTML) → rightmost visually,
+   1D → next to SECTOR, AVG (last HTML) → leftmost visually.
+   Natural Hebrew reading order: anchor on right (sector name) → short period → long period → summary. */
 .col.main .sectors-card .t{
   width:100%;border-collapse:separate;border-spacing:0;
-  font-size:11px;direction:ltr;
+  font-size:11px;
   min-width:670px;  /* 11 data columns + sector column */
 }
 
@@ -900,9 +901,9 @@ section.compact{}
   box-sizing:border-box;
 }
 
-/* Sticky Sector column — LAST cell, pinned to right edge */
+/* Sticky Sector column — FIRST cell, pinned to right edge (RTL) */
 .col.main .sectors-card .t thead th.sec-col,
-.col.main .sectors-card .t thead th:last-child{
+.col.main .sectors-card .t thead th:first-child{
   position:sticky;right:0;z-index:3;
   width:150px;min-width:150px;
   padding:0 12px !important;
@@ -961,7 +962,7 @@ section.compact{}
 
 /* Light-mode overrides for the new sticky Sector column */
 body.light .col.main .sectors-card .t thead th.sec-col,
-body.light .col.main .sectors-card .t thead th:last-child{
+body.light .col.main .sectors-card .t thead th:first-child{
   background:var(--bg) !important;
 }
 body.light .col.main .sectors-card .t tbody td.sec-cell{
@@ -2080,7 +2081,7 @@ body.light .col.main .sectors-card .t tbody tr.avgrow td.sec-cell{background:var
         <div class="tbl-wrap">
           <table class="t">
             <thead>
-              <tr><th>1D</th><th>1W</th><th>1M</th><th>3M</th><th>6M</th><th>1Y</th><th>52W HIGH</th><th>52W LOW</th><th>VOL</th><th>MACRO</th><th>AVG</th><th class="sec-col">SECTOR</th></tr>
+              <tr><th class="sec-col">SECTOR</th><th>1D</th><th>1W</th><th>1M</th><th>3M</th><th>6M</th><th>1Y</th><th>52W HIGH</th><th>52W LOW</th><th>VOL</th><th>MACRO</th><th>AVG</th></tr>
             </thead>
             <tbody id="sector-tbody"></tbody>
           </table>
@@ -2394,7 +2395,8 @@ window.showKey = function(){
       // הסימבול קריא מ-data-sym attribute (עמודת הסקטור כבר לא חלק מה-tr הזה)
       const sym = row.getAttribute('data-sym');
       if(!sym || !SECTOR_MAP[sym]) return;
-      const dayCell = row.querySelector('td');
+      // תא ה-1D הוא התא הראשון שאינו sec-cell (ה-sec-cell הוא עכשיו ה-td הראשון ב-tr)
+      const dayCell = row.querySelector('td:not(.sec-cell)');
       const pct = parsePct(dayCell ? dayCell.textContent : '');
       const cell = document.querySelector(`.heat-cell[data-sector-slot="${sym}"]`);
       if(!cell) return;
@@ -2435,7 +2437,7 @@ window.showKey = function(){
     rows.forEach(row => {
       const sym = row.getAttribute('data-sym');
       if (!sym || !SECTOR_NAMES[sym]) return;
-      const td = row.querySelector('td');
+      const td = row.querySelector('td:not(.sec-cell)');
       const m = td ? td.textContent.match(/-?\d+\.?\d*/) : null;
       if (!m) return;
       const d1 = parseFloat(m[0]);
