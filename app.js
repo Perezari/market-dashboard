@@ -1995,25 +1995,25 @@ function startMarketClock() {
       const rem = 4*60 - totalMin;
       const remS = (60 - s) % 60;
       const remM = remS > 0 ? rem - 1 : rem;
-      countdownText = `פרי-מרקט בעוד <b>${String(Math.floor(remM/60)).padStart(2,'0')}:${String(remM%60).padStart(2,'0')}:${String(remS).padStart(2,'0')}</b><br><span style="font-size:9px;opacity:.7">ישראל ${formatIL(4,0)}</span>`;
+      countdownText = `פרי-מרקט בעוד <b>${String(Math.floor(rem/60)).padStart(2,'0')}:${String(rem%60).padStart(2,'0')}</b><br><span style="font-size:9px;opacity:.7">ישראל ${formatIL(4,0)}</span>`;
     } else if (totalMin < 9*60+30) {
       status = 'פרי-מרקט'; cls = 'pre';
       const rem = 9*60+30 - totalMin;
       const remS = (60 - s) % 60;
       const remM = remS > 0 ? rem - 1 : rem;
-      countdownText = `פתיחה בעוד <b>${String(Math.floor(remM/60)).padStart(2,'0')}:${String(remM%60).padStart(2,'0')}:${String(remS).padStart(2,'0')}</b><br><span style="font-size:9px;opacity:.7">ישראל ${formatIL(9,30)}</span>`;
+      countdownText = `פתיחה בעוד <b>${String(Math.floor(rem/60)).padStart(2,'0')}:${String(rem%60).padStart(2,'0')}</b><br><span style="font-size:9px;opacity:.7">ישראל ${formatIL(9,30)}</span>`;
     } else if (totalMin < 16*60) {
       status = 'שוק פתוח'; cls = 'open';
       const rem = 16*60 - totalMin;
       const remS = (60 - s) % 60;
       const remM = remS > 0 ? rem - 1 : rem;
-      countdownText = `סגירה בעוד <b>${String(Math.floor(remM/60)).padStart(2,'0')}:${String(remM%60).padStart(2,'0')}:${String(remS).padStart(2,'0')}</b><br><span style="font-size:9px;opacity:.7">ישראל ${formatIL(16,0)}</span>`;
+      countdownText = `סגירה בעוד <b>${String(Math.floor(rem/60)).padStart(2,'0')}:${String(rem%60).padStart(2,'0')}</b><br><span style="font-size:9px;opacity:.7">ישראל ${formatIL(16,0)}</span>`;
     } else if (totalMin < 20*60) {
       status = 'אפטר-אוורס'; cls = 'after';
       const rem = 20*60 - totalMin;
       const remS = (60 - s) % 60;
       const remM = remS > 0 ? rem - 1 : rem;
-      countdownText = `נסגר בעוד <b>${String(Math.floor(remM/60)).padStart(2,'0')}:${String(remM%60).padStart(2,'0')}:${String(remS).padStart(2,'0')}</b>`;
+      countdownText = `נסגר בעוד <b>${String(Math.floor(rem/60)).padStart(2,'0')}:${String(rem%60).padStart(2,'0')}</b>`;
     } else {
       status = 'סגור'; cls = 'closed';
       countdownText = `פרי-מרקט מחר<br><span style="font-size:9px;opacity:.7">ישראל ${formatIL(4,0)}</span>`;

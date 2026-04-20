@@ -186,12 +186,14 @@ body::after{
   .tb-brand-sub{display:none}
 }
 @media(max-width:820px){
-  .term-bar{gap:10px;padding:0 10px}
+  .term-bar{gap:10px;padding-left:10px;padding-right:10px}
   .tb-version{display:none}
   .tb-brand-text{display:none}
   .tb-item.tb-tlv{display:none}
-  .tb-status-pill{padding:4px 8px}
+  .tb-status-pill{padding:4px 8px;min-width:0;overflow:hidden}
   .tb-status-pill .label{font-size:8.5px;letter-spacing:1px}
+  /* מסתיר את ה-"ישראל XX:XX" הפנימי במובייל כדי שהפיל לא יגלוש */
+  .tb-countdown span{display:none !important}
 }
 @media(max-width:520px){
   .term-bar{height:44px}
@@ -199,6 +201,10 @@ body::after{
   .tb-live{font-size:0;gap:0}
   .tb-live::before{width:8px;height:8px}
   .tb-group{gap:8px}
+  /* ממצמצם עוד יותר במסכים צרים במיוחד */
+  .tb-status-pill{gap:5px;padding:4px 7px}
+  .market-label{font-size:8.5px !important;letter-spacing:.8px !important}
+  .tb-countdown{font-size:8.5px}
 }
 
 /* Wave decoration */
@@ -2006,8 +2012,9 @@ window.showKey = function(){
 (function(){
   function tick(){
     const now = new Date();
-    const tlv = now.toLocaleTimeString('en-GB',{hour12:false,timeZone:'Asia/Jerusalem'});
-    const ny  = now.toLocaleTimeString('en-GB',{hour12:false,timeZone:'America/New_York'});
+    const fmt = {hour12:false, hour:'2-digit', minute:'2-digit'};
+    const tlv = now.toLocaleTimeString('en-GB',{...fmt,timeZone:'Asia/Jerusalem'});
+    const ny  = now.toLocaleTimeString('en-GB',{...fmt,timeZone:'America/New_York'});
     const a=document.getElementById('term-clock-tlv'); if(a)a.textContent=tlv;
     const b=document.getElementById('term-clock-ny');  if(b)b.textContent=ny;
     const d=document.getElementById('hdr-build');
