@@ -5082,7 +5082,7 @@ function renderTable() {
     return `
       <tr onclick="openDetail('${s.sym}')">
         <td class="rk ${rkCls}">${s.rank}</td>
-        <td class="sym"><b>${s.sym}</b>${badges.join('')}<span class="name">${s.name}</span></td>
+        <td class="sym"><img class="sym-logo" src="https://financialmodelingprep.com/image-stock/${s.sym}.png" alt="" loading="lazy" onerror="this.classList.add('sym-logo-err')"><b>${s.sym}</b>${badges.join('')}<span class="name">${s.name}</span></td>
         <td class="sec">${s.sectorName}</td>
         <td><span class="score ${scoreClass(s.score)}">${s.score}</span></td>
         <td class="hide-m">${renderFactorBars(s.scores)}</td>

@@ -4959,3 +4959,28 @@ table.picks tbody td:nth-child(5){text-align:center}
 /* Ellipsis for name/sector when the content is long and the column is now fixed. */
 table.picks tbody td.sym,
 table.picks tbody td.sec{overflow:hidden;text-overflow:ellipsis}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ADVISOR · company logo in picks table
+   Source: financialmodelingprep.com (free, no API key for logo endpoint)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.sym-logo{
+  display:inline-block;
+  width:25px;height:25px;
+  border-radius:4px;
+  vertical-align:middle;
+  margin-inline-end:8px;         /* gap between logo and ticker — RTL/LTR safe */
+  object-fit:contain;
+  background:rgb(0 0 0 / 0%);               /* most company logos have transparent BGs — white canvas keeps them legible on dark theme */
+  flex-shrink:0;
+}
+
+/* Graceful fallback when a ticker has no logo on FMP's CDN:
+   collapse the <img> completely so the row doesn't show a broken image or empty gap. */
+.sym-logo-err{
+  display:none;
+}
+
+/* On light theme, drop the white box-background since most logos look better on bg3 */
+body.light .sym-logo{background:var(--bg3)}
