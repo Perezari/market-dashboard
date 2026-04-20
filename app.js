@@ -4697,9 +4697,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const PROXY = localStorage.getItem('app_proxy_url') || '';
 
 // Cache keys
-const CACHE_KEY_BASE = 'advisor_scan_cache_v1';
+const CACHE_KEY_BASE = 'advisor_scan_cache_v2';
 const WL_KEY = 'advisor_watchlist_v1';
 const UNIVERSE_KEY = 'advisor_universe_v1';
+const METHODOLOGY_KEY = 'advisor_methodology_v1';
 const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
 
 // Sector Hebrew names
@@ -4722,8 +4723,15 @@ const UNIVERSES = {
 let currentUniverse = localStorage.getItem(UNIVERSE_KEY) || 'large';
 if (!UNIVERSES[currentUniverse]) currentUniverse = 'large';
 
+let currentMethodology = localStorage.getItem(METHODOLOGY_KEY) || 'momentum';
+// NOTE: the `if (!METHODOLOGIES[...])` validation that used to be here
+// caused a TDZ error because METHODOLOGIES is declared further down in the file.
+// Validation is deferred to advisorBoot() where the reference is safe.
+
 const getCurrentHoldings = () => UNIVERSES[currentUniverse].holdings;
-const getCacheKey        = () => `${CACHE_KEY_BASE}_${currentUniverse}`;
+const getCurrentMethodology = () => METHODOLOGIES[currentMethodology];
+// Per-universe AND per-methodology cache — switching either is instant if cached
+const getCacheKey = () => `${CACHE_KEY_BASE}_${currentUniverse}_${currentMethodology}`;
 
 // Symbol → sector/name maps, rebuilt whenever the universe changes.
 const SYM_SECTOR = {};
@@ -4762,16 +4770,15 @@ function advisorBoot() {
     $('adv-screen-error').style.display = 'block';
     return;
   }
-  // Populate sector filter
-  const sel = $('f-sector');
-  Object.entries(SECTOR_NAMES).forEach(([k, v]) => {
-    const opt = document.createElement('option');
-    opt.value = k; opt.textContent = v;
-    sel.appendChild(opt);
-  });
-  // Sync universe chip UI + KPI subtitle with currently-active universe
+  // Validate saved methodology against the live METHODOLOGIES dictionary
+  // (we couldn't do this at the `let currentMethodology = ...` site because of TDZ)
+  if (!METHODOLOGIES[currentMethodology]) currentMethodology = 'momentum';
+  // Build custom dropdowns (sector + methodology) and reflect current state
+  populateSectorDropdown();
+  populateMethodologyDropdown();
   syncUniverseUI();
-  // Try load from cache for the current universe
+  syncMethodologyUI();
+  // Try load from cache for this (universe, methodology)
   try {
     const cached = JSON.parse(localStorage.getItem(getCacheKey()));
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
@@ -4948,7 +4955,221 @@ function percentileRank(arr, val) {
   return (below / valid.length) * 100;
 }
 
-function computeScores(stocksData, spyCloses) {
+/* ════════════════════════════════════════════════════════════════════════════
+   VOLATILITY HELPERS
+   Used by Low-Vol Quality and VCP methodologies. Based on weekly returns
+   computed from closes (already fetched for the scan — no extra network).
+   ════════════════════════════════════════════════════════════════════════════ */
+function _stdDev(values) {
+  const valid = values.filter(v => v != null && !isNaN(v));
+  if (valid.length < 2) return 0;
+  const mean = valid.reduce((a, b) => a + b, 0) / valid.length;
+  const sqDiffs = valid.map(v => (v - mean) ** 2);
+  return Math.sqrt(sqDiffs.reduce((a, b) => a + b, 0) / valid.length);
+}
+function _weeklyReturns(closes) {
+  const rets = [];
+  for (let i = 1; i < closes.length; i++) {
+    if (closes[i - 1]) rets.push((closes[i] - closes[i - 1]) / closes[i - 1]);
+  }
+  return rets;
+}
+/** Annualized-ish weekly-return std over the last `window` weeks. */
+function computeVolatility(closes, window = 26) {
+  if (!closes || closes.length < window + 1) return null;
+  return _stdDev(_weeklyReturns(closes.slice(-window - 1)));
+}
+/** VCP — Minervini pattern. Ratio of recent 6w std to prior 6w std.
+ *  Ratio < 1 = volatility contracting (bullish setup). */
+function computeVolContraction(closes) {
+  if (!closes || closes.length < 13) return 1;
+  const recentRets = _weeklyReturns(closes.slice(-7));     // 6 returns
+  const priorRets  = _weeklyReturns(closes.slice(-13, -6)); // 6 returns
+  const rec = _stdDev(recentRets);
+  const pri = _stdDev(priorRets);
+  if (pri === 0) return 1;
+  return rec / pri;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   METHODOLOGIES — 6 scoring models. Each returns { score, factors } in a
+   unified shape so the table/detail panel/modal can be methodology-agnostic.
+   All models share the same computeMetrics() output; only the weighting and
+   composition differs. Switching methodologies never triggers a re-scan.
+   ════════════════════════════════════════════════════════════════════════════ */
+function scoreMomentum(m, pct) {
+  const MOM = pct.ret12m_1m(m.ret12m_1m) * 0.45 + pct.ret6m(m.ret6m) * 0.30 + pct.ret3m(m.ret3m) * 0.25;
+  const RS  = pct.rs12m(m.rs12m) * 0.60 + pct.rs3m(m.rs3m) * 0.40;
+  let TRD = 0;
+  if (m.price > m.sma10) TRD += 20;
+  if (m.price > m.sma40) TRD += 20;
+  if (m.sma10 > m.sma40) TRD += 20;
+  TRD += pct.sma10Slope(m.sma10Slope) * 0.20;
+  TRD += (m.stickiness * 20);
+  TRD = Math.min(100, TRD);
+  const POS = pct.fromHi(m.fromHi) * 0.6 + pct.rangePos(m.rangePos) * 0.4;
+  const score = MOM * 0.35 + RS * 0.30 + TRD * 0.25 + POS * 0.10;
+  return { score, factors: { MOM, RS, TRD, POS } };
+}
+
+function scoreReversion(m, pct) {
+  // LTU: long-term uptrend (pre-pullback) — we still want winners
+  const LTU = pct.ret12m_1m(m.ret12m_1m);
+  // STW: short-term weakness — negative ret1m ranks highest (invert)
+  const STW = 100 - pct.ret1m(m.ret1m);
+  // DEV: how far price is below sma10 — more oversold = better
+  const DEV = pct.dev10(m.dev10);
+  const score = LTU * 0.40 + STW * 0.35 + DEV * 0.25;
+  return { score, factors: { LTU, STW, DEV } };
+}
+
+function scoreBreakout(m, pct) {
+  // PRX: proximity to 52w high (fromHi closer to 0 = better; high pct = good)
+  const PRX = pct.fromHi(m.fromHi);
+  // IGN: ignition — recent month positive + crossed SMA10
+  let IGN = 0;
+  if (m.ret1m != null && m.ret1m > 0) IGN += 40;
+  if (m.price > m.sma10) IGN += 30;
+  IGN += pct.ret1m(m.ret1m) * 0.3;
+  IGN = Math.min(100, IGN);
+  // TRG: trend support — golden cross + sma slope
+  let TRG = 0;
+  if (m.sma10 > m.sma40) TRG += 40;
+  TRG += pct.sma10Slope(m.sma10Slope) * 0.6;
+  TRG = Math.min(100, TRG);
+  const score = PRX * 0.45 + IGN * 0.35 + TRG * 0.20;
+  return { score, factors: { PRX, IGN, TRG } };
+}
+
+function scoreQuality(m, pct) {
+  // STB: low volatility is good — invert
+  const STB = 100 - pct.vol(m.vol);
+  // CMP: steady compounder — positive but moderate ret12m
+  const CMP = pct.ret12m(m.ret12m);
+  // STK: stickiness (fraction of weeks above SMA10)
+  const STK = (m.stickiness || 0) * 100;
+  const score = STB * 0.40 + CMP * 0.35 + STK * 0.25;
+  return { score, factors: { STB, CMP, STK } };
+}
+
+function scoreVCP(m, pct) {
+  // PRX: close to 52w high
+  const PRX = pct.fromHi(m.fromHi);
+  // CTR: volatility contracting — lower ratio = better (invert percentile)
+  const CTR = 100 - pct.volContraction(m.volContraction);
+  // TRN: proper Stage-2 uptrend (Minervini template)
+  let TRN = 0;
+  if (m.price > m.sma10) TRN += 25;
+  if (m.sma10 > m.sma40) TRN += 25;
+  if (m.sma10Slope != null && m.sma10Slope > 0) TRN += 20;
+  TRN += (m.stickiness || 0) * 30;
+  TRN = Math.min(100, TRN);
+  const score = PRX * 0.45 + CTR * 0.30 + TRN * 0.25;
+  return { score, factors: { PRX, CTR, TRN } };
+}
+
+function scoreDualMomentum(m, pct) {
+  // Hard gates (Antonacci): absolute momentum + relative momentum
+  const passesAbs = m.ret12m_1m != null && m.ret12m_1m > 0;
+  const passesRel = m.rs12m != null && m.rs12m > 0;
+  if (!passesAbs || !passesRel) {
+    return {
+      score: 0,
+      factors: { ABS: passesAbs ? 100 : 0, REL: passesRel ? 100 : 0, INT: 0 }
+    };
+  }
+  const ABS = pct.ret12m_1m(m.ret12m_1m);
+  const REL = pct.rs12m(m.rs12m);
+  const INT = pct.sma10Slope(m.sma10Slope);
+  const score = ABS * 0.40 + REL * 0.40 + INT * 0.20;
+  return { score, factors: { ABS, REL, INT } };
+}
+
+const METHODOLOGIES = {
+  momentum: {
+    label:'Momentum', labelHe:'מומנטום',
+    subtitle:'Ride the trend',
+    desc:'factor investing קלאסי — מומנטום + חוזק יחסי',
+    theory:'מבוסס על מחקר Jegadeesh & Titman (1993) ו-Asness et al. (2013). מניות שעלו חזק ממשיכות לעלות בטווח 3-12 חודשים.',
+    bestWhen:'שווקים טרנדיים · bull markets',
+    factors:[
+      {k:'MOM', label:'מומנטום',    weight:35, desc:'תשואות היסטוריות'},
+      {k:'RS',  label:'חוזק יחסי',   weight:30, desc:'ביצועים מול SPY'},
+      {k:'TRD', label:'איכות מגמה',  weight:25, desc:'SMA + יציבות'},
+      {k:'POS', label:'מיקום',       weight:10, desc:'מרחק מ-52w high'},
+    ],
+    compute: scoreMomentum,
+  },
+  reversion: {
+    label:'Mean Reversion', labelHe:'חזרה לממוצע',
+    subtitle:'Buy the dip',
+    desc:'winners בפולבק זמני — oversold bounces',
+    theory:'mean reversion theory (de Bondt & Thaler 1985). מניות עם מומנטום ארוך טווח שקיבלו מכה קצרה נוטות לחזור לממוצע.',
+    bestWhen:'שווקים עם פולבקים · תיקונים',
+    factors:[
+      {k:'LTU', label:'רקע חיובי',   weight:40, desc:'תשואת 12M-1M'},
+      {k:'STW', label:'חולשה קצרה',  weight:35, desc:'1M return שלילי'},
+      {k:'DEV', label:'סטייה מ-MA',  weight:25, desc:'מרחק מתחת ל-SMA50'},
+    ],
+    compute: scoreReversion,
+  },
+  breakout: {
+    label:'Breakout', labelHe:'פריצה',
+    subtitle:'New highs igniting',
+    desc:'מתקרבות או שוברות שיא 52ש עם מומנטום מתחדש',
+    theory:'בהשראת William O\'Neil (IBD) ו-Mark Minervini. מזהה early-stage breakouts לשיאים חדשים — לפני ה-run הגדול.',
+    bestWhen:'bull markets · רוטציות חזקות',
+    factors:[
+      {k:'PRX', label:'קירבה לשיא',  weight:45, desc:'fromHi נמוך'},
+      {k:'IGN', label:'פריצה',       weight:35, desc:'1M חיובי + SMA10'},
+      {k:'TRG', label:'מגמה תומכת',  weight:20, desc:'Golden Cross + slope'},
+    ],
+    compute: scoreBreakout,
+  },
+  quality: {
+    label:'Low Vol Quality', labelHe:'יציבות',
+    subtitle:'Steady compounders',
+    desc:'תשואה יציבה ותנודתיות נמוכה — defensive',
+    theory:'Low-Volatility Anomaly (Haugen 1991). מניות עם vol נמוך מניבות risk-adjusted returns טובים יותר. אבני יסוד של תיקים defensive.',
+    bestWhen:'bear markets · high-VIX · risk-off',
+    factors:[
+      {k:'STB', label:'יציבות',       weight:40, desc:'volatility נמוכה'},
+      {k:'CMP', label:'תשואה מצטברת', weight:35, desc:'ret12m יציב'},
+      {k:'STK', label:'Stickiness',  weight:25, desc:'% זמן מעל SMA'},
+    ],
+    compute: scoreQuality,
+  },
+  vcp: {
+    label:'VCP — Minervini', labelHe:'התכנסות',
+    subtitle:'Volatility contraction',
+    desc:'coiled springs — התכנסות לפני פריצה',
+    theory:'Volatility Contraction Pattern של Mark Minervini. התכווצות של התנודתיות השבועית ליד שיא 52ש היא setup קלאסי לפני breakouts גדולים — CROX, NVDA, TSLA בזמנים שונים.',
+    bestWhen:'bull markets · swing trading',
+    factors:[
+      {k:'PRX', label:'קירבה לשיא',     weight:45, desc:'fromHi > -10%'},
+      {k:'CTR', label:'התכווצות vol',   weight:30, desc:'6w std < prior 6w'},
+      {k:'TRN', label:'Stage 2 uptrend',weight:25, desc:'price > SMA10 > SMA40'},
+    ],
+    compute: scoreVCP,
+  },
+  dual: {
+    label:'Dual Momentum', labelHe:'Antonacci',
+    subtitle:'Strict filters',
+    desc:'רק מניות עם מומנטום מוחלט ויחסי חיובי',
+    theory:'Dual Momentum של Gary Antonacci (2014). שני שערים: (1) תשואה מוחלטת חיובית, (2) beat SPY. מניה שנכשלת באחד — ציון 0. המודל נמנע מ-bear markets בהגדרה.',
+    bestWhen:'כל הזמן · risk-averse · drawdowns נמוכים',
+    factors:[
+      {k:'ABS', label:'מומנטום מוחלט',  weight:40, desc:'ret12m > 0'},
+      {k:'REL', label:'מומנטום יחסי',   weight:40, desc:'beat SPY'},
+      {k:'INT', label:'עוצמת מגמה',     weight:20, desc:'slope של SMA'},
+    ],
+    compute: scoreDualMomentum,
+  },
+};
+
+function computeScores(stocksData, spyCloses, methodologyKey) {
+  const methodology = METHODOLOGIES[methodologyKey] || METHODOLOGIES.momentum;
+
   const raw = {};
   for (const [sym, data] of Object.entries(stocksData)) {
     const m = computeMetrics(data, spyCloses);
@@ -4957,53 +5178,37 @@ function computeScores(stocksData, spyCloses) {
   const symbols = Object.keys(raw);
   if (symbols.length === 0) return [];
 
-  const ret12m_1mArr = symbols.map(s => raw[s].ret12m_1m);
-  const ret6mArr = symbols.map(s => raw[s].ret6m);
-  const ret3mArr = symbols.map(s => raw[s].ret3m);
-  const rs12mArr = symbols.map(s => raw[s].rs12m);
-  const rs3mArr = symbols.map(s => raw[s].rs3m);
-  const slopeArr = symbols.map(s => raw[s].sma10Slope);
-  const fromHiArr = symbols.map(s => raw[s].fromHi);
-  const rangePosArr = symbols.map(s => raw[s].rangePos);
+  // Derive extended metrics used by some methodologies
+  for (const sym of symbols) {
+    const m = raw[sym];
+    m.dev10 = m.sma10 ? (m.sma10 - m.price) / m.sma10 : 0;
+    m.vol = computeVolatility(m.closes, 26);
+    m.volContraction = computeVolContraction(m.closes);
+  }
+
+  // Pre-compute ranking arrays so percentile lookups are O(n) per factor per stock
+  const fields = ['ret12m_1m','ret12m','ret6m','ret3m','ret1m','rs12m','rs3m',
+                  'sma10Slope','fromHi','rangePos','dev10','vol','volContraction'];
+  const pct = {};
+  for (const f of fields) {
+    const arr = symbols.map(s => raw[s][f]);
+    pct[f] = (val) => percentileRank(arr, val);
+  }
 
   const results = [];
   for (const sym of symbols) {
     const m = raw[sym];
-    const pMom =
-      percentileRank(ret12m_1mArr, m.ret12m_1m) * 0.45 +
-      percentileRank(ret6mArr, m.ret6m) * 0.30 +
-      percentileRank(ret3mArr, m.ret3m) * 0.25;
-
-    const pRS =
-      percentileRank(rs12mArr, m.rs12m) * 0.60 +
-      percentileRank(rs3mArr, m.rs3m) * 0.40;
-
-    let trendScore = 0;
-    if (m.price > m.sma10) trendScore += 20;
-    if (m.price > m.sma40) trendScore += 20;
-    if (m.sma10 > m.sma40) trendScore += 20;
-    trendScore += percentileRank(slopeArr, m.sma10Slope) * 0.20;
-    trendScore += (m.stickiness * 20);
-    trendScore = Math.min(100, trendScore);
-
-    const posScore =
-      percentileRank(fromHiArr, m.fromHi) * 0.6 +
-      percentileRank(rangePosArr, m.rangePos) * 0.4;
-
-    const composite = pMom * 0.35 + pRS * 0.30 + trendScore * 0.25 + posScore * 0.10;
+    const { score, factors } = methodology.compute(m, pct);
+    const roundedFactors = {};
+    for (const [k, v] of Object.entries(factors)) roundedFactors[k] = Math.round(v);
 
     results.push({
       sym,
       name: SYM_NAME[sym] || sym,
       sector: SYM_SECTOR[sym] || '—',
       sectorName: SECTOR_NAMES[SYM_SECTOR[sym]] || '—',
-      score: Math.round(composite),
-      scores: {
-        MOM: Math.round(pMom),
-        RS: Math.round(pRS),
-        TRD: Math.round(trendScore),
-        POS: Math.round(posScore),
-      },
+      score: Math.round(score),
+      scores: roundedFactors,
       metrics: m,
       price: m.price,
       y1: m.ret12m != null ? m.ret12m * 100 : null,
@@ -5013,7 +5218,7 @@ function computeScores(stocksData, spyCloses) {
     });
   }
 
-  results.sort((a,b) => b.score - a.score);
+  results.sort((a, b) => b.score - a.score);
   results.forEach((r, i) => r.rank = i + 1);
   return results;
 }
@@ -5051,7 +5256,7 @@ async function runScan() {
 
   $('loading-msg').textContent = 'מחשב ציונים רב-פקטוריים...';
   await sleep(50);
-  const stocks = computeScores(stocksData, spyData.closes);
+  const stocks = computeScores(stocksData, spyData.closes, currentMethodology);
   if (stocks.length === 0) {
     $('adv-err-msg').textContent = 'לא נאספו מספיק נתונים. בדוק את ה-proxy.';
     showScreen('adv-screen-error');
@@ -5061,11 +5266,15 @@ async function runScan() {
   scanData = {
     stocks, timestamp: Date.now(),
     universeSize: stocks.length,
+    methodology: currentMethodology,
+    universe: currentUniverse,
   };
   try {
     const lean = {
       timestamp: scanData.timestamp,
       universeSize: scanData.universeSize,
+      methodology: scanData.methodology,
+      universe: scanData.universe,
       stocks: stocks.map(s => ({
         ...s,
         metrics: { ...s.metrics, closes: s.metrics.closes.slice(-26) }
@@ -5117,7 +5326,7 @@ function renderKPIs() {
   $('kpi-cache').textContent = ttl > 0 ? `${ttl}m cache TTL` : 'cache expired';
 }
 
-function applyFilters() { displayState.sector = $('f-sector').value; renderTable(); }
+function applyFilters() { renderTable(); }
 function setMinScore(v, btn) {
   displayState.minScore = v;
   document.querySelectorAll('[data-min]').forEach(b => b.classList.toggle('active', b === btn));
@@ -5127,6 +5336,165 @@ function setView(v, btn) {
   displayState.view = v;
   document.querySelectorAll('.chip[data-view]').forEach(b => b.classList.toggle('active', b === btn));
   renderTable();
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   CUSTOM DROPDOWN INFRASTRUCTURE (.cdd)
+   - toggleCdd(id) — open/close, close siblings
+   - closeAllCdd() — bound to document click + ESC
+   - On mobile (<600px), the panel uses position:fixed so we compute its `top`
+     from the trigger's bounding rect, guaranteeing the panel sits directly
+     below whichever dropdown was clicked instead of below the whole wrapped
+     controls bar. Left/right are fixed to 8px for viewport-spanning width.
+   ════════════════════════════════════════════════════════════════════════════ */
+function toggleCdd(id) {
+  const el = document.getElementById(`cdd-${id}`);
+  if (!el) return;
+  const wasOpen = el.classList.contains('open');
+  closeAllCdd();
+  if (!wasOpen) {
+    el.classList.add('open');
+    positionCddPanel(el);
+  }
+}
+function positionCddPanel(cdd) {
+  const panel = cdd.querySelector('.cdd-panel');
+  const trigger = cdd.querySelector('.cdd-trigger');
+  if (!panel || !trigger) return;
+  // Desktop: rely on CSS absolute positioning → clear any inline overrides
+  if (window.innerWidth > 600) {
+    panel.style.top = '';
+    panel.style.left = '';
+    panel.style.right = '';
+    panel.style.width = '';
+    panel.style.maxHeight = '';
+    return;
+  }
+  // Mobile: match the trigger's exact horizontal position + width so the panel
+  // looks like a natural extension of the field (not a full-width overlay)
+  const rect = trigger.getBoundingClientRect();
+  panel.style.top = `${Math.round(rect.bottom + 4)}px`;
+  panel.style.left = `${Math.round(rect.left)}px`;
+  panel.style.right = 'auto';
+  panel.style.width = `${Math.round(rect.width)}px`;
+  const spaceBelow = window.innerHeight - rect.bottom - 16;
+  panel.style.maxHeight = `${Math.max(200, Math.min(spaceBelow, window.innerHeight * 0.6))}px`;
+}
+function closeAllCdd() {
+  document.querySelectorAll('.cdd.open').forEach(e => e.classList.remove('open'));
+}
+// Outside-click + ESC close (attached once; guarded against re-attach)
+if (!window.__cddGlobalBound) {
+  window.__cddGlobalBound = true;
+  document.addEventListener('click', (e) => {
+    document.querySelectorAll('.cdd.open').forEach(cdd => {
+      if (!cdd.contains(e.target)) cdd.classList.remove('open');
+    });
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeAllCdd();
+  });
+  // Close dropdowns on resize/orientation change so stale fixed-position panels don't float around
+  window.addEventListener('resize', closeAllCdd);
+  window.addEventListener('orientationchange', closeAllCdd);
+}
+
+/* ────────────── SECTOR DROPDOWN ────────────── */
+function populateSectorDropdown() {
+  const panel = $('cdd-sector-panel');
+  if (!panel) return;
+  panel.innerHTML = '';
+  const makeOpt = (val, label) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cdd-option';
+    if (val === displayState.sector) btn.classList.add('active');
+    btn.dataset.value = val;
+    btn.innerHTML = `<div class="cdd-option-title">${label}</div>`;
+    btn.onclick = (e) => { e.stopPropagation(); selectSector(val, label); };
+    panel.appendChild(btn);
+  };
+  makeOpt('', 'כל הסקטורים');
+  Object.entries(SECTOR_NAMES).forEach(([k, v]) => makeOpt(k, v));
+}
+function selectSector(val, label) {
+  displayState.sector = val;
+  const cur = $('cdd-sector-current');
+  if (cur) cur.textContent = label;
+  $('cdd-sector-panel').querySelectorAll('.cdd-option').forEach(b =>
+    b.classList.toggle('active', b.dataset.value === val)
+  );
+  closeAllCdd();
+  renderTable();
+}
+
+/* ────────────── METHODOLOGY DROPDOWN ────────────── */
+function populateMethodologyDropdown() {
+  const panel = $('cdd-meth-panel');
+  if (!panel) return;
+  panel.innerHTML = '';
+  Object.entries(METHODOLOGIES).forEach(([k, m]) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cdd-option';
+    if (k === currentMethodology) btn.classList.add('active');
+    btn.dataset.value = k;
+    btn.innerHTML = `
+      <div class="cdd-option-title">
+        <span>${m.labelHe}</span>
+        <span class="cdd-option-title-en">${m.label}</span>
+      </div>
+      <div class="cdd-option-desc">${m.desc}</div>
+    `;
+    btn.onclick = (e) => { e.stopPropagation(); setMethodology(k); };
+    panel.appendChild(btn);
+  });
+}
+
+/**
+ * Switch scoring methodology. Like setUniverse, cache is per-(universe,methodology)
+ * so switching is instant if previously scanned. Otherwise user re-scans.
+ */
+function setMethodology(key) {
+  if (!METHODOLOGIES[key] || key === currentMethodology) { closeAllCdd(); return; }
+  currentMethodology = key;
+  localStorage.setItem(METHODOLOGY_KEY, key);
+
+  scanData = null;
+  syncMethodologyUI();
+  closeAllCdd();
+
+  // Try cache for this (universe, methodology) combo
+  try {
+    const cached = JSON.parse(localStorage.getItem(getCacheKey()));
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      scanData = cached;
+      showResults();
+      renderWatchlist();
+      return;
+    }
+  } catch(e){}
+
+  // No cache → reset KPIs, show welcome
+  ['kpi-universe','kpi-avg','kpi-sector','kpi-sector-sub','kpi-time','kpi-cache']
+    .forEach(id => { const el = $(id); if (el) el.textContent = '—'; });
+  showScreen('screen-welcome');
+  renderWatchlist();
+}
+
+function syncMethodologyUI() {
+  const meth = METHODOLOGIES[currentMethodology];
+  const cur = $('cdd-meth-current');
+  if (cur) cur.textContent = meth.labelHe;
+  const curSub = $('cdd-meth-current-sub');
+  if (curSub) curSub.textContent = meth.label;
+  // Mark active option
+  const panel = $('cdd-meth-panel');
+  if (panel) {
+    panel.querySelectorAll('.cdd-option').forEach(b =>
+      b.classList.toggle('active', b.dataset.value === currentMethodology)
+    );
+  }
 }
 
 /**
@@ -5257,9 +5625,9 @@ function renderTable() {
 }
 
 function renderFactorBars(scores) {
-  const fs = ['MOM', 'RS', 'TRD', 'POS'];
+  const fs = METHODOLOGIES[currentMethodology].factors.map(f => f.k);
   return `<div class="fbars">${
-    fs.map(f => `<div class="fbar" data-f="${f}" title="${f}: ${scores[f]}"><div class="fbar-fill" style="height:${scores[f]}%"></div></div>`).join('')
+    fs.map(f => `<div class="fbar" data-f="${f}" title="${f}: ${scores[f] ?? 0}"><div class="fbar-fill" style="height:${scores[f] ?? 0}%"></div></div>`).join('')
   }</div>`;
 }
 
@@ -5323,23 +5691,18 @@ function openDetail(sym) {
     </div>
 
     <div class="dt-section">
-      <div class="dt-section-title">פירוט פקטורים</div>
+      <div class="dt-section-title">פירוט פקטורים · <span style="font-weight:500;color:var(--dim)">${METHODOLOGIES[currentMethodology].label}</span></div>
       <div class="factor-grid">
-        ${[
-          { k:'MOM', label:'מומנטום', weight:35, desc:'תשואות היסטוריות' },
-          { k:'RS', label:'חוזק יחסי', weight:30, desc:'ביצועים מול SPY' },
-          { k:'TRD', label:'איכות מגמה', weight:25, desc:'SMA + יציבות' },
-          { k:'POS', label:'מיקום', weight:10, desc:'מרחק מ-52w high' },
-        ].map(f => `
+        ${METHODOLOGIES[currentMethodology].factors.map(f => `
           <div class="factor-row" data-f="${f.k}">
             <div>
               <div class="factor-name">${f.label}</div>
               <div class="factor-sub">${f.desc} · ${f.weight}%</div>
             </div>
             <div class="factor-bar-wrap">
-              <div class="factor-bar-fill" style="width:${s.scores[f.k]}%"></div>
+              <div class="factor-bar-fill" style="width:${s.scores[f.k] ?? 0}%"></div>
             </div>
-            <div class="factor-val" style="color:${s.scores[f.k]>=70?'var(--green)':s.scores[f.k]>=40?'var(--text)':'var(--red)'}">${s.scores[f.k]}</div>
+            <div class="factor-val" style="color:${(s.scores[f.k]??0)>=70?'var(--green)':(s.scores[f.k]??0)>=40?'var(--text)':'var(--red)'}">${s.scores[f.k] ?? '—'}</div>
           </div>
         `).join('')}
       </div>
@@ -5482,12 +5845,74 @@ function renderWatchlist() {
 }
 
 // ═══ METHODOLOGY MODAL ═══
-function openMethodology() { $('mth-overlay').classList.add('open'); }
+function openMethodology() {
+  renderMethodologyModal();
+  $('mth-overlay').classList.add('open');
+}
 function closeMethodology(e) {
   if (e && e.target && e.target.id !== 'mth-overlay') return;
   closeMethodologyDirect();
 }
 function closeMethodologyDirect() { $('mth-overlay').classList.remove('open'); }
+
+/**
+ * Regenerate modal body from METHODOLOGIES[currentMethodology].
+ * Shows: title, theory, best-when, factor table, and a grid of alternatives
+ * the user can switch to directly from the modal.
+ */
+function renderMethodologyModal() {
+  const meth = METHODOLOGIES[currentMethodology];
+  const title = $('mth-title');
+  const body  = $('mth-body');
+  if (!title || !body || !meth) return;
+
+  title.textContent = `${meth.label} · ${meth.subtitle}`;
+
+  const factorRows = meth.factors.map(f => `
+    <tr>
+      <td><b>${f.label}</b> <span style="color:var(--dim);font-family:var(--mono);font-size:10px">· ${f.k}</span></td>
+      <td style="color:var(--dim)">${f.desc}</td>
+      <td style="text-align:left;font-family:var(--mono);font-weight:700;color:var(--green)">${f.weight}%</td>
+    </tr>
+  `).join('');
+
+  const alternatives = Object.entries(METHODOLOGIES)
+    .filter(([k]) => k !== currentMethodology)
+    .map(([k, m]) => `
+      <button class="mth-alt" onclick="setMethodology('${k}')">
+        <div class="mth-alt-title">${m.labelHe} <span class="mth-alt-title-en">· ${m.label}</span></div>
+        <div class="mth-alt-desc">${m.desc}</div>
+      </button>
+    `).join('');
+
+  body.innerHTML = `
+    <p>${meth.theory}</p>
+
+    <div class="mth-best">
+      <div class="mth-best-label">עובד הכי טוב ב:</div>
+      <div class="mth-best-val">${meth.bestWhen}</div>
+    </div>
+
+    <h4>הפקטורים של המודל הנוכחי</h4>
+    <table class="mth-factors">
+      <thead>
+        <tr><th>פקטור</th><th>מה הוא מודד</th><th>משקל</th></tr>
+      </thead>
+      <tbody>${factorRows}</tbody>
+    </table>
+
+    <h4>חישוב הציון</h4>
+    <p>כל פקטור מתורגם ל-<b>Percentile Rank</b> מול כלל המניות בסריקה (0-100). הציון הסופי הוא ממוצע משוקלל — יתרון חשוב: הציון מתאים אוטומטית למצב השוק (אם כולם יורדים, הטובים ביותר עדיין יקבלו ציון גבוה).</p>
+
+    <div class="mth-warning">
+      <b>חשוב להבין:</b> המודל הוא technical בלבד — הוא לא יודע אם החברה רווחית, כמה היא שווה, או אם יש קטליזטור קרב. מניה יכולה לקבל 95/100 ולקרוס אחרי earnings. זה דירוג של חוזק טכני, לא של ערך פונדמנטלי.
+    </div>
+
+    <h4>מתודולוגיות אחרות</h4>
+    <p style="color:var(--dim);font-size:12px;margin-top:-4px">אפשר לעבור מיד — אם כבר סרקת אותן, התוצאות נטענות מה-cache. אחרת תצטרך לסרוק מחדש.</p>
+    <div class="mth-alts">${alternatives}</div>
+  `;
+}
 
 // ESC closes panels
 document.addEventListener('keydown', e => {
@@ -5506,7 +5931,8 @@ document.addEventListener('keydown', e => {
   // toggleMobileMenu, closeMobileMenu — these already exist as
   // globals in app.js and we must NOT overwrite those.
   Object.assign(window, {
-    runScan, setMinScore, setView, setUniverse, sortBy, applyFilters,
+    runScan, setMinScore, setView, setUniverse, setMethodology,
+    toggleCdd, selectSector, sortBy, applyFilters,
     openMethodology, closeMethodology, closeMethodologyDirect,
     openDetail, closeDetail, closeDetailDirect,
     toggleWatchlist

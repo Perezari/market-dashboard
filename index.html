@@ -20,7 +20,7 @@
 
 <!-- Consolidated stylesheet -->
 <!-- Consolidated stylesheet (cache-bust via ?v= to force fresh load after rebuilds) -->
-<link rel="stylesheet" href="app.css?v=2026-04-20-mobile">
+<link rel="stylesheet" href="app.css?v=2026-04-20-modal-fullscreen">
 </head>
 <body>
 
@@ -660,10 +660,24 @@
       <button class="chip" data-universe="mid" onclick="setUniverse('mid', this)">Mid</button>
     </div>
     <div class="ctl-group">
+      <span class="ctl-label">מודל</span>
+      <div class="cdd cdd-meth" id="cdd-meth">
+        <button class="cdd-trigger" type="button" onclick="toggleCdd('meth')">
+          <span class="cdd-current" id="cdd-meth-current">Momentum</span>
+          <svg class="cdd-chevron" viewBox="0 0 12 8" fill="none"><path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="cdd-panel" id="cdd-meth-panel"></div>
+      </div>
+    </div>
+    <div class="ctl-group">
       <span class="ctl-label">סקטור</span>
-      <select id="f-sector" class="sel" onchange="applyFilters()">
-        <option value="">הכל</option>
-      </select>
+      <div class="cdd cdd-simple" id="cdd-sector">
+        <button class="cdd-trigger" type="button" onclick="toggleCdd('sector')">
+          <span class="cdd-current" id="cdd-sector-current">כל הסקטורים</span>
+          <svg class="cdd-chevron" viewBox="0 0 12 8" fill="none"><path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="cdd-panel" id="cdd-sector-panel"></div>
+      </div>
     </div>
     <div class="ctl-group">
       <span class="ctl-label">ציון מינ׳</span>
@@ -785,57 +799,11 @@
 <div class="mth-overlay" id="mth-overlay" onclick="closeMethodology(event)">
   <div class="mth-modal" onclick="event.stopPropagation()">
     <div class="mth-hdr">
-      <div class="mth-title">איך הציון מחושב</div>
+      <div class="mth-title" id="mth-title">איך הציון מחושב</div>
       <button class="dt-close" onclick="closeMethodologyDirect()">✕</button>
     </div>
-    <div class="mth-body">
-      <p>המודל מבוסס על מחקר אקדמי ב-factor investing (Jegadeesh &amp; Titman 1993, Asness et al 2013). כל מניה מקבלת ציון 0-100 שמשקלל ארבעה פקטורים:</p>
-
-      <h4>1. Momentum (מומנטום) · 35%</h4>
-      <p>תשואה היסטורית לאורך מספר טווחים. מניות שעלו חזק בעבר נוטות להמשיך (בטווח של 3-12 חודשים).</p>
-      <ul>
-        <li><b>12M-1M</b> · תשואה שנתית בדילוג על החודש האחרון (להימנע מ-reversal)</li>
-        <li><b>6M</b> · תשואה ל-6 חודשים</li>
-        <li><b>3M</b> · תשואה ל-3 חודשים</li>
-      </ul>
-
-      <h4>2. Relative Strength (חוזק יחסי) · 30%</h4>
-      <p>ביצועים מול <code>SPY</code> (S&amp;P 500). מניות שמתעלות על השוק לאורך זמן - הן המובילות.</p>
-      <ul>
-        <li><b>12M Excess</b> · תשואה שנתית מינוס תשואת SPY</li>
-        <li><b>3M Excess</b> · תשואה 3 חודשים מינוס SPY</li>
-      </ul>
-
-      <h4>3. Trend Quality (איכות מגמה) · 25%</h4>
-      <p>האם המגמה יציבה או תנודתית? מגמה נקייה =&gt; ציון גבוה.</p>
-      <ul>
-        <li><b>Price &gt; SMA50</b> · 5 נקודות</li>
-        <li><b>Price &gt; SMA200</b> · 5 נקודות</li>
-        <li><b>SMA50 &gt; SMA200 (Golden Cross)</b> · 5 נקודות</li>
-        <li><b>SMA50 Slope</b> · שיפוע עולה של הממוצע 50</li>
-        <li><b>Stickiness</b> · כמה שבועות המחיר מעל SMA50</li>
-      </ul>
-
-      <h4>4. Position (מיקום) · 10%</h4>
-      <p>מרחק משיא 52 שבועות (קרוב לשיא = חוזק) ומיקום בטווח השנתי.</p>
-
-      <h4>חישוב הציון הסופי</h4>
-      <p>כל פקטור מתורגם ל-<b>Percentile Rank</b> מול כלל המניות בסריקה (0-100). הציון הסופי הוא ממוצע משוקלל של הדירוגים היחסיים. זה יתרון חשוב - הציון מתאים למצב השוק (אם כולם יורדים, הטובים ביותר עדיין יקבלו ציון גבוה).</p>
-
-      <div class="mth-warning">
-        <b>חשוב להבין:</b> המודל הוא technical בלבד - הוא לא יודע אם החברה רווחית, כמה היא שווה, או אם יש קטליזטור קרב. מניה יכולה לקבל 95/100 ולקרוס אחרי earnings. הדירוג מזהה <b>חוזק יחסי וטכני</b>, לא ערך פונדמנטלי.
-      </div>
-
-      <h4>מתי המודל לא עובד?</h4>
-      <ul>
-        <li><b>שינויי מגמה חדים</b> · המודל איטי - הוא מזהה מומנטום, לא reversals</li>
-        <li><b>שווקים sideway</b> · פחות אלפא מפקטור מומנטום</li>
-        <li><b>Small caps / penny stocks</b> · המודל מכסה רק holdings של 11 ETF סקטוריאליים</li>
-        <li><b>אירועים חד-פעמיים</b> · מניות שזוחלות על חדשות (כמו EFOI +300%) לא ייתפסו</li>
-      </ul>
-
-      <h4>רקע אקדמי</h4>
-      <p>אסטרטגיות מומנטום ו-RS תועדו היטב בספרות: Jegadeesh-Titman (1993) הראו שמניות זוכות ממשיכות להוביל ל-3-12 חודשים. O'Neil (IBD) פיתח RS Rating על בסיס דומה. Minervini (SEPA) דורש מגמה נקייה כפי שהמודל הזה מודד.</p>
+    <div class="mth-body" id="mth-body">
+      <!-- Populated dynamically by renderMethodologyModal() based on the active methodology -->
     </div>
   </div>
 </div>
@@ -906,7 +874,7 @@
 
 <!-- Consolidated script -->
 <!-- Consolidated script (cache-bust via ?v=) -->
-<script src="app.js?v=2026-04-20-mobile"></script>
+<script src="app.js?v=2026-04-20-modal-fullscreen"></script>
 
 </body>
 </html>
