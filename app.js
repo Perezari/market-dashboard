@@ -2879,13 +2879,75 @@ const FOMC_DATES = {
 };
 
 const FRED_RELEASES = [
-  {id:10,  name:'CPI Report',              he:'מדד המחירים לצרכן = כמה עלו המחירים בסופר ובחנויות. גבוה מהצפוי? הפד יעלה ריבית → מניות יורדות. נמוך? ריבית תרד → מניות עולות.', impact:'high',   time:'08:30 ET', url:'https://www.bls.gov/cpi/'},
-  {id:50,  name:'NFP — Non-Farm Payrolls', he:'כמה משרות חדשות נוצרו בחודש. הרבה = כלכלה חזקה (אבל הפד עלול לשמור ריבית גבוהה). מעט = חולשה (הפד עשוי להוריד ריבית → טוב למניות).', impact:'high',   time:'08:30 ET', url:'https://www.bls.gov/news.release/empsit.toc.htm'},
-  {id:54,  name:'PCE Price Index',         he:'מדד האינפלציה שהפד מסתכל עליו הכי הרבה. זה ה"מבחן" שקובע אם הריבית תעלה או תרד.', impact:'high',   time:'08:30 ET', url:'https://www.bea.gov/data/personal-consumption-expenditures-price-index'},
-  {id:53,  name:'GDP (Advance)',           he:'גודל הכלכלה. עלייה = כלכלה צומחת = טוב למניות. שני רבעונים שליליים ברצף = "מיתון" = שוק יורד חזק.', impact:'high',   time:'08:30 ET', url:'https://www.bea.gov/data/gdp/gross-domestic-product'},
-  {id:31,  name:'PPI Report',             he:'מחירי הייצור — כמה עולה ליצרנים לייצר. אם המחירים עולים, זה יגיע גם אלינו כצרכנים (אינפלציה עתידית).', impact:'medium', time:'08:30 ET', url:'https://www.bls.gov/ppi/'},
-  {id:84,  name:'Retail Sales',           he:'כמה אנשים קונים. 70% מהכלכלה האמריקאית = קניות. אם אנשים מפסיקים לקנות → חברות מרוויחות פחות → מניות יורדות.', impact:'medium', time:'08:30 ET', url:'https://www.census.gov/retail/index.html'},
-  {id:180, name:'Initial Jobless Claims', he:'כמה אנשים הגישו תביעות אבטלה השבוע. עלייה = שוק העבודה מתרופף. ירידה = שוק עבודה חזק.', impact:'medium', time:'08:30 ET', url:'https://www.dol.gov/ui/data.pdf'},
+  {id:10,  name:'CPI Report', nameHe:'מדד המחירים לצרכן',
+   impact:'high', time:'08:30 ET', url:'https://www.bls.gov/cpi/',
+   he:'מדד המחירים לצרכן = כמה עלו המחירים בסופר ובחנויות. גבוה מהצפוי? הפד יעלה ריבית → מניות יורדות. נמוך? ריבית תרד → מניות עולות.',
+   details:{
+     what:'מודד את קצב עליית המחירים של סל מוצרים ושירותים שצרכנים קונים. מתפרסם חודשי ומהווה את מדד האינפלציה המרכזי בארה״ב.',
+     bullish:'אינפלציה נמוכה מהצפוי → הפד יוכל להוריד ריבית → מניות טכנולוגיה וצמיחה עולות.',
+     bearish:'אינפלציה גבוהה מהצפוי → הפד ישמור ריבית גבוהה או יעלה → אג״ח ומניות יורדות.',
+     tip:'התנודתיות הגדולה ב-30-60 הדקות הראשונות אחרי 08:30 ET. הימנע מפוזיציות גדולות לפני הפרסום.'
+   }},
+
+  {id:50,  name:'NFP — Non-Farm Payrolls', nameHe:'דוח תעסוקה',
+   impact:'high', time:'08:30 ET', url:'https://www.bls.gov/news.release/empsit.toc.htm',
+   he:'כמה משרות חדשות נוצרו בחודש. הרבה = כלכלה חזקה (אבל הפד עלול לשמור ריבית גבוהה). מעט = חולשה (הפד עשוי להוריד ריבית → טוב למניות).',
+   details:{
+     what:'דוח חודשי על מספר המשרות החדשות (מחוץ לחקלאות), שיעור האבטלה, וקצב הגידול בשכר בארה״ב.',
+     bullish:'הרבה משרות + שכר מתון → כלכלה חזקה בלי לחץ אינפלציוני → טוב למניות.',
+     bearish:'פחות משרות מהצפוי → חשש ממיתון. או: שכר שעולה חזק מדי → חשש מאינפלציה. שניהם → מניות יורדות.',
+     tip:'מתפרסם יום שישי הראשון של החודש. הנתון הכי תנודתי לשוק — צפה לתזוזות של 1-2% במדדים.'
+   }},
+
+  {id:54,  name:'PCE Price Index', nameHe:'מדד מחירי PCE',
+   impact:'high', time:'08:30 ET', url:'https://www.bea.gov/data/personal-consumption-expenditures-price-index',
+   he:'מדד האינפלציה שהפד מסתכל עליו הכי הרבה. זה ה"מבחן" שקובע אם הריבית תעלה או תרד.',
+   details:{
+     what:'מדד האינפלציה המועדף על הפד. גרסת "Core PCE" (ללא מזון ואנרגיה) היא הנתון שהפד באמת מתמקד בו ביחס ליעד 2%.',
+     bullish:'Core PCE מתקרב ל-2% → הפד יכול להתחיל/להמשיך להוריד ריבית.',
+     bearish:'Core PCE "תקוע" מעל 2.5% → הפד ישמור ריבית גבוהה זמן רב יותר.',
+     tip:'אם ה-PCE סותר את ה-CPI בכיוון — הפד מסתמך בעיקר על ה-PCE. עקוב אחרי השינוי השנתי ב-Core.'
+   }},
+
+  {id:53,  name:'GDP (Advance)', nameHe:'תמ״ג — אומדן ראשון',
+   impact:'high', time:'08:30 ET', url:'https://www.bea.gov/data/gdp/gross-domestic-product',
+   he:'גודל הכלכלה. עלייה = כלכלה צומחת = טוב למניות. שני רבעונים שליליים ברצף = "מיתון" = שוק יורד חזק.',
+   details:{
+     what:'שיעור צמיחת התמ״ג השנתי (מנורמל) ברבעון. "Advance" = האומדן הראשון והמשפיע ביותר על השוק.',
+     bullish:'צמיחה בריאה (2-3%) → חברות מרוויחות יותר → מניות עולות, במיוחד מחזוריות.',
+     bearish:'צמיחה שלילית שני רבעונים ברצף = מיתון טכני → מניות יורדות, בטיחות (XLU, XLP) עדיפות.',
+     tip:'חשוב לא פחות מהצמיחה: רכיב האינפלציה (GDP Deflator) והצריכה הפרטית בתוך הדוח.'
+   }},
+
+  {id:31,  name:'PPI Report', nameHe:'מדד מחירי היצרן',
+   impact:'medium', time:'08:30 ET', url:'https://www.bls.gov/ppi/',
+   he:'מחירי הייצור — כמה עולה ליצרנים לייצר. אם המחירים עולים, זה יגיע גם אלינו כצרכנים (אינפלציה עתידית).',
+   details:{
+     what:'מודד כמה היצרנים משלמים על חומרי גלם וייצור. מתפרסם יום לפני ה-CPI ומשמש כחיזוי מקדים.',
+     bullish:'PPI יורד → סימן שה-CPI של מחר עשוי להפתיע כלפי מטה → מניות עולות.',
+     bearish:'PPI מזנק → עלויות ייצור יתגלגלו לצרכן → אינפלציה עתידית → מניות יורדות.',
+     tip:'לבדו פחות זז את השוק — אבל חשוב לחיזוי התגובה ל-CPI של הבוקר שאחריו.'
+   }},
+
+  {id:84,  name:'Retail Sales', nameHe:'מכירות קמעונאיות',
+   impact:'medium', time:'08:30 ET', url:'https://www.census.gov/retail/index.html',
+   he:'כמה אנשים קונים. 70% מהכלכלה האמריקאית = קניות. אם אנשים מפסיקים לקנות → חברות מרוויחות פחות → מניות יורדות.',
+   details:{
+     what:'שינוי חודשי בהיקף המכירות הקמעונאיות בארה״ב. הצריכה הפרטית היא כ-70% מהתמ״ג.',
+     bullish:'מכירות חזקות → הצרכן האמריקאי בריא → טוב ל-XLY (Consumer Discretionary) ולמניות קמעונאיות.',
+     bearish:'ירידה/היחלשות → חשש ממיתון, פגיעה ברווחיות הקמעונאיות, לחץ על XLY.',
+     tip:'שים לב ל-"Control Group" — גרסה שמנטרלת רכב ובנזין, והיא המשמעותית באמת לכלכלנים.'
+   }},
+
+  {id:180, name:'Initial Jobless Claims', nameHe:'תביעות אבטלה ראשוניות',
+   impact:'medium', time:'08:30 ET', url:'https://www.dol.gov/ui/data.pdf',
+   he:'כמה אנשים הגישו תביעות אבטלה השבוע. עלייה = שוק העבודה מתרופף. ירידה = שוק עבודה חזק.',
+   details:{
+     what:'מספר התביעות החדשות לאבטלה בשבוע שעבר. נתון שבועי שמודד את חום שוק העבודה בזמן אמת.',
+     bullish:'מתחת ל-230K → שוק עבודה חזק אך לא "חם מדי" מבחינת הפד.',
+     bearish:'זינוק פתאומי מעל 300K → סימן מוקדם לחולשה כלכלית ופיטורים המוניים.',
+     tip:'פחות תנודתי משאר הנתונים. עקוב אחרי הממוצע של 4 שבועות כדי לסנן רעש.'
+   }},
 ];
 
 async function fetchEconCalendarFRED() {
@@ -2902,7 +2964,7 @@ async function fetchEconCalendarFRED() {
       const d = await r.json();
       (d.release_dates||[]).forEach(rd => {
         if (rd.date >= start && rd.date <= end)
-          events.push({date:rd.date, name:rel.name, he:rel.he, impact:rel.impact, time:rel.time, url:rel.url, d:new Date(rd.date+'T12:00:00')});
+          events.push({date:rd.date, name:rel.name, nameHe:rel.nameHe, he:rel.he, details:rel.details, impact:rel.impact, time:rel.time, url:rel.url, d:new Date(rd.date+'T12:00:00')});
       });
     } catch(e) {}
   }));
@@ -2911,7 +2973,19 @@ async function fetchEconCalendarFRED() {
   const y = today.getFullYear();
   [...(FOMC_DATES[y]||[]), ...(FOMC_DATES[y+1]||[])].forEach(date => {
     if (date >= start && date <= end)
-      events.push({date, name:'FOMC Decision', he:'החלטת ריבית הפד — היום הכי חשוב בלוח השנה! הפד מחליט אם להעלות, להוריד, או להשאיר את הריבית. העלאה = מניות בלחץ. הורדה = מניות עולות. השוק זז חזק ב-30 הדקות אחרי ההודעה.', impact:'high', time:'14:00 ET', url:'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm', d:new Date(date+'T12:00:00')});
+      events.push({
+        date, name:'FOMC Decision', nameHe:'החלטת ריבית הפד',
+        impact:'high', time:'14:00 ET',
+        url:'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm',
+        d:new Date(date+'T12:00:00'),
+        he:'החלטת ריבית הפד — היום הכי חשוב בלוח השנה! הפד מחליט אם להעלות, להוריד, או להשאיר את הריבית. העלאה = מניות בלחץ. הורדה = מניות עולות. השוק זז חזק ב-30 הדקות אחרי ההודעה.',
+        details:{
+          what:'הפד מכריז על ריבית הבסיס, מפרסם "dot plot" (תחזיות חברי הוועדה), ומקיים מסיבת עיתונאים עם פאוול.',
+          bullish:'הורדת ריבית או איתות "dovish" → כסף זול → מניות טכנולוגיה וצמיחה עולות חזק.',
+          bearish:'העלאת ריבית או טון "hawkish" → מניות יורדות, במיוחד טכנולוגיה; אג״ח יורדות.',
+          tip:'ההכרזה ב-14:00 ET, מסיבת העיתונאים ב-14:30. התנודתיות האמיתית בשאלות לפאוול. אין להחזיק פוזיציות גדולות ללא גידור.'
+        }
+      });
   });
 
   return events.sort((a,b) => a.date.localeCompare(b.date));
@@ -2936,19 +3010,21 @@ async function renderEconCalendar() {
     return;
   }
 
-  wrap.innerHTML = events.map(e => {
+  window._econEvents = events; // נשמר גלובלית עבור מודאל ה-Preview
+
+  wrap.innerHTML = events.map((e, i) => {
     const isToday = e.d.toDateString() === todayD.toDateString();
     const isPast  = e.d < todayD;
     const cls = isPast ? 'econ-past' : isToday ? 'econ-today-row' : '';
-    const href = e.url || '#';
-    return `<a class="econ-row ${cls}" href="${href}" onclick="if(this.href!=='#'){window.open('${href}','_blank','noopener,noreferrer');return false;}" style="text-decoration:none;color:inherit;display:flex;cursor:pointer">
+    const displayName = e.nameHe || e.name;
+    return `<div class="econ-row ${cls}" onclick="openEconPreview(${i})" style="cursor:pointer;display:flex">
       <div class="econ-date-col">
         <div class="econ-day">${e.d.getDate()}</div>
         <div class="econ-mon">${MONTHS_EN[e.d.getMonth()]}</div>
         <div class="econ-dow">${DAYS_HE[e.d.getDay()]}</div>
       </div>
       <div class="econ-body">
-        <div class="econ-name">${e.name}${isToday?' <span style="color:var(--blue);font-size:9px">• היום</span>':''}</div>
+        <div class="econ-name">${displayName}${isToday?' <span style="color:var(--blue);font-size:9px">• היום</span>':''}</div>
         <div class="econ-he">${e.he}</div>
         <div class="econ-impact">
           <div class="econ-dot ${e.impact}"></div>
@@ -2956,8 +3032,80 @@ async function renderEconCalendar() {
         </div>
       </div>
       <div class="econ-time">${e.time}</div>
-    </a>`;
+    </div>`;
   }).join('') + '<div style="padding:6px 12px 8px;text-align:left;font-size:9px;color:var(--dim);opacity:.6">מקור: FRED — Federal Reserve Bank of St. Louis</div>';
+}
+
+// ── ECON PREVIEW MODAL ──
+function openEconPreview(idx) {
+  const e = (window._econEvents || [])[idx];
+  if (!e) return;
+
+  const existing = document.getElementById('econ-preview-overlay');
+  if (existing) existing.remove();
+
+  const DAYS_HE_FULL = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+  const MONTHS_HE    = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+  const displayName  = e.nameHe || e.name;
+  const englishName  = e.nameHe ? e.name : '';
+  const dateStr      = `יום ${DAYS_HE_FULL[e.d.getDay()]}, ${e.d.getDate()} ב${MONTHS_HE[e.d.getMonth()]} ${e.d.getFullYear()}`;
+  const impactLabel  = e.impact === 'high' ? 'השפעה גבוהה' : 'השפעה בינונית';
+  const impactColor  = e.impact === 'high' ? '#ef4444' : '#f59e0b';
+  const d            = e.details || {};
+
+  const overlay = document.createElement('div');
+  overlay.id = 'econ-preview-overlay';
+  overlay.className = 'modal-overlay open';
+  overlay.style.cssText = 'direction:rtl';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:540px">
+      <div class="modal-hdr">
+        <div style="flex:1;min-width:0">
+          <div class="modal-title">${displayName}</div>
+          ${englishName ? `<div class="modal-sub" style="font-family:var(--mono);direction:ltr;text-align:right;letter-spacing:.3px">${englishName}</div>` : ''}
+        </div>
+        <button class="modal-close" onclick="document.getElementById('econ-preview-overlay').remove()">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+          <div style="background:var(--bg3);border:1px solid var(--border);padding:5px 10px;border-radius:6px;font-size:11px;color:var(--text)">${dateStr}</div>
+          <div style="background:var(--bg3);border:1px solid var(--border);padding:5px 10px;border-radius:6px;font-size:11px;font-family:var(--mono);color:var(--text)">${e.time}</div>
+          <div style="background:${impactColor}22;border:1px solid ${impactColor}44;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;color:${impactColor}">● ${impactLabel}</div>
+        </div>
+
+        <div class="econ-prev-section">
+          <div class="econ-prev-lbl">מה זה מודד?</div>
+          <div class="econ-prev-txt">${d.what || e.he || ''}</div>
+        </div>
+
+        ${d.bullish ? `
+        <div class="econ-prev-section">
+          <div class="econ-prev-lbl" style="color:var(--green)">▲ תרחיש חיובי לשוק</div>
+          <div class="econ-prev-txt">${d.bullish}</div>
+        </div>` : ''}
+
+        ${d.bearish ? `
+        <div class="econ-prev-section">
+          <div class="econ-prev-lbl" style="color:var(--red)">▼ תרחיש שלילי לשוק</div>
+          <div class="econ-prev-txt">${d.bearish}</div>
+        </div>` : ''}
+
+        ${d.tip ? `
+        <div class="econ-prev-section" style="background:var(--bg3);padding:10px 12px;border-radius:8px;border-right:3px solid var(--blue);margin-top:14px">
+          <div class="econ-prev-lbl" style="color:var(--blue)">טיפ מסחר</div>
+          <div class="econ-prev-txt">${d.tip}</div>
+        </div>` : ''}
+      </div>
+      <div class="modal-footer" style="display:flex;gap:8px;justify-content:center;align-items:center;padding:12px 16px">
+        ${e.url ? `<a href="${e.url}" target="_blank" rel="noopener noreferrer" style="background:var(--blue);color:#000;font-weight:700;font-size:12px;padding:8px 16px;border-radius:6px;text-decoration:none;display:inline-flex;align-items:center;gap:6px">המשך למקור הרשמי <span style="font-size:10px">↗</span></a>` : ''}
+        <button onclick="document.getElementById('econ-preview-overlay').remove()" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);font-size:12px;padding:8px 16px;border-radius:6px;cursor:pointer;font-family:inherit">סגור</button>
+      </div>
+    </div>`;
+
+  overlay.addEventListener('click', (ev) => {
+    if (ev.target === overlay) overlay.remove();
+  });
+  document.body.appendChild(overlay);
 }
 
 // ── SECTOR MACRO COLUMN (uses existing qmap data — no extra fetch) ──

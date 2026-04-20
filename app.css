@@ -1732,3 +1732,38 @@ body.light .macro-chg.down{background:rgba(204,26,58,.1)}
   .ai-brief-hdr{flex-direction:column;align-items:flex-start;gap:8px}
 }
 
+
+/* ── ECON PREVIEW MODAL ── */
+.econ-prev-section{margin-bottom:14px}
+.econ-prev-section:last-child{margin-bottom:0}
+.econ-prev-lbl{font-size:10px;font-weight:800;color:var(--text);letter-spacing:.3px;margin-bottom:5px}
+.econ-prev-txt{font-size:12.5px;line-height:1.65;color:var(--text);opacity:.92}
+
+/* מונע הרחבה של ה-body לכל הגובה כשהתוכן קצר — המודאל גדל לפי התוכן */
+#econ-preview-overlay .modal-body{flex:0 1 auto}
+
+@media(max-width:480px){
+  /* כותרת: כרית נדיבה יותר כדי שהטקסט לא ייחנק בקצה */
+  #econ-preview-overlay .modal-hdr{padding:14px 16px !important}
+  #econ-preview-overlay .modal-title{font-size:16px}
+  #econ-preview-overlay .modal-sub{font-size:11px;margin-top:3px}
+
+  /* גוף: מרווח אחיד ונוח לקריאה על נייד */
+  #econ-preview-overlay .modal-body{padding:14px 16px !important}
+  #econ-preview-overlay .econ-prev-txt{font-size:13px;line-height:1.7}
+
+  /* פוטר: הכפתורים יורדים זה מתחת לזה, רוחב מלא, וכרית בטוחה ל-iPhone */
+  #econ-preview-overlay .modal-footer{
+    flex-direction:column-reverse !important;
+    gap:8px !important;
+    padding:12px 14px max(14px, env(safe-area-inset-bottom)) !important;
+  }
+  #econ-preview-overlay .modal-footer > a,
+  #econ-preview-overlay .modal-footer > button{
+    width:100% !important;
+    justify-content:center !important;
+    padding:13px 16px !important;
+    font-size:14px !important;
+    box-sizing:border-box !important;
+  }
+}
