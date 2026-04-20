@@ -1380,7 +1380,7 @@ body.light .hi52{color:#00904a}
 body.light .lo52{color:#cc1a3a}
 
 /* ── 6. CORRELATION MATRIX ── */
-.corr-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;min-width:0;width:100%;border-radius:0;border:none;border-top:1px solid var(--border);display:block;box-sizing:border-box;will-change:scroll-position;transform:translateZ(0);-webkit-transform:translateZ(0)}
+.corr-wrap{overflow-x:auto}
 .corr-table{border-collapse:separate;border-spacing:0;font-size:9px;min-width:400px;width:100%}
 .corr-table th{padding:5px 6px;font-family:var(--mono);font-size:9px;color:var(--dim);background:var(--bg);border-bottom:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap;text-align:center}
 .corr-table th:last-child{border-right:none}
@@ -2143,6 +2143,8 @@ section.compact{}
   margin:0 !important;
   cursor:pointer;transition:background .12s;
   transform:none !important;
+  gap: 4px !important;
+  padding: 8px 2px !important;
 }
 .col .mover-row:last-child
 {
@@ -3029,7 +3031,7 @@ body.light .col.main .sectors-card .t tbody tr.avgrow td.sec-cell{background:var
 .footer{
   margin-top:20px !important;padding:14px 0 !important;
   background:transparent !important;border-top:1px solid var(--border) !important;
-  font-family:var(--mono) !important;font-size:10px !important;
+  font-family:var(--sans) !important;font-size:10px !important;
   color:var(--dim) !important;text-align:center;letter-spacing:.5px;
 }
 
