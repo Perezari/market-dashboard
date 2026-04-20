@@ -46,201 +46,368 @@ const EN_NEWS_FEEDS = [
 
 const ETF_HOLDINGS = {
   XLK: [
-    {s:'NVDA',n:'NVIDIA',w:23.1},{s:'MSFT',n:'Microsoft',w:20.8},{s:'AAPL',n:'Apple',w:18.4},
-    {s:'AVGO',n:'Broadcom',w:4.9},{s:'ORCL',n:'Oracle',w:3.6},{s:'AMD',n:'AMD',w:2.4},
-    {s:'NOW',n:'ServiceNow',w:2.1},{s:'PLTR',n:'Palantir',w:1.9},{s:'CRM',n:'Salesforce',w:1.7},
-    {s:'CSCO',n:'Cisco',w:1.5},{s:'ACN',n:'Accenture',w:1.4},{s:'IBM',n:'IBM',w:1.2},
-    {s:'ADBE',n:'Adobe',w:1.1},{s:'QCOM',n:'Qualcomm',w:1.0},{s:'TXN',n:'Texas Instruments',w:0.9},
-    {s:'INTU',n:'Intuit',w:0.8},{s:'MU',n:'Micron',w:0.7},{s:'AMAT',n:'Applied Materials',w:0.7},
-    {s:'LRCX',n:'Lam Research',w:0.6},{s:'ADI',n:'Analog Devices',w:0.5}
+    {s:'NVDA',n:"Nvidia",w:7.57},{s:'AAPL',n:"Apple",w:6.13},{s:'MSFT',n:"Microsoft",w:4.85},
+    {s:'AVGO',n:"Broadcom",w:2.97},{s:'MU',n:"Micron",w:0.79},{s:'ORCL',n:"Oracle",w:0.78},
+    {s:'AMD',n:"AMD",w:0.7},{s:'PLTR',n:"Palantir",w:0.54},{s:'INTC',n:"Intel",w:0.53},
+    {s:'CSCO',n:"Cisco",w:0.53},{s:'LRCX',n:"Lam Research",w:0.52},{s:'AMAT',n:"Applied Materials",w:0.49},
+    {s:'IBM',n:"IBM",w:0.37},{s:'KLAC',n:"KLA",w:0.36},{s:'TXN',n:"Texas Instruments",w:0.32},
+    {s:'ANET',n:"Arista Networks",w:0.32},{s:'APH',n:"Amphenol",w:0.29},{s:'ADI',n:"Analog Devices",w:0.28},
+    {s:'CRM',n:"Salesforce",w:0.26},{s:'APP',n:"AppLovin",w:0.25},{s:'QCOM',n:"Qualcomm",w:0.22},
+    {s:'GLW',n:"Corning",w:0.22},{s:'PANW',n:"Palo Alto Networks",w:0.21},{s:'SNDK',n:"Sandisk",w:0.21},
+    {s:'DELL',n:"Dell",w:0.2},{s:'WDC',n:"Western Digital",w:0.2},{s:'STX',n:"Seagate",w:0.19},
+    {s:'ACN',n:"Accenture",w:0.19},{s:'INTU',n:"Intuit",w:0.17},{s:'CRWD',n:"CrowdStrike",w:0.17},
+    {s:'NOW',n:"ServiceNow",w:0.15},{s:'ADBE',n:"Adobe",w:0.15},{s:'SNPS',n:"Synopsys",w:0.13},
+    {s:'CDNS',n:"Cadence",w:0.13},{s:'MSI',n:"Motorola Solutions",w:0.11},{s:'TEL',n:"TE Connectivity",w:0.11},
+    {s:'MPWR',n:"Monolithic Power",w:0.11},{s:'CIEN',n:"Ciena",w:0.11},{s:'COHR',n:"Coherent",w:0.1},
+    {s:'LITE',n:"Lumentum",w:0.1},{s:'FTNT',n:"Fortinet",w:0.09},{s:'TER',n:"Teradyne",w:0.09},
+    {s:'KEYS',n:"Keysight",w:0.09},{s:'NXPI',n:"NXP Semi",w:0.08},{s:'ADSK',n:"Autodesk",w:0.08},
+    {s:'DDOG',n:"Datadog",w:0.07},{s:'MCHP',n:"Microchip",w:0.07},{s:'ROP',n:"Roper Tech",w:0.06},
+    {s:'HPE',n:"HP Enterprise",w:0.05},{s:'JBL',n:"Jabil",w:0.05},{s:'ON',n:"ON Semi",w:0.05},
+    {s:'WDAY',n:"Workday",w:0.05},{s:'TDY',n:"Teledyne",w:0.05},{s:'CTSH',n:"Cognizant",w:0.05},
+    {s:'Q',n:"Qnity Electronics",w:0.04},{s:'FICO',n:"Fair Isaac",w:0.04},{s:'VRSN',n:"Verisign",w:0.04},
+    {s:'NTAP',n:"NetApp",w:0.03},{s:'FSLR',n:"First Solar",w:0.03},{s:'BR',n:"Broadridge",w:0.03},
+    {s:'HPQ',n:"HP",w:0.03},{s:'FFIV',n:"F5",w:0.03},{s:'SMCI',n:"Supermicro",w:0.03},
+    {s:'CDW',n:"CDW",w:0.03},{s:'PTC',n:"PTC",w:0.03},{s:'TRMB',n:"Trimble",w:0.02},
+    {s:'TYL',n:"Tyler Tech",w:0.02},{s:'AKAM',n:"Akamai",w:0.02},{s:'GEN',n:"Gen Digital",w:0.02},
+    {s:'GDDY',n:"GoDaddy",w:0.02},{s:'ZBRA',n:"Zebra Tech",w:0.02},{s:'IT',n:"Gartner",w:0.02},
+    {s:'SWKS',n:"Skyworks",w:0.01},{s:'EPAM',n:"EPAM",w:0.01}
   ],
   XLF: [
-    {s:'BRK/B',n:'Berkshire Hathaway',w:13.2},{s:'JPM',n:'JPMorgan Chase',w:12.8},{s:'V',n:'Visa',w:8.4},
-    {s:'MA',n:'Mastercard',w:6.9},{s:'BAC',n:'Bank of America',w:4.1},{s:'WFC',n:'Wells Fargo',w:3.8},
-    {s:'GS',n:'Goldman Sachs',w:3.2},{s:'MS',n:'Morgan Stanley',w:2.9},{s:'SPGI',n:'S&P Global',w:2.7},
-    {s:'BLK',n:'BlackRock',w:2.5},{s:'AXP',n:'American Express',w:2.3},{s:'C',n:'Citigroup',w:2.0},
-    {s:'PGR',n:'Progressive',w:1.9},{s:'COF',n:'Capital One',w:1.7},{s:'ICE',n:'ICE',w:1.5},
-    {s:'CME',n:'CME Group',w:1.4},{s:'CB',n:'Chubb',w:1.3},{s:'MMC',n:'Marsh & McLennan',w:1.1},
-    {s:'SCHW',n:'Charles Schwab',w:1.0},{s:'USB',n:'U.S. Bancorp',w:0.9}
+    {s:'BRK.B',n:"Berkshire Hathaway",w:1.58},{s:'JPM',n:"JPMorgan Chase",w:1.28},{s:'V',n:"Visa",w:0.94},
+    {s:'MA',n:"Mastercard",w:0.72},{s:'BAC',n:"Bank of America",w:0.59},{s:'MS',n:"Morgan Stanley",w:0.46},
+    {s:'GS',n:"Goldman Sachs",w:0.42},{s:'WFC',n:"Wells Fargo",w:0.39},{s:'AXP',n:"American Express",w:0.35},
+    {s:'C',n:"Citigroup",w:0.35},{s:'BLK',n:"BlackRock",w:0.25},{s:'SCHW',n:"Schwab",w:0.25},
+    {s:'SPGI',n:"S&P Global",w:0.2},{s:'CB',n:"Chubb",w:0.2},{s:'COF',n:"Capital One",w:0.2},
+    {s:'PGR',n:"Progressive",w:0.18},{s:'CME',n:"CME Group",w:0.16},{s:'BX',n:"Blackstone",w:0.15},
+    {s:'BK',n:"BNY Mellon",w:0.14},{s:'KKR',n:"KKR",w:0.14},{s:'ICE',n:"ICE",w:0.14},
+    {s:'PNC',n:"PNC",w:0.14},{s:'USB',n:"U.S. Bancorp",w:0.14},{s:'MMC',n:"Marsh McLennan",w:0.13},
+    {s:'HOOD',n:"Robinhood",w:0.13},{s:'MCO',n:"Moodys",w:0.13},{s:'APO',n:"Apollo Global",w:0.11},
+    {s:'AON',n:"Aon",w:0.11},{s:'TRV',n:"Travelers",w:0.1},{s:'TFC',n:"Truist Financial",w:0.1},
+    {s:'AFL',n:"Aflac",w:0.09},{s:'AJG',n:"AJ Gallagher",w:0.09},{s:'ALL',n:"Allstate",w:0.09},
+    {s:'COIN',n:"Coinbase",w:0.08},{s:'MET',n:"MetLife",w:0.08},{s:'NDAQ',n:"Nasdaq Inc",w:0.08},
+    {s:'PYPL',n:"PayPal",w:0.07},{s:'FITB',n:"Fifth Third",w:0.07},{s:'XYZ',n:"Block",w:0.07},
+    {s:'AIG',n:"AIG",w:0.07},{s:'MSCI',n:"MSCI",w:0.06},{s:'AMP',n:"Ameriprise",w:0.06},
+    {s:'STT',n:"State Street",w:0.06},{s:'HIG',n:"Hartford",w:0.06},{s:'IBKR',n:"Interactive Brokers",w:0.06},
+    {s:'PRU',n:"Prudential",w:0.05},{s:'ACGL',n:"Arch Capital",w:0.05},{s:'HBAN',n:"Huntington Bancshares",w:0.05},
+    {s:'FISV',n:"Fiserv",w:0.05},{s:'MTB',n:"M&T Bank",w:0.05},{s:'CBOE',n:"Cboe",w:0.05},
+    {s:'RJF',n:"Raymond James",w:0.05},{s:'NTRS',n:"Northern Trust",w:0.05},{s:'WTW',n:"Willis Towers Watson",w:0.04},
+    {s:'CFG',n:"Citizens Financial",w:0.04},{s:'SYF',n:"Synchrony Financial",w:0.04},{s:'ARES',n:"Ares Management",w:0.04},
+    {s:'CINF',n:"Cincinnati Financial",w:0.04},{s:'WRB',n:"W.R. Berkley",w:0.04},{s:'FIS',n:"Fidelity National Info",w:0.04},
+    {s:'RF',n:"Regions Financial",w:0.04},{s:'KEY',n:"KeyCorp",w:0.04},{s:'BRO',n:"Brown & Brown",w:0.04},
+    {s:'L',n:"Loews",w:0.04},{s:'CPAY',n:"Corpay",w:0.03},{s:'TROW',n:"T. Rowe Price",w:0.03},
+    {s:'PFG',n:"Principal Financial",w:0.03},{s:'GPN',n:"Global Payments",w:0.03},{s:'BEN',n:"Franklin Resources",w:0.02},
+    {s:'EG',n:"Everest Group",w:0.02},{s:'ERIE',n:"Erie Indemnity",w:0.02},{s:'GL',n:"Globe Life",w:0.02},
+    {s:'AIZ',n:"Assurant",w:0.02},{s:'JKHY',n:"Jack Henry",w:0.02},{s:'IVZ',n:"Invesco",w:0.02},
+    {s:'FDS',n:"FactSet",w:0.01}
   ],
   XLE: [
-    {s:'XOM',n:'ExxonMobil',w:23.4},{s:'CVX',n:'Chevron',w:15.2},{s:'COP',n:'ConocoPhillips',w:8.1},
-    {s:'EOG',n:'EOG Resources',w:5.3},{s:'SLB',n:'Schlumberger',w:4.2},{s:'MPC',n:'Marathon Petroleum',w:3.8},
-    {s:'PSX',n:'Phillips 66',w:3.4},{s:'VLO',n:'Valero Energy',w:3.1},{s:'OXY',n:'Occidental',w:2.8},
-    {s:'HAL',n:'Halliburton',w:2.5},{s:'DVN',n:'Devon Energy',w:2.2},{s:'FANG',n:'Diamondback Energy',w:2.0},
-    {s:'HES',n:'Hess',w:1.9},{s:'BKR',n:'Baker Hughes',w:1.7},{s:'TRGP',n:'Targa Resources',w:1.5},
-    {s:'WMB',n:'Williams Companies',w:1.4},{s:'KMI',n:'Kinder Morgan',w:1.2},{s:'OKE',n:'ONEOK',w:1.1},
-    {s:'EQT',n:'EQT Corp',w:0.9},{s:'MRO',n:'Marathon Oil',w:0.8}
+    {s:'XOM',n:"ExxonMobil",w:0.94},{s:'CVX',n:"Chevron",w:0.57},{s:'COP',n:"ConocoPhillips",w:0.22},
+    {s:'WMB',n:"Williams Cos",w:0.13},{s:'SLB',n:"Schlumberger",w:0.12},{s:'KMI',n:"Kinder Morgan",w:0.11},
+    {s:'EOG',n:"EOG Resources",w:0.11},{s:'VLO',n:"Valero",w:0.1},{s:'MPC',n:"Marathon Petroleum",w:0.1},
+    {s:'PSX',n:"Phillips 66",w:0.1},{s:'BKR',n:"Baker Hughes",w:0.09},{s:'OXY',n:"Occidental",w:0.08},
+    {s:'OKE',n:"ONEOK",w:0.08},{s:'FANG',n:"Diamondback Energy",w:0.08},{s:'TRGP',n:"Targa Resources",w:0.08},
+    {s:'EQT',n:"EQT",w:0.06},{s:'HAL',n:"Halliburton",w:0.05},{s:'TPL',n:"Texas Pacific Land",w:0.05},
+    {s:'DVN',n:"Devon Energy",w:0.04},{s:'CTRA',n:"Coterra",w:0.04},{s:'EXE',n:"Expand Energy",w:0.04},
+    {s:'APA',n:"APA",w:0.02}
   ],
   XLV: [
-    {s:'UNH',n:'UnitedHealth',w:12.5},{s:'LLY',n:'Eli Lilly',w:11.8},{s:'ABBV',n:'AbbVie',w:8.2},
-    {s:'JNJ',n:'Johnson & Johnson',w:7.4},{s:'MRK',n:'Merck',w:6.1},{s:'TMO',n:'Thermo Fisher',w:4.3},
-    {s:'ABT',n:'Abbott Labs',w:3.9},{s:'DHR',n:'Danaher',w:3.5},{s:'ISRG',n:'Intuitive Surgical',w:3.2},
-    {s:'BSX',n:'Boston Scientific',w:2.8},{s:'SYK',n:'Stryker',w:2.6},{s:'VRTX',n:'Vertex Pharma',w:2.3},
-    {s:'REGN',n:'Regeneron',w:2.1},{s:'CI',n:'Cigna',w:1.9},{s:'ELV',n:'Elevance Health',w:1.7},
-    {s:'HUM',n:'Humana',w:1.5},{s:'ZTS',n:'Zoetis',w:1.4},{s:'MRNA',n:'Moderna',w:1.2},
-    {s:'MCK',n:'McKesson',w:1.1},{s:'A',n:'Agilent',w:0.9}
+    {s:'LLY',n:"Eli Lilly",w:1.28},{s:'JNJ',n:"Johnson & Johnson",w:0.87},{s:'ABBV',n:"AbbVie",w:0.57},
+    {s:'UNH',n:"UnitedHealth",w:0.46},{s:'MRK',n:"Merck",w:0.45},{s:'TMO',n:"Thermo Fisher",w:0.3},
+    {s:'AMGN',n:"Amgen",w:0.3},{s:'GILD',n:"Gilead",w:0.26},{s:'ABT',n:"Abbott",w:0.26},
+    {s:'ISRG',n:"Intuitive Surgical",w:0.26},{s:'PFE',n:"Pfizer",w:0.24},{s:'DHR',n:"Danaher",w:0.21},
+    {s:'SYK',n:"Stryker",w:0.2},{s:'BMY',n:"Bristol Myers Squibb",w:0.19},{s:'VRTX',n:"Vertex Pharma",w:0.17},
+    {s:'MDT',n:"Medtronic",w:0.17},{s:'HCA',n:"HCA Healthcare",w:0.17},{s:'MCK',n:"McKesson",w:0.16},
+    {s:'CVS',n:"CVS Health",w:0.15},{s:'BSX',n:"Boston Scientific",w:0.15},{s:'REGN',n:"Regeneron",w:0.12},
+    {s:'CI',n:"Cigna",w:0.11},{s:'ELV',n:"Elevance Health",w:0.11},{s:'COR',n:"Cencora",w:0.1},
+    {s:'ZTS',n:"Zoetis",w:0.08},{s:'CAH',n:"Cardinal Health",w:0.08},{s:'IDXX',n:"Idexx Labs",w:0.07},
+    {s:'EW',n:"Edwards Lifesciences",w:0.07},{s:'BDX',n:"Becton Dickinson",w:0.07},{s:'A',n:"Agilent",w:0.05},
+    {s:'GEHC',n:"GE HealthCare",w:0.05},{s:'RMD',n:"ResMed",w:0.05},{s:'WAT',n:"Waters",w:0.05},
+    {s:'IQV',n:"IQVIA",w:0.05},{s:'MTD',n:"Mettler Toledo",w:0.04},{s:'BIIB',n:"Biogen",w:0.04},
+    {s:'HUM',n:"Humana",w:0.04},{s:'DXCM',n:"Dexcom",w:0.04},{s:'LH',n:"LabCorp",w:0.03},
+    {s:'STE',n:"Steris",w:0.03},{s:'DGX',n:"Quest Diagnostics",w:0.03},{s:'MRNA',n:"Moderna",w:0.03},
+    {s:'WST',n:"West Pharma",w:0.03},{s:'INCY',n:"Incyte",w:0.03},{s:'CNC',n:"Centene",w:0.03},
+    {s:'ZBH',n:"Zimmer Biomet",w:0.03},{s:'VTRS',n:"Viatris",w:0.03},{s:'PODD',n:"Insulet",w:0.02},
+    {s:'COO',n:"Cooper",w:0.02},{s:'ALGN',n:"Align Technology",w:0.02},{s:'SOLV',n:"Solventum",w:0.02},
+    {s:'UHS',n:"Universal Health Services",w:0.02},{s:'RVTY',n:"Revvity",w:0.02},{s:'DVA',n:"DaVita",w:0.02},
+    {s:'BAX',n:"Baxter",w:0.01},{s:'TECH',n:"Bio-Techne",w:0.01},{s:'CRL',n:"Charles River Labs",w:0.01},
+    {s:'HSIC',n:"Henry Schein",w:0.01}
   ],
   XLC: [
-    {s:'META',n:'Meta Platforms',w:22.6},{s:'GOOGL',n:'Alphabet A',w:15.3},{s:'GOOG',n:'Alphabet C',w:13.1},
-    {s:'NFLX',n:'Netflix',w:7.8},{s:'T',n:'AT&T',w:4.2},{s:'VZ',n:'Verizon',w:3.8},
-    {s:'CHTR',n:'Charter Comm',w:3.1},{s:'TMUS',n:'T-Mobile',w:2.9},{s:'EA',n:'Electronic Arts',w:2.4},
-    {s:'TTWO',n:'Take-Two Interactive',w:1.8},{s:'LYV',n:'Live Nation',w:1.6},{s:'IPG',n:'Interpublic',w:1.4},
-    {s:'OMC',n:'Omnicom',w:1.3},{s:'MTCH',n:'Match Group',w:1.1},{s:'PARA',n:'Paramount',w:0.9},
-    {s:'WBD',n:'Warner Bros Discovery',w:0.8},{s:'FOXA',n:'Fox Corp A',w:0.7},{s:'DIS',n:'Disney',w:0.6}
+    {s:'GOOGL',n:"Alphabet A",w:3.3},{s:'GOOG',n:"Alphabet C",w:3.06},{s:'META',n:"Meta Platforms",w:2.69},
+    {s:'NFLX',n:"Netflix",w:0.63},{s:'TMUS',n:"T-Mobile US",w:0.34},{s:'VZ',n:"Verizon",w:0.3},
+    {s:'DIS',n:"Disney",w:0.29},{s:'T',n:"AT&T",w:0.29},{s:'CMCSA',n:"Comcast",w:0.16},
+    {s:'WBD',n:"Warner Bros Discovery",w:0.11},{s:'EA',n:"Electronic Arts",w:0.08},{s:'TTWO',n:"Take-Two",w:0.06},
+    {s:'SATS',n:"EchoStar",w:0.06},{s:'LYV',n:"Live Nation",w:0.06},{s:'CHTR',n:"Charter Comms",w:0.05},
+    {s:'OMC',n:"Omnicom",w:0.03},{s:'TKO',n:"TKO Group",w:0.02},{s:'FOX',n:"Fox B",w:0.02},
+    {s:'FOXA',n:"Fox A",w:0.02},{s:'PSKY',n:"Paramount Skydance",w:0.02},{s:'TTD',n:"Trade Desk",w:0.02},
+    {s:'NWSA',n:"News Corp A",w:0.01},{s:'NWS',n:"News Corp B",w:0.01}
   ],
   XLI: [
-    {s:'RTX',n:'RTX Corp (Raytheon)',w:6.8},{s:'HON',n:'Honeywell',w:6.2},{s:'CAT',n:'Caterpillar',w:5.9},
-    {s:'GE',n:'GE Aerospace',w:5.4},{s:'UNP',n:'Union Pacific',w:4.8},{s:'DE',n:'John Deere',w:4.3},
-    {s:'ETN',n:'Eaton',w:4.0},{s:'LMT',n:'Lockheed Martin',w:3.7},{s:'UPS',n:'UPS',w:3.4},
-    {s:'PH',n:'Parker Hannifin',w:3.1},{s:'ITW',n:'Illinois Tool Works',w:2.9},{s:'WM',n:'Waste Management',w:2.7},
-    {s:'EMR',n:'Emerson Electric',w:2.5},{s:'NOC',n:'Northrop Grumman',w:2.3},{s:'GD',n:'General Dynamics',w:2.1},
-    {s:'CSX',n:'CSX',w:2.0},{s:'NSC',n:'Norfolk Southern',w:1.9},{s:'FDX',n:'FedEx',w:1.7},
-    {s:'AXON',n:'Axon Enterprise',w:1.5},{s:'VRSK',n:'Verisk',w:1.3}
+    {s:'CAT',n:"Caterpillar",w:0.57},{s:'GE',n:"GE Aerospace",w:0.49},{s:'GEV',n:"GE Vernova",w:0.42},
+    {s:'RTX',n:"RTX",w:0.41},{s:'BA',n:"Boeing",w:0.27},{s:'DE',n:"Deere",w:0.25},
+    {s:'ETN',n:"Eaton",w:0.24},{s:'UBER',n:"Uber",w:0.24},{s:'UNP',n:"Union Pacific",w:0.23},
+    {s:'HON',n:"Honeywell",w:0.23},{s:'LMT',n:"Lockheed Martin",w:0.21},{s:'PH',n:"Parker Hannifin",w:0.19},
+    {s:'VRT',n:"Vertiv",w:0.18},{s:'TT',n:"Trane Tech",w:0.16},{s:'HWM',n:"Howmet",w:0.16},
+    {s:'NOC',n:"Northrop Grumman",w:0.15},{s:'FDX',n:"FedEx",w:0.14},{s:'GD',n:"General Dynamics",w:0.14},
+    {s:'UPS',n:"UPS",w:0.14},{s:'PWR',n:"Quanta Services",w:0.14},{s:'WM',n:"Waste Management",w:0.14},
+    {s:'CMI',n:"Cummins",w:0.13},{s:'JCI',n:"Johnson Controls",w:0.13},{s:'EMR',n:"Emerson Electric",w:0.13},
+    {s:'MMM',n:"3M",w:0.12},{s:'ADP',n:"ADP",w:0.12},{s:'CSX',n:"CSX",w:0.12},
+    {s:'ITW',n:"Illinois Tool Works",w:0.12},{s:'CTAS',n:"Cintas",w:0.11},{s:'TDG',n:"TransDigm",w:0.11},
+    {s:'NSC',n:"Norfolk Southern",w:0.1},{s:'PCAR',n:"Paccar",w:0.1},{s:'LHX',n:"L3Harris",w:0.1},
+    {s:'RSG',n:"Republic Services",w:0.1},{s:'FIX',n:"Comfort Systems",w:0.09},{s:'GWW',n:"Grainger",w:0.09},
+    {s:'AME',n:"Ametek",w:0.08},{s:'FAST',n:"Fastenal",w:0.08},{s:'CARR',n:"Carrier Global",w:0.08},
+    {s:'URI',n:"United Rentals",w:0.08},{s:'DAL',n:"Delta Air Lines",w:0.07},{s:'ROK',n:"Rockwell Automation",w:0.07},
+    {s:'ODFL',n:"Old Dominion",w:0.07},{s:'WAB',n:"Wabtec",w:0.07},{s:'EME',n:"EMCOR",w:0.06},
+    {s:'IR',n:"Ingersoll Rand",w:0.05},{s:'UAL',n:"United Airlines",w:0.05},{s:'PAYX',n:"Paychex",w:0.05},
+    {s:'AXON',n:"Axon Enterprise",w:0.05},{s:'CPRT',n:"Copart",w:0.05},{s:'OTIS',n:"Otis",w:0.05},
+    {s:'DOV',n:"Dover",w:0.05},{s:'XYL',n:"Xylem",w:0.05},{s:'HUBB',n:"Hubbell",w:0.04},
+    {s:'ROL',n:"Rollins",w:0.04},{s:'EFX',n:"Equifax",w:0.04},{s:'VRSK',n:"Verisk",w:0.04},
+    {s:'JBHT',n:"J.B. Hunt",w:0.04},{s:'VLTO',n:"Veralto",w:0.03},{s:'CHRW',n:"C.H. Robinson",w:0.03},
+    {s:'LUV',n:"Southwest Airlines",w:0.03},{s:'SNA',n:"Snap-on",w:0.03},{s:'EXPD',n:"Expeditors",w:0.03},
+    {s:'LDOS',n:"Leidos",w:0.03},{s:'FTV',n:"Fortive",w:0.03},{s:'LII',n:"Lennox",w:0.03},
+    {s:'TXT',n:"Textron",w:0.02},{s:'NDSN',n:"Nordson",w:0.02},{s:'HII',n:"Huntington Ingalls",w:0.02},
+    {s:'IEX',n:"IDEX",w:0.02},{s:'J',n:"Jacobs",w:0.02},{s:'PNR',n:"Pentair",w:0.02},
+    {s:'MAS',n:"Masco",w:0.02},{s:'GNRC',n:"Generac",w:0.02},{s:'ALLE',n:"Allegion",w:0.02},
+    {s:'SWK',n:"Stanley Black & Decker",w:0.02},{s:'BLDR',n:"Builders FirstSource",w:0.01},{s:'AOS',n:"A.O. Smith",w:0.01}
   ],
   XLB: [
-    {s:'LIN',n:'Linde',w:17.8},{s:'SHW',n:'Sherwin-Williams',w:8.4},{s:'FCX',n:'Freeport-McMoRan',w:7.2},
-    {s:'APD',n:'Air Products',w:6.1},{s:'ECL',n:'Ecolab',w:5.3},{s:'NEM',n:'Newmont',w:4.8},
-    {s:'NUE',n:'Nucor',w:4.2},{s:'ALB',n:'Albemarle',w:3.6},{s:'PPG',n:'PPG Industries',w:3.3},
-    {s:'DD',n:'DuPont',w:3.0},{s:'VMC',n:'Vulcan Materials',w:2.8},{s:'MLM',n:'Martin Marietta',w:2.6},
-    {s:'CE',n:'Celanese',w:2.3},{s:'MOS',n:'Mosaic',w:2.1},{s:'IFF',n:'Intl Flavors',w:1.9},
-    {s:'BALL',n:'Ball Corp',w:1.7},{s:'AVY',n:'Avery Dennison',w:1.5},{s:'FMC',n:'FMC Corp',w:1.3},
-    {s:'CF',n:'CF Industries',w:1.2},{s:'CTVA',n:'Corteva',w:1.0}
+    {s:'LIN',n:"Linde",w:0.35},{s:'NEM',n:"Newmont",w:0.19},{s:'FCX',n:"Freeport-McMoRan",w:0.16},
+    {s:'SHW',n:"Sherwin-Williams",w:0.13},{s:'CRH',n:"CRH",w:0.12},{s:'ECL',n:"Ecolab",w:0.12},
+    {s:'APD',n:"Air Products",w:0.1},{s:'CTVA',n:"Corteva",w:0.08},{s:'NUE',n:"Nucor",w:0.07},
+    {s:'VMC',n:"Vulcan Materials",w:0.06},{s:'MLM',n:"Martin Marietta",w:0.06},{s:'STLD',n:"Steel Dynamics",w:0.04},
+    {s:'PPG',n:"PPG Industries",w:0.04},{s:'DOW',n:"Dow",w:0.04},{s:'ALB',n:"Albemarle",w:0.04},
+    {s:'SW',n:"Smurfit WestRock",w:0.03},{s:'LYB',n:"LyondellBasell",w:0.03},{s:'IP',n:"International Paper",w:0.03},
+    {s:'DD',n:"DuPont",w:0.03},{s:'IFF',n:"Intl Flavors & Fragrances",w:0.03},{s:'AMCR',n:"Amcor",w:0.03},
+    {s:'PKG',n:"Packaging Corp",w:0.03},{s:'CF',n:"CF Industries",w:0.03},{s:'BALL',n:"Ball",w:0.03},
+    {s:'AVY',n:"Avery Dennison",w:0.02},{s:'MOS',n:"Mosaic",w:0.01}
   ],
   XLRE: [
-    {s:'AMT',n:'American Tower',w:11.2},{s:'PLD',n:'Prologis',w:10.5},{s:'CCI',n:'Crown Castle',w:7.8},
-    {s:'EQIX',n:'Equinix',w:7.3},{s:'PSA',n:'Public Storage',w:5.9},{s:'SBAC',n:'SBA Comm',w:4.8},
-    {s:'O',n:'Realty Income',w:4.5},{s:'DLR',n:'Digital Realty',w:4.2},{s:'WY',n:'Weyerhaeuser',w:3.9},
-    {s:'EXR',n:'Extra Space Storage',w:3.6},{s:'SPG',n:'Simon Property',w:3.3},{s:'AVB',n:'AvalonBay',w:3.0},
-    {s:'EQR',n:'Equity Residential',w:2.8},{s:'VTR',n:'Ventas',w:2.6},{s:'ARE',n:'Alexandria RE',w:2.4},
-    {s:'ESS',n:'Essex Property',w:2.2},{s:'MAA',n:'Mid-America Apt',w:2.0},{s:'INVH',n:'Invitation Homes',w:1.8},
-    {s:'VICI',n:'VICI Properties',w:1.6},{s:'HST',n:'Host Hotels',w:1.4}
+    {s:'WELL',n:"Welltower",w:0.23},{s:'PLD',n:"Prologis",w:0.21},{s:'EQIX',n:"Equinix",w:0.17},
+    {s:'AMT',n:"American Tower",w:0.13},{s:'DLR',n:"Digital Realty",w:0.11},{s:'SPG',n:"Simon Property",w:0.1},
+    {s:'O',n:"Realty Income",w:0.09},{s:'PSA',n:"Public Storage",w:0.08},{s:'CBRE',n:"CBRE",w:0.07},
+    {s:'VTR',n:"Ventas",w:0.06},{s:'CCI',n:"Crown Castle",w:0.06},{s:'IRM',n:"Iron Mountain",w:0.05},
+    {s:'VICI',n:"VICI Properties",w:0.05},{s:'EXR',n:"Extra Space Storage",w:0.05},{s:'AVB',n:"AvalonBay",w:0.04},
+    {s:'SBAC',n:"SBA Comms",w:0.04},{s:'EQR',n:"Equity Residential",w:0.04},{s:'WY',n:"Weyerhaeuser",w:0.03},
+    {s:'CSGP',n:"CoStar",w:0.03},{s:'ESS',n:"Essex Property",w:0.03},{s:'KIM',n:"Kimco Realty",w:0.03},
+    {s:'INVH',n:"Invitation Homes",w:0.03},{s:'MAA',n:"Mid-America Apts",w:0.02},{s:'REG',n:"Regency Centers",w:0.02},
+    {s:'HST',n:"Host Hotels",w:0.02},{s:'DOC',n:"Healthpeak",w:0.02},{s:'UDR',n:"UDR",w:0.02},
+    {s:'CPT',n:"Camden Property",w:0.02},{s:'FRT',n:"Federal Realty",w:0.02},{s:'BXP',n:"BXP",w:0.01},
+    {s:'ARE',n:"Alexandria Real Estate",w:0.01}
   ],
   XLU: [
-    {s:'NEE',n:'NextEra Energy',w:16.4},{s:'SO',n:'Southern Company',w:7.8},{s:'DUK',n:'Duke Energy',w:7.2},
-    {s:'SRE',n:'Sempra',w:5.9},{s:'AEP',n:'American Electric Power',w:5.4},{s:'EXC',n:'Exelon',w:5.1},
-    {s:'XEL',n:'Xcel Energy',w:4.8},{s:'ED',n:'Consolidated Edison',w:4.3},{s:'ETR',n:'Entergy',w:3.9},
-    {s:'ES',n:'Eversource',w:3.6},{s:'WEC',n:'WEC Energy',w:3.3},{s:'AWK',n:'American Water Works',w:3.0},
-    {s:'CMS',n:'CMS Energy',w:2.8},{s:'DTE',n:'DTE Energy',w:2.6},{s:'AES',n:'AES Corp',w:2.4},
-    {s:'NI',n:'NiSource',w:2.2},{s:'AEE',n:'Ameren',w:2.0},{s:'LNT',n:'Alliant Energy',w:1.8},
-    {s:'EVRG',n:'Evergy',w:1.6},{s:'PNW',n:'Pinnacle West',w:1.4}
+    {s:'NEE',n:"NextEra Energy",w:0.3},{s:'CEG',n:"Constellation Energy",w:0.17},{s:'SO',n:"Southern Co",w:0.16},
+    {s:'DUK',n:"Duke Energy",w:0.15},{s:'AEP',n:"American Electric Power",w:0.11},{s:'SRE',n:"Sempra",w:0.09},
+    {s:'VST',n:"Vistra",w:0.09},{s:'D',n:"Dominion Energy",w:0.08},{s:'ETR',n:"Entergy",w:0.08},
+    {s:'XEL',n:"Xcel Energy",w:0.08},{s:'EXC',n:"Exelon",w:0.07},{s:'PEG',n:"PSEG",w:0.06},
+    {s:'ED',n:"ConEd",w:0.06},{s:'PCG',n:"PG&E",w:0.06},{s:'WEC',n:"WEC Energy",w:0.06},
+    {s:'NRG',n:"NRG Energy",w:0.06},{s:'AEE',n:"Ameren",w:0.05},{s:'ATO',n:"Atmos Energy",w:0.05},
+    {s:'DTE',n:"DTE Energy",w:0.05},{s:'PPL',n:"PPL",w:0.05},{s:'FE',n:"FirstEnergy",w:0.04},
+    {s:'CNP',n:"CenterPoint Energy",w:0.04},{s:'EIX',n:"Edison International",w:0.04},{s:'ES',n:"Eversource",w:0.04},
+    {s:'AWK',n:"American Water Works",w:0.04},{s:'CMS',n:"CMS Energy",w:0.04},{s:'NI',n:"NiSource",w:0.04},
+    {s:'EVRG',n:"Evergy",w:0.03},{s:'LNT',n:"Alliant Energy",w:0.03},{s:'PNW',n:"Pinnacle West",w:0.02},
+    {s:'AES',n:"AES",w:0.02}
   ],
   XLP: [
-    {s:'PG',n:'Procter & Gamble',w:16.2},{s:'KO',n:'Coca-Cola',w:11.8},{s:'PEP',n:'PepsiCo',w:11.4},
-    {s:'COST',n:'Costco',w:10.9},{s:'PM',n:'Philip Morris',w:6.3},{s:'MO',n:'Altria',w:4.8},
-    {s:'MDLZ',n:'Mondelez',w:4.2},{s:'CL',n:'Colgate',w:3.7},{s:'KMB',n:'Kimberly-Clark',w:3.3},
-    {s:'STZ',n:'Constellation Brands',w:3.0},{s:'GIS',n:'General Mills',w:2.8},{s:'SYY',n:'Sysco',w:2.6},
-    {s:'CAG',n:'Conagra Brands',w:2.4},{s:'HRL',n:'Hormel Foods',w:2.2},{s:'KHC',n:'Kraft Heinz',w:2.0},
-    {s:'TSN',n:'Tyson Foods',w:1.8},{s:'K',n:'Kellanova',w:1.6},{s:'CPB',n:'Campbell Soup',w:1.4},
-    {s:'CHD',n:'Church & Dwight',w:1.2},{s:'CLX',n:'Clorox',w:1.0}
+    {s:'WMT',n:"Walmart",w:1.57},{s:'COST',n:"Costco",w:0.69},{s:'PG',n:"Procter & Gamble",w:0.53},
+    {s:'KO',n:"Coca-Cola",w:0.5},{s:'PM',n:"Philip Morris",w:0.38},{s:'PEP',n:"PepsiCo",w:0.33},
+    {s:'MO',n:"Altria",w:0.17},{s:'MNST',n:"Monster Beverage",w:0.12},{s:'MDLZ',n:"Mondelez",w:0.11},
+    {s:'CL',n:"Colgate-Palmolive",w:0.11},{s:'TGT',n:"Target",w:0.09},{s:'KR',n:"Kroger",w:0.06},
+    {s:'HSY',n:"Hershey",w:0.06},{s:'SYY',n:"Sysco",w:0.06},{s:'KDP',n:"Keurig Dr Pepper",w:0.06},
+    {s:'KVUE',n:"Kenvue",w:0.05},{s:'KMB',n:"Kimberly-Clark",w:0.05},{s:'ADM',n:"Archer Daniels Midland",w:0.05},
+    {s:'STZ',n:"Constellation Brands",w:0.04},{s:'DG',n:"Dollar General",w:0.04},{s:'CASY',n:"Caseys",w:0.04},
+    {s:'EL',n:"Estee Lauder",w:0.04},{s:'KHC',n:"Kraft Heinz",w:0.04},{s:'BG',n:"Bunge",w:0.04},
+    {s:'CHD',n:"Church & Dwight",w:0.04},{s:'TSN',n:"Tyson Foods",w:0.04},{s:'DLTR',n:"Dollar Tree",w:0.03},
+    {s:'GIS',n:"General Mills",w:0.03},{s:'MKC',n:"McCormick",w:0.02},{s:'BF.B',n:"Brown-Forman",w:0.02},
+    {s:'CLX',n:"Clorox",w:0.02},{s:'HRL',n:"Hormel",w:0.02},{s:'SJM',n:"J.M. Smucker",w:0.02},
+    {s:'TAP',n:"Molson Coors",w:0.01},{s:'CAG',n:"Conagra",w:0.01},{s:'CPB',n:"Campbell Soup",w:0.01}
   ],
   XLY: [
-    {s:'AMZN',n:'Amazon',w:24.8},{s:'TSLA',n:'Tesla',w:17.2},{s:'HD',n:'Home Depot',w:8.6},
-    {s:'MCD',n:"McDonald's",w:5.4},{s:'NKE',n:'Nike',w:4.1},{s:'LOW',n:"Lowe's",w:3.8},
-    {s:'SBUX',n:'Starbucks',w:3.5},{s:'TJX',n:'TJX Companies',w:3.2},{s:'BKNG',n:'Booking Holdings',w:2.9},
-    {s:'F',n:'Ford Motor',w:2.6},{s:'GM',n:'General Motors',w:2.4},{s:'YUM',n:'Yum! Brands',w:2.2},
-    {s:'ORLY',n:"O'Reilly Auto",w:2.0},{s:'AZO',n:'AutoZone',w:1.8},{s:'APTV',n:'Aptiv',w:1.6},
-    {s:'DHI',n:'D.R. Horton',w:1.4},{s:'LEN',n:'Lennar',w:1.3},{s:'PHM',n:'PulteGroup',w:1.2},
-    {s:'CCL',n:'Carnival',w:1.1},{s:'RCL',n:'Royal Caribbean',w:1.0}
-  ]
+    {s:'AMZN',n:"Amazon",w:4.16},{s:'TSLA',n:"Tesla",w:2.32},{s:'HD',n:"Home Depot",w:0.54},
+    {s:'MCD',n:"McDonalds",w:0.34},{s:'TJX',n:"TJX",w:0.27},{s:'BKNG',n:"Booking",w:0.23},
+    {s:'LOW',n:"Lowes",w:0.22},{s:'SBUX',n:"Starbucks",w:0.18},{s:'MAR',n:"Marriott",w:0.15},
+    {s:'ABNB',n:"Airbnb",w:0.13},{s:'DASH',n:"DoorDash",w:0.12},{s:'ORLY',n:"OReilly Auto",w:0.12},
+    {s:'HLT',n:"Hilton",w:0.12},{s:'RCL',n:"Royal Caribbean",w:0.12},{s:'GM',n:"General Motors",w:0.11},
+    {s:'ROST',n:"Ross Stores",w:0.11},{s:'NKE',n:"Nike",w:0.11},{s:'AZO',n:"AutoZone",w:0.09},
+    {s:'CVNA',n:"Carvana",w:0.09},{s:'F',n:"Ford",w:0.08},{s:'GRMN',n:"Garmin",w:0.08},
+    {s:'EBAY',n:"eBay",w:0.07},{s:'CMG',n:"Chipotle",w:0.07},{s:'YUM',n:"Yum Brands",w:0.07},
+    {s:'DHI',n:"D.R. Horton",w:0.07},{s:'CCL',n:"Carnival",w:0.06},{s:'LVS',n:"Las Vegas Sands",w:0.06},
+    {s:'EXPE',n:"Expedia",w:0.05},{s:'TPR',n:"Tapestry",w:0.05},{s:'PHM',n:"PulteGroup",w:0.04},
+    {s:'ULTA',n:"Ulta Beauty",w:0.04},{s:'TSCO',n:"Tractor Supply",w:0.04},{s:'WSM',n:"Williams-Sonoma",w:0.04},
+    {s:'RL',n:"Ralph Lauren",w:0.04},{s:'DRI',n:"Darden",w:0.04},{s:'LEN',n:"Lennar",w:0.04},
+    {s:'NVR',n:"NVR",w:0.03},{s:'LULU',n:"Lululemon",w:0.03},{s:'DECK',n:"Deckers",w:0.02},
+    {s:'GPC',n:"Genuine Parts",w:0.02},{s:'BBY',n:"Best Buy",w:0.02},{s:'HAS',n:"Hasbro",w:0.02},
+    {s:'APTV',n:"Aptiv",w:0.02},{s:'DPZ',n:"Dominos",w:0.02},{s:'WYNN',n:"Wynn Resorts",w:0.02},
+    {s:'MGM',n:"MGM Resorts",w:0.02},{s:'NCLH',n:"Norwegian Cruise",w:0.01},{s:'POOL',n:"Pool",w:0.01}
+  ],
 };
 
 
 /* ════════════════════════════════════════════════════════════════════════════
-   MID_CAP_HOLDINGS · S&P MidCap 400 — curated holdings per GICS sector.
-   Structure mirrors ETF_HOLDINGS exactly so the scan engine can swap universes
-   with a single variable change. Keys are the same sector-ETF codes used in
-   SECTOR_NAMES so all KPIs and filters keep working transparently.
-   ~187 names, curated Apr 2026 from MDY (SPDR S&P MidCap 400) constituents.
-   Feel free to add/remove tickers — the scan/ranking logic is data-agnostic.
+   MID_CAP_HOLDINGS · S&P MidCap 400 — comprehensive coverage (~393 names).
+   Organized by GICS sector mapped to XL ETF keys. Tickers that have been
+   promoted to the S&P 500 are EXCLUDED to prevent overlap with ETF_HOLDINGS.
+   Source: composition as of Jan 2026; minor rotations (~10-20/quarter) may
+   cause individual tickers to fail fetching — those are just skipped.
    ════════════════════════════════════════════════════════════════════════════ */
 const MID_CAP_HOLDINGS = {
-  XLK: [  // Technology · טכנולוגיה
-    {s:'LITE',n:'Lumentum',w:1.4},{s:'COHR',n:'Coherent',w:1.2},{s:'FLEX',n:'Flex',w:0.7},
-    {s:'FN',n:'Fabrinet',w:0.6},{s:'PSTG',n:'Pure Storage',w:0.6},{s:'CIEN',n:'Ciena',w:0.6},
-    {s:'JBL',n:'Jabil',w:0.5},{s:'STX',n:'Seagate',w:0.5},{s:'WDC',n:'Western Digital',w:0.5},
-    {s:'LSCC',n:'Lattice Semi',w:0.4},{s:'MKSI',n:'MKS Instruments',w:0.4},{s:'ENTG',n:'Entegris',w:0.4},
-    {s:'MANH',n:'Manhattan Assoc',w:0.4},{s:'CGNX',n:'Cognex',w:0.3},{s:'TRMB',n:'Trimble',w:0.3},
-    {s:'NTAP',n:'NetApp',w:0.4},{s:'DOX',n:'Amdocs',w:0.4},{s:'TYL',n:'Tyler Tech',w:0.4}
+  XLK: [
+    {s:'FLEX',n:"Flex",w:0.3},{s:'FN',n:"Fabrinet",w:0.3},{s:'PSTG',n:"Pure Storage",w:0.3},
+    {s:'LSCC',n:"Lattice Semi",w:0.3},{s:'MKSI',n:"MKS Instruments",w:0.3},{s:'ENTG',n:"Entegris",w:0.3},
+    {s:'MANH',n:"Manhattan Associates",w:0.3},{s:'CGNX',n:"Cognex",w:0.3},{s:'DOX',n:"Amdocs",w:0.3},
+    {s:'AMKR',n:"Amkor Technology",w:0.3},{s:'APPF',n:"AppFolio",w:0.3},{s:'ARW',n:"Arrow Electronics",w:0.3},
+    {s:'BLKB',n:"Blackbaud",w:0.3},{s:'BOX',n:"Box",w:0.3},{s:'CVLT',n:"Commvault",w:0.3},
+    {s:'DBX',n:"Dropbox",w:0.3},{s:'GLOB',n:"Globant",w:0.3},{s:'IPGP',n:"IPG Photonics",w:0.3},
+    {s:'KD',n:"Kyndryl",w:0.3},{s:'MTSI',n:"MACOM",w:0.3},{s:'NSIT',n:"Insight Enterprises",w:0.3},
+    {s:'NOVT',n:"Novanta",w:0.3},{s:'PEGA',n:"Pegasystems",w:0.3},{s:'RMBS',n:"Rambus",w:0.3},
+    {s:'SANM',n:"Sanmina",w:0.3},{s:'SMTC',n:"Semtech",w:0.3},{s:'TDC',n:"Teradata",w:0.3},
+    {s:'TENB',n:"Tenable",w:0.3},{s:'VRNS',n:"Varonis",w:0.3},{s:'XRX',n:"Xerox",w:0.3},
+    {s:'ZD',n:"Ziff Davis",w:0.3},{s:'QRVO',n:"Qorvo",w:0.3},{s:'CRUS',n:"Cirrus Logic",w:0.3},
+    {s:'VSH',n:"Vishay",w:0.3},{s:'ALGM',n:"Allegro MicroSystems",w:0.3},{s:'PRGS',n:"Progress Software",w:0.3},
+    {s:'XM',n:"Qualtrics",w:0.3}
   ],
-  XLF: [  // Financials · פיננסים
-    {s:'RBA',n:'RB Global',w:0.6},{s:'CBOE',n:'Cboe Global',w:0.6},{s:'MKL',n:'Markel',w:0.6},
-    {s:'CINF',n:'Cincinnati Financial',w:0.5},{s:'RJF',n:'Raymond James',w:0.5},{s:'JEF',n:'Jefferies',w:0.5},
-    {s:'EWBC',n:'East West Bancorp',w:0.5},{s:'WBS',n:'Webster Financial',w:0.4},{s:'FHN',n:'First Horizon',w:0.4},
-    {s:'CFR',n:'Cullen/Frost',w:0.4},{s:'PNFP',n:'Pinnacle Financial',w:0.4},{s:'WTFC',n:'Wintrust',w:0.4},
-    {s:'LPLA',n:'LPL Financial',w:0.5},{s:'UMBF',n:'UMB Financial',w:0.3},{s:'OZK',n:'Bank OZK',w:0.3},
-    {s:'AFG',n:'American Financial',w:0.4},{s:'RLI',n:'RLI Corp',w:0.3},{s:'ZION',n:'Zions Bancorp',w:0.4},
-    {s:'SNV',n:'Synovus',w:0.4}
+  XLF: [
+    {s:'MKL',n:"Markel",w:0.3},{s:'JEF',n:"Jefferies",w:0.3},{s:'EWBC',n:"East West Bancorp",w:0.3},
+    {s:'WBS',n:"Webster Financial",w:0.3},{s:'FHN',n:"First Horizon",w:0.3},{s:'CFR',n:"Cullen/Frost",w:0.3},
+    {s:'PNFP',n:"Pinnacle Financial",w:0.3},{s:'WTFC',n:"Wintrust",w:0.3},{s:'LPLA',n:"LPL Financial",w:0.3},
+    {s:'UMBF',n:"UMB Financial",w:0.3},{s:'OZK',n:"Bank OZK",w:0.3},{s:'AFG',n:"American Financial",w:0.3},
+    {s:'RLI',n:"RLI Corp",w:0.3},{s:'ZION',n:"Zions Bancorp",w:0.3},{s:'SNV',n:"Synovus",w:0.3},
+    {s:'RBA',n:"RB Global",w:0.3},{s:'RGA',n:"Reinsurance Group",w:0.3},{s:'FNF',n:"Fidelity National Financial",w:0.3},
+    {s:'ORI',n:"Old Republic",w:0.3},{s:'UNM',n:"Unum Group",w:0.3},{s:'AMG',n:"Affiliated Managers",w:0.3},
+    {s:'ALLY',n:"Ally Financial",w:0.3},{s:'COLB',n:"Columbia Banking",w:0.3},{s:'CMA',n:"Comerica",w:0.3},
+    {s:'CBSH',n:"Commerce Bancshares",w:0.3},{s:'WTM',n:"White Mountains",w:0.3},{s:'SEIC',n:"SEI Investments",w:0.3},
+    {s:'HOMB',n:"Home BancShares",w:0.3},{s:'PB',n:"Prosperity Bancshares",w:0.3},{s:'FFIN',n:"First Financial Bankshares",w:0.3},
+    {s:'GBCI',n:"Glacier Bancorp",w:0.3},{s:'MTG',n:"MGIC Investment",w:0.3},{s:'RNR',n:"RenaissanceRe",w:0.3},
+    {s:'SLM',n:"SLM Corp",w:0.3},{s:'ESNT',n:"Essent Group",w:0.3},{s:'RDN',n:"Radian",w:0.3},
+    {s:'BOKF',n:"BOK Financial",w:0.3},{s:'WAL',n:"Western Alliance",w:0.3},{s:'PFSI',n:"PennyMac Financial",w:0.3},
+    {s:'AGO',n:"Assured Guaranty",w:0.3},{s:'NLY',n:"Annaly Capital",w:0.3},{s:'STWD',n:"Starwood Property",w:0.3},
+    {s:'AGNC',n:"AGNC Investment",w:0.3},{s:'PRI',n:"Primerica",w:0.3}
   ],
-  XLE: [  // Energy · אנרגיה
-    {s:'FTI',n:'TechnipFMC',w:0.8},{s:'MTDR',n:'Matador Resources',w:0.5},{s:'CHRD',n:'Chord Energy',w:0.5},
-    {s:'RRC',n:'Range Resources',w:0.4},{s:'AR',n:'Antero Resources',w:0.4},{s:'CIVI',n:'Civitas Resources',w:0.4},
-    {s:'MGY',n:'Magnolia Oil & Gas',w:0.4},{s:'SM',n:'SM Energy',w:0.3},{s:'NOV',n:'NOV Inc',w:0.4},
-    {s:'CHX',n:'ChampionX',w:0.3},{s:'OII',n:'Oceaneering',w:0.3},{s:'PTEN',n:'Patterson-UTI',w:0.3},
-    {s:'NFG',n:'National Fuel Gas',w:0.3},{s:'MUR',n:'Murphy Oil',w:0.3},{s:'CNX',n:'CNX Resources',w:0.3},
-    {s:'VNOM',n:'Viper Energy',w:0.3},{s:'WFRD',n:'Weatherford',w:0.3}
+  XLE: [
+    {s:'FTI',n:"TechnipFMC",w:0.3},{s:'MTDR',n:"Matador",w:0.3},{s:'CHRD',n:"Chord Energy",w:0.3},
+    {s:'RRC',n:"Range Resources",w:0.3},{s:'AR',n:"Antero Resources",w:0.3},{s:'CIVI',n:"Civitas Resources",w:0.3},
+    {s:'MGY',n:"Magnolia Oil & Gas",w:0.3},{s:'SM',n:"SM Energy",w:0.3},{s:'NOV',n:"NOV Inc",w:0.3},
+    {s:'CHX',n:"ChampionX",w:0.3},{s:'OII',n:"Oceaneering",w:0.3},{s:'PTEN',n:"Patterson-UTI",w:0.3},
+    {s:'NFG',n:"National Fuel Gas",w:0.3},{s:'MUR',n:"Murphy Oil",w:0.3},{s:'CNX',n:"CNX Resources",w:0.3},
+    {s:'VNOM',n:"Viper Energy",w:0.3},{s:'WFRD',n:"Weatherford",w:0.3},{s:'LBRT',n:"Liberty Energy",w:0.3},
+    {s:'HP',n:"Helmerich & Payne",w:0.3},{s:'DINO',n:"HF Sinclair",w:0.3},{s:'PBF',n:"PBF Energy",w:0.3},
+    {s:'SWN',n:"Southwestern Energy",w:0.3},{s:'CRK',n:"Comstock Resources",w:0.3},{s:'AM',n:"Antero Midstream",w:0.3},
+    {s:'WES',n:"Western Midstream",w:0.3},{s:'ENLC',n:"EnLink Midstream",w:0.3},{s:'DK',n:"Delek US",w:0.3},
+    {s:'AROC',n:"Archrock",w:0.3},{s:'GPOR',n:"Gulfport Energy",w:0.3}
   ],
-  XLV: [  // Healthcare · בריאות
-    {s:'UTHR',n:'United Therapeutics',w:0.7},{s:'ILMN',n:'Illumina',w:0.6},{s:'THC',n:'Tenet Healthcare',w:0.6},
-    {s:'CRL',n:'Charles River Labs',w:0.5},{s:'JAZZ',n:'Jazz Pharma',w:0.5},{s:'PEN',n:'Penumbra',w:0.5},
-    {s:'MOH',n:'Molina Healthcare',w:0.5},{s:'UHS',n:'Universal Health',w:0.4},{s:'BIO',n:'Bio-Rad',w:0.4},
-    {s:'BRKR',n:'Bruker',w:0.4},{s:'HAE',n:'Haemonetics',w:0.3},{s:'LIVN',n:'LivaNova',w:0.3},
-    {s:'CHE',n:'Chemed',w:0.3},{s:'MEDP',n:'Medpace',w:0.4},{s:'SHC',n:'Sotera Health',w:0.3},
-    {s:'ACHC',n:'Acadia Healthcare',w:0.3},{s:'ENSG',n:'Ensign Group',w:0.4},{s:'EHC',n:'Encompass Health',w:0.4}
+  XLV: [
+    {s:'MMSI',n:"Merit Medical",w:0.3},{s:'UTHR',n:"United Therapeutics",w:0.3},{s:'ILMN',n:"Illumina",w:0.3},
+    {s:'THC',n:"Tenet Healthcare",w:0.3},{s:'JAZZ',n:"Jazz Pharma",w:0.3},{s:'PEN',n:"Penumbra",w:0.3},
+    {s:'MOH',n:"Molina Healthcare",w:0.3},{s:'BIO',n:"Bio-Rad",w:0.3},{s:'BRKR',n:"Bruker",w:0.3},
+    {s:'HAE',n:"Haemonetics",w:0.3},{s:'LIVN',n:"LivaNova",w:0.3},{s:'CHE',n:"Chemed",w:0.3},
+    {s:'MEDP',n:"Medpace",w:0.3},{s:'SHC',n:"Sotera Health",w:0.3},{s:'ACHC',n:"Acadia Healthcare",w:0.3},
+    {s:'ENSG',n:"Ensign Group",w:0.3},{s:'EHC',n:"Encompass Health",w:0.3},{s:'AMED',n:"Amedisys",w:0.3},
+    {s:'AVTR',n:"Avantor",w:0.3},{s:'EXEL',n:"Exelixis",w:0.3},{s:'HALO',n:"Halozyme",w:0.3},
+    {s:'ICUI',n:"ICU Medical",w:0.3},{s:'IONS',n:"Ionis Pharma",w:0.3},{s:'NBIX',n:"Neurocrine",w:0.3},
+    {s:'SRPT',n:"Sarepta",w:0.3},{s:'PRGO',n:"Perrigo",w:0.3},{s:'OMCL',n:"Omnicell",w:0.3},
+    {s:'QDEL',n:"QuidelOrtho",w:0.3},{s:'CNMD',n:"CONMED",w:0.3},{s:'GKOS',n:"Glaukos",w:0.3},
+    {s:'LNTH',n:"Lantheus",w:0.3},{s:'HIMS',n:"Hims & Hers",w:0.3},{s:'ITGR',n:"Integer Holdings",w:0.3},
+    {s:'PRVA',n:"Privia Health",w:0.3},{s:'NHC',n:"National HealthCare",w:0.3},{s:'BKD',n:"Brookdale Senior",w:0.3},
+    {s:'CORT',n:"Corcept Therapeutics",w:0.3},{s:'RDY',n:"Dr Reddys",w:0.3}
   ],
-  XLC: [  // Communication Services · תקשורת (small sector in mid-cap)
-    {s:'IPG',n:'Interpublic',w:0.5},{s:'NYT',n:'NY Times',w:0.5},{s:'IAC',n:'IAC Inc',w:0.4},
-    {s:'FOXA',n:'Fox Corp A',w:0.5},{s:'FOX',n:'Fox Corp B',w:0.3},{s:'WBD',n:'Warner Bros Discovery',w:0.4},
-    {s:'PARA',n:'Paramount',w:0.3},{s:'CABO',n:'Cable One',w:0.2},{s:'SIRI',n:'Sirius XM',w:0.3}
+  XLC: [
+    {s:'NYT',n:"New York Times",w:0.3},{s:'IAC',n:"IAC",w:0.3},{s:'CABO',n:"Cable One",w:0.3},
+    {s:'SIRI',n:"SiriusXM",w:0.3},{s:'GCI',n:"Gannett",w:0.3},{s:'NXST',n:"Nexstar Media",w:0.3},
+    {s:'SSP',n:"E.W. Scripps",w:0.3},{s:'MSGS',n:"Madison Square Garden Sports",w:0.3},{s:'MSGE',n:"MSG Entertainment",w:0.3},
+    {s:'WWE',n:"WWE",w:0.3},{s:'SHEN',n:"Shenandoah Telecomm",w:0.3},{s:'ATUS',n:"Altice USA",w:0.3},
+    {s:'TDS',n:"Telephone Data Systems",w:0.3},{s:'WLY',n:"John Wiley",w:0.3}
   ],
-  XLI: [  // Industrials · תעשייה  (largest sector in S&P MidCap 400, ~24%)
-    {s:'CW',n:'Curtiss-Wright',w:0.8},{s:'WWD',n:'Woodward',w:0.7},{s:'XPO',n:'XPO Inc',w:0.7},
-    {s:'ATI',n:'ATI Inc',w:0.6},{s:'MTZ',n:'MasTec',w:0.6},{s:'NVT',n:'nVent Electric',w:0.5},
-    {s:'BWXT',n:'BWX Technologies',w:0.5},{s:'RBC',n:'RBC Bearings',w:0.5},{s:'FIX',n:'Comfort Systems',w:0.7},
-    {s:'GGG',n:'Graco',w:0.5},{s:'JBT',n:'JBT Corp',w:0.4},{s:'SAIA',n:'Saia',w:0.5},
-    {s:'WCC',n:'WESCO',w:0.5},{s:'BLD',n:"TopBuild",w:0.5},{s:'WMS',n:'Advanced Drainage',w:0.5},
-    {s:'RHI',n:'Robert Half',w:0.3},{s:'MLI',n:'Mueller Industries',w:0.4},{s:'TREX',n:'Trex',w:0.4},
-    {s:'EME',n:'EMCOR Group',w:0.5},{s:'KNX',n:'Knight-Swift',w:0.4}
+  XLI: [
+    {s:'CW',n:"Curtiss-Wright",w:0.3},{s:'WWD',n:"Woodward",w:0.3},{s:'XPO',n:"XPO",w:0.3},
+    {s:'ATI',n:"ATI Inc",w:0.3},{s:'MTZ',n:"MasTec",w:0.3},{s:'NVT',n:"nVent Electric",w:0.3},
+    {s:'BWXT',n:"BWX Technologies",w:0.3},{s:'RBC',n:"RBC Bearings",w:0.3},{s:'GGG',n:"Graco",w:0.3},
+    {s:'JBT',n:"JBT",w:0.3},{s:'SAIA',n:"Saia",w:0.3},{s:'WCC',n:"WESCO",w:0.3},
+    {s:'BLD',n:"TopBuild",w:0.3},{s:'WMS',n:"Advanced Drainage",w:0.3},{s:'RHI',n:"Robert Half",w:0.3},
+    {s:'MLI',n:"Mueller Industries",w:0.3},{s:'TREX',n:"Trex",w:0.3},{s:'KNX',n:"Knight-Swift",w:0.3},
+    {s:'AAL',n:"American Airlines",w:0.3},{s:'AAON',n:"AAON",w:0.3},{s:'ACM',n:"AECOM",w:0.3},
+    {s:'AGCO',n:"AGCO",w:0.3},{s:'AIT',n:"Applied Industrial",w:0.3},{s:'ALK',n:"Alaska Air",w:0.3},
+    {s:'ALSN',n:"Allison Transmission",w:0.3},{s:'AYI',n:"Acuity Brands",w:0.3},{s:'AZZ',n:"AZZ Inc",w:0.3},
+    {s:'BC',n:"Brunswick",w:0.3},{s:'BCC',n:"Boise Cascade",w:0.3},{s:'BECN',n:"Beacon Roofing",w:0.3},
+    {s:'CLH',n:"Clean Harbors",w:0.3},{s:'CR',n:"Crane",w:0.3},{s:'DY',n:"Dycom",w:0.3},
+    {s:'EXPO',n:"Exponent",w:0.3},{s:'FBIN',n:"Fortune Brands",w:0.3},{s:'FLS',n:"Flowserve",w:0.3},
+    {s:'GATX',n:"GATX",w:0.3},{s:'GTLS',n:"Chart Industries",w:0.3},{s:'HEES',n:"H&E Equipment",w:0.3},
+    {s:'HXL',n:"Hexcel",w:0.3},{s:'ICFI',n:"ICF International",w:0.3},{s:'JBLU',n:"JetBlue",w:0.3},
+    {s:'KAI',n:"Kadant",w:0.3},{s:'KEX',n:"Kirby",w:0.3},{s:'LECO',n:"Lincoln Electric",w:0.3},
+    {s:'LSTR',n:"Landstar",w:0.3},{s:'MAN',n:"ManpowerGroup",w:0.3},{s:'MATX',n:"Matson",w:0.3},
+    {s:'MOG.A',n:"Moog",w:0.3},{s:'MSA',n:"MSA Safety",w:0.3},{s:'MSM',n:"MSC Industrial",w:0.3},
+    {s:'OC',n:"Owens Corning",w:0.3},{s:'OSK',n:"Oshkosh",w:0.3},{s:'PLPC',n:"Preformed Line",w:0.3},
+    {s:'R',n:"Ryder System",w:0.3},{s:'SAIC',n:"Science Applications",w:0.3},{s:'SITE',n:"SiteOne Landscape",w:0.3},
+    {s:'STRL',n:"Sterling Infrastructure",w:0.3},{s:'TKR',n:"Timken",w:0.3},{s:'TTC',n:"Toro",w:0.3},
+    {s:'UHAL',n:"U-Haul",w:0.3},{s:'VMI',n:"Valmont",w:0.3},{s:'WSO',n:"Watsco",w:0.3},
+    {s:'AWI',n:"Armstrong World",w:0.3},{s:'MIDD',n:"Middleby",w:0.3},{s:'WTS',n:"Watts Water",w:0.3},
+    {s:'ESAB',n:"ESAB",w:0.3},{s:'CXT',n:"Crane NXT",w:0.3},{s:'FLR',n:"Fluor",w:0.3},
+    {s:'CSL',n:"Carlisle Cos",w:0.3},{s:'G',n:"Genpact",w:0.3},{s:'CACI',n:"CACI International",w:0.3},
+    {s:'MOD',n:"Modine Manufacturing",w:0.3}
   ],
-  XLB: [  // Materials · חומרים
-    {s:'CRS',n:'Carpenter Tech',w:0.6},{s:'RGLD',n:'Royal Gold',w:0.7},{s:'OLN',n:'Olin',w:0.4},
-    {s:'RPM',n:'RPM International',w:0.5},{s:'EXP',n:'Eagle Materials',w:0.4},{s:'ATR',n:'AptarGroup',w:0.4},
-    {s:'ASH',n:'Ashland',w:0.3},{s:'MTX',n:'Minerals Technologies',w:0.3},{s:'SLGN',n:'Silgan Holdings',w:0.3},
-    {s:'SXT',n:'Sensient Tech',w:0.3},{s:'WOR',n:'Worthington Industries',w:0.3},{s:'AA',n:'Alcoa',w:0.5},
-    {s:'AXTA',n:'Axalta Coating',w:0.4},{s:'HUN',n:'Huntsman',w:0.3},{s:'CC',n:'Chemours',w:0.3}
+  XLB: [
+    {s:'ATR',n:"AptarGroup",w:0.3},{s:'SLGN',n:"Silgan",w:0.3},{s:'CRS',n:"Carpenter Tech",w:0.3},
+    {s:'RGLD',n:"Royal Gold",w:0.3},{s:'OLN',n:"Olin",w:0.3},{s:'RPM',n:"RPM International",w:0.3},
+    {s:'EXP',n:"Eagle Materials",w:0.3},{s:'ASH',n:"Ashland",w:0.3},{s:'MTX',n:"Minerals Tech",w:0.3},
+    {s:'SXT',n:"Sensient Tech",w:0.3},{s:'WOR',n:"Worthington Industries",w:0.3},{s:'AA',n:"Alcoa",w:0.3},
+    {s:'AXTA',n:"Axalta Coating",w:0.3},{s:'HUN',n:"Huntsman",w:0.3},{s:'CC',n:"Chemours",w:0.3},
+    {s:'CBT',n:"Cabot",w:0.3},{s:'GEF',n:"Greif",w:0.3},{s:'KNF',n:"Knife River",w:0.3},
+    {s:'LPX',n:"Louisiana-Pacific",w:0.3},{s:'SON',n:"Sonoco",w:0.3},{s:'SUM',n:"Summit Materials",w:0.3},
+    {s:'VSTS',n:"Vestis",w:0.3},{s:'EMN',n:"Eastman Chemical",w:0.3},{s:'FUL',n:"H.B. Fuller",w:0.3},
+    {s:'HBM',n:"Hudbay Minerals",w:0.3},{s:'IOSP',n:"Innospec",w:0.3}
   ],
-  XLRE: [  // Real Estate · נדל״ן
-    {s:'CUBE',n:'CubeSmart',w:0.5},{s:'REG',n:'Regency Centers',w:0.5},{s:'NNN',n:'NNN REIT',w:0.4},
-    {s:'EPR',n:'EPR Properties',w:0.3},{s:'FR',n:'First Industrial',w:0.4},{s:'RHP',n:'Ryman Hospitality',w:0.4},
-    {s:'STAG',n:'STAG Industrial',w:0.4},{s:'CDP',n:'Cousins Properties',w:0.3},{s:'LAMR',n:'Lamar Advertising',w:0.5},
-    {s:'EGP',n:'EastGroup Properties',w:0.4},{s:'KRG',n:'Kite Realty',w:0.3},{s:'BRX',n:'Brixmor Property',w:0.4},
-    {s:'OHI',n:'Omega Healthcare',w:0.4},{s:'GLPI',n:'Gaming & Leisure',w:0.5},{s:'APLE',n:'Apple Hospitality',w:0.3},
-    {s:'PEB',n:'Pebblebrook Hotel',w:0.2},{s:'ELS',n:'Equity LifeStyle',w:0.5},{s:'SUI',n:'Sun Communities',w:0.5}
+  XLRE: [
+    {s:'CUBE',n:"CubeSmart",w:0.3},{s:'NNN',n:"NNN REIT",w:0.3},{s:'EPR',n:"EPR Properties",w:0.3},
+    {s:'FR',n:"First Industrial",w:0.3},{s:'RHP',n:"Ryman Hospitality",w:0.3},{s:'STAG',n:"STAG Industrial",w:0.3},
+    {s:'CDP',n:"COPT Defense",w:0.3},{s:'LAMR',n:"Lamar Advertising",w:0.3},{s:'EGP',n:"EastGroup Properties",w:0.3},
+    {s:'KRG',n:"Kite Realty",w:0.3},{s:'BRX',n:"Brixmor",w:0.3},{s:'OHI',n:"Omega Healthcare",w:0.3},
+    {s:'GLPI',n:"Gaming & Leisure",w:0.3},{s:'APLE',n:"Apple Hospitality",w:0.3},{s:'PEB',n:"Pebblebrook Hotel",w:0.3},
+    {s:'ELS',n:"Equity Lifestyle",w:0.3},{s:'SUI',n:"Sun Communities",w:0.3},{s:'AMH',n:"American Homes 4 Rent",w:0.3},
+    {s:'ADC',n:"Agree Realty",w:0.3},{s:'REXR',n:"Rexford Industrial",w:0.3},{s:'SLG',n:"SL Green",w:0.3},
+    {s:'SBRA',n:"Sabra Health Care",w:0.3},{s:'HIW',n:"Highwoods Properties",w:0.3},{s:'PK',n:"Park Hotels",w:0.3},
+    {s:'DEI',n:"Douglas Emmett",w:0.3},{s:'MAC',n:"Macerich",w:0.3},{s:'KRC',n:"Kilroy Realty",w:0.3},
+    {s:'CUZ',n:"Cousins Properties",w:0.3},{s:'NSA',n:"National Storage",w:0.3},{s:'LXP',n:"LXP Industrial",w:0.3},
+    {s:'PSTL',n:"Postal Realty",w:0.3}
   ],
-  XLU: [  // Utilities · תשתיות
-    {s:'IDA',n:'IDACORP',w:0.4},{s:'ALE',n:'Allete',w:0.3},{s:'AVA',n:'Avista',w:0.2},
-    {s:'POR',n:'Portland General',w:0.3},{s:'OGE',n:'OGE Energy',w:0.4},{s:'BKH',n:'Black Hills',w:0.3},
-    {s:'NWE',n:'NorthWestern Energy',w:0.2},{s:'NJR',n:'NJ Resources',w:0.3},{s:'UGI',n:'UGI Corp',w:0.3},
-    {s:'SWX',n:'Southwest Gas',w:0.3},{s:'SR',n:'Spire',w:0.3},{s:'OTTR',n:'Otter Tail',w:0.2},
-    {s:'MGEE',n:'MGE Energy',w:0.2}
+  XLU: [
+    {s:'IDA',n:"IDACORP",w:0.3},{s:'ALE',n:"ALLETE",w:0.3},{s:'AVA',n:"Avista",w:0.3},
+    {s:'POR',n:"Portland General",w:0.3},{s:'OGE',n:"OGE Energy",w:0.3},{s:'BKH',n:"Black Hills",w:0.3},
+    {s:'NWE',n:"NorthWestern Energy",w:0.3},{s:'NJR',n:"New Jersey Resources",w:0.3},{s:'UGI',n:"UGI",w:0.3},
+    {s:'SWX',n:"Southwest Gas",w:0.3},{s:'SR',n:"Spire Inc",w:0.3},{s:'OTTR',n:"Otter Tail",w:0.3},
+    {s:'MGEE',n:"MGE Energy",w:0.3},{s:'OGS',n:"ONE Gas",w:0.3},{s:'HE',n:"Hawaiian Electric",w:0.3},
+    {s:'PNM',n:"PNM Resources",w:0.3}
   ],
-  XLP: [  // Consumer Staples · צריכה בסיסית
-    {s:'CASY',n:"Casey's",w:0.8},{s:'USFD',n:'US Foods',w:0.6},{s:'FLO',n:'Flowers Foods',w:0.3},
-    {s:'LW',n:'Lamb Weston',w:0.4},{s:'POST',n:'Post Holdings',w:0.4},{s:'INGR',n:'Ingredion',w:0.4},
-    {s:'PFGC',n:'Performance Food',w:0.5},{s:'ACI',n:'Albertsons',w:0.5},{s:'UVV',n:'Universal Corp',w:0.2},
-    {s:'ENR',n:'Energizer',w:0.2},{s:'SPB',n:'Spectrum Brands',w:0.2},{s:'BJ',n:'BJ Wholesale',w:0.5},
-    {s:'COTY',n:'Coty',w:0.3},{s:'ELF',n:'e.l.f. Beauty',w:0.5}
+  XLP: [
+    {s:'USFD',n:"US Foods",w:0.3},{s:'FLO',n:"Flowers Foods",w:0.3},{s:'LW',n:"Lamb Weston",w:0.3},
+    {s:'POST',n:"Post Holdings",w:0.3},{s:'INGR',n:"Ingredion",w:0.3},{s:'PFGC',n:"Performance Food",w:0.3},
+    {s:'ACI',n:"Albertsons",w:0.3},{s:'UVV',n:"Universal Corp",w:0.3},{s:'ENR',n:"Energizer",w:0.3},
+    {s:'SPB',n:"Spectrum Brands",w:0.3},{s:'BJ',n:"BJs Wholesale",w:0.3},{s:'COTY',n:"Coty",w:0.3},
+    {s:'ELF',n:"e.l.f. Beauty",w:0.3},{s:'BRBR',n:"BellRing Brands",w:0.3},{s:'FIZZ',n:"National Beverage",w:0.3},
+    {s:'HAIN',n:"Hain Celestial",w:0.3},{s:'HLF',n:"Herbalife",w:0.3},{s:'LANC',n:"Lancaster Colony",w:0.3},
+    {s:'MUSA',n:"Murphy USA",w:0.3},{s:'PRMW',n:"Primo Water",w:0.3},{s:'REYN',n:"Reynolds Consumer",w:0.3},
+    {s:'SFM',n:"Sprouts Farmers",w:0.3},{s:'UNFI',n:"United Natural Foods",w:0.3}
   ],
-  XLY: [  // Consumer Discretionary · צריכה שיקולית
-    {s:'BURL',n:'Burlington Stores',w:0.6},{s:'WSM',n:'Williams-Sonoma',w:0.6},{s:'CROX',n:'Crocs',w:0.5},
-    {s:'RL',n:'Ralph Lauren',w:0.5},{s:'TPR',n:'Tapestry',w:0.5},{s:'PVH',n:'PVH Corp',w:0.3},
-    {s:'UAA',n:'Under Armour',w:0.3},{s:'KMX',n:'CarMax',w:0.5},{s:'M',n:"Macy's",w:0.3},
-    {s:'GPS',n:'Gap',w:0.3},{s:'ANF',n:'Abercrombie',w:0.4},{s:'DKS',n:"Dick's Sporting",w:0.5},
-    {s:'TOL',n:'Toll Brothers',w:0.5},{s:'CAVA',n:'CAVA Group',w:0.5},{s:'BLDR',n:'Builders FirstSource',w:0.5},
-    {s:'CHDN',n:'Churchill Downs',w:0.4},{s:'CZR',n:'Caesars',w:0.4},{s:'BYD',n:'Boyd Gaming',w:0.3},
-    {s:'FND',n:'Floor & Decor',w:0.4},{s:'ETSY',n:'Etsy',w:0.3},{s:'THO',n:'Thor Industries',w:0.3},
-    {s:'BBWI',n:'Bath & Body Works',w:0.3},{s:'WEN',n:"Wendy's",w:0.3},{s:'CHWY',n:'Chewy',w:0.4}
-  ]
+  XLY: [
+    {s:'BURL',n:"Burlington Stores",w:0.3},{s:'CROX',n:"Crocs",w:0.3},{s:'PVH',n:"PVH",w:0.3},
+    {s:'UAA',n:"Under Armour",w:0.3},{s:'KMX',n:"CarMax",w:0.3},{s:'M',n:"Macys",w:0.3},
+    {s:'GPS',n:"Gap",w:0.3},{s:'ANF',n:"Abercrombie & Fitch",w:0.3},{s:'DKS',n:"Dicks Sporting Goods",w:0.3},
+    {s:'TOL',n:"Toll Brothers",w:0.3},{s:'CAVA',n:"CAVA Group",w:0.3},{s:'CHDN',n:"Churchill Downs",w:0.3},
+    {s:'CZR',n:"Caesars",w:0.3},{s:'BYD',n:"Boyd Gaming",w:0.3},{s:'FND',n:"Floor & Decor",w:0.3},
+    {s:'ETSY',n:"Etsy",w:0.3},{s:'THO',n:"Thor Industries",w:0.3},{s:'BBWI',n:"Bath & Body Works",w:0.3},
+    {s:'WEN',n:"Wendys",w:0.3},{s:'CHWY',n:"Chewy",w:0.3},{s:'AN',n:"AutoNation",w:0.3},
+    {s:'ALV',n:"Autoliv",w:0.3},{s:'BWA',n:"BorgWarner",w:0.3},{s:'CBRL',n:"Cracker Barrel",w:0.3},
+    {s:'CVCO',n:"Cavco Industries",w:0.3},{s:'DENN',n:"Dennys",w:0.3},{s:'FL',n:"Foot Locker",w:0.3},
+    {s:'GME',n:"GameStop",w:0.3},{s:'GNTX',n:"Gentex",w:0.3},{s:'GT',n:"Goodyear",w:0.3},
+    {s:'HOG',n:"Harley-Davidson",w:0.3},{s:'IBP',n:"Installed Building Products",w:0.3},{s:'JACK',n:"Jack in the Box",w:0.3},
+    {s:'JWN',n:"Nordstrom",w:0.3},{s:'KBH',n:"KB Home",w:0.3},{s:'KSS',n:"Kohls",w:0.3},
+    {s:'LAD',n:"Lithia Motors",w:0.3},{s:'LKQ',n:"LKQ",w:0.3},{s:'MAT',n:"Mattel",w:0.3},
+    {s:'MHO',n:"M/I Homes",w:0.3},{s:'MTH',n:"Meritage Homes",w:0.3},{s:'MTN',n:"Vail Resorts",w:0.3},
+    {s:'PATK',n:"Patrick Industries",w:0.3},{s:'PAG',n:"Penske Automotive",w:0.3},{s:'PII',n:"Polaris",w:0.3},
+    {s:'SCI',n:"Service Corp",w:0.3},{s:'SIG',n:"Signet Jewelers",w:0.3},{s:'SKX',n:"Skechers",w:0.3},
+    {s:'TMHC',n:"Taylor Morrison",w:0.3},{s:'TXRH',n:"Texas Roadhouse",w:0.3},{s:'VC',n:"Visteon",w:0.3},
+    {s:'WH',n:"Wyndham Hotels",w:0.3},{s:'WING',n:"Wingstop",w:0.3},{s:'YETI',n:"YETI",w:0.3},
+    {s:'OLLI',n:"Ollies Bargain Outlet",w:0.3},{s:'RH',n:"RH",w:0.3},{s:'CWH',n:"Camping World",w:0.3},
+    {s:'TPH',n:"Tri Pointe Homes",w:0.3},{s:'GPI',n:"Group 1 Automotive",w:0.3},{s:'ABG',n:"Asbury Automotive",w:0.3},
+    {s:'VSCO',n:"Victorias Secret",w:0.3},{s:'SHAK',n:"Shake Shack",w:0.3}
+  ],
 };
 
 
@@ -4568,13 +4735,16 @@ function renderKpi(ind, data){
   const isPct = ind.type === 'yoy' || ind.type === 'mom' || ind.type === 'delta';
   const valClass = (isPct && latest.value > 0) ? 'pos' : (isPct && latest.value < 0) ? 'neg' : '';
   const borderClass = (isPct && latest.value < 0) ? 'neg' : '';
+  // formatValue already appends '%' when format is 'pct'. Adding ind.unit in that case
+  // produced a double "%%". Only append unit when the formatter didn't already.
+  const unitSuffix = (ind.format === 'pct') ? '' : (ind.unit || '');
   el.className = 'kpi-item ' + borderClass;
   el.innerHTML = `
     <div class="kpi-label">${ind.nameHe}</div>
     <div class="kpi-val-row">
-      <span class="kpi-val ${valClass}">${formatValue(latest.value, ind.format)}${ind.unit||''}</span>
-      <span class="kpi-date">${formatDate(latest.date)}</span>
-    </div>`;
+      <span class="kpi-val ${valClass}">${formatValue(latest.value, ind.format)}${unitSuffix}</span>
+    </div>
+    <div class="kpi-date">${formatDate(latest.date)}</div>`;
 }
 
 /* ── Init: render grid skeletons ── */
@@ -4725,17 +4895,114 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const PROXY = localStorage.getItem('app_proxy_url') || '';
 
 // Cache keys
-const CACHE_KEY_BASE = 'advisor_scan_cache_v2';
+// Cache version bumped v2→v3 after expanding LARGE from 217→500 and MID from 185→~390.
+// Stale v2 caches (if any persisted in localStorage) are silently ignored by lookup.
+const CACHE_KEY_BASE = 'advisor_scan_cache_v3';
 const WL_KEY = 'advisor_watchlist_v1';
 const UNIVERSE_KEY = 'advisor_universe_v1';
 const METHODOLOGY_KEY = 'advisor_methodology_v1';
 const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
+
+// One-time cleanup: purge stale cache versions (v1, v2) from localStorage to
+// reclaim space on browsers with tight quotas (Safari ~5MB). Old keys just
+// pile up otherwise — they're orphaned by the version bump.
+(function purgeStaleCaches(){
+  try {
+    const stale = Object.keys(localStorage).filter(k =>
+      /^advisor_scan_cache_v[12]_/.test(k)
+    );
+    stale.forEach(k => localStorage.removeItem(k));
+    if (stale.length) console.info(`purged ${stale.length} stale scan cache(s)`);
+  } catch(e){}
+})();
 
 // Sector Hebrew names
 const SECTOR_NAMES = {
   XLK:'טכנולוגיה', XLF:'פיננסים', XLE:'אנרגיה', XLV:'בריאות',
   XLC:'תקשורת', XLI:'תעשייה', XLB:'חומרים', XLRE:'נדל״ן',
   XLU:'תשתיות', XLP:'צריכה בסיסית', XLY:'צריכה שיקולית'
+};
+
+/* ════════════════════════════════════════════════════════════════════════════
+   SUB-INDUSTRY · GICS Sub-Industry classification per ticker.
+   SI_LABELS (code → {e, h}) + SYM_SUBIND (ticker → code). Sub-industry is
+   one level below the sector (e.g. XLK → "Semiconductors"), shown in the
+   stock detail panel and can be extended to a filter in the future. Unmapped
+   tickers (rare) fall back to the sector label.
+   ════════════════════════════════════════════════════════════════════════════ */
+const SI_LABELS = {
+  semi:{e:'Semiconductors',h:'מוליכים למחצה'},
+  thw:{e:'Tech Hardware & Storage',h:'חומרת מחשבים ואחסון'},
+  sw:{e:'Software',h:'תוכנה'},
+  itsvc:{e:'IT Services',h:'שירותי IT'},
+  commeq:{e:'Communications Equipment',h:'ציוד תקשורת'},
+  elec:{e:'Electronic Equipment',h:'ציוד אלקטרוני'},
+  imds:{e:'Interactive Media',h:'מדיה אינטראקטיבית'},
+  ent:{e:'Entertainment',h:'בידור'},
+  media:{e:'Media',h:'מדיה'},
+  dtel:{e:'Telecom (Wired)',h:'טלקום קווי'},
+  wtel:{e:'Wireless Telecom',h:'טלקום אלחוטי'},
+  bret:{e:'Broadline Retail',h:'קמעונאות רחבה'},
+  sret:{e:'Specialty Retail',h:'קמעונאות ייעודית'},
+  csdr:{e:'Staples Distribution',h:'הפצת מוצרי צריכה'},
+  hrl:{e:'Hotels, Rest. & Leisure',h:'מלונות, מסעדות ופנאי'},
+  auto:{e:'Automobiles',h:'רכב'},
+  autop:{e:'Auto Components',h:'חלקי רכב'},
+  appar:{e:'Apparel & Luxury',h:'ביגוד ויוקרה'},
+  leis:{e:'Leisure Products',h:'מוצרי פנאי'},
+  hhd:{e:'Household Durables',h:'מוצרי בית ברי-קיימא'},
+  hhp:{e:'Household Products',h:'מוצרי בית'},
+  pcp:{e:'Personal Care',h:'טיפוח אישי'},
+  food:{e:'Food Products',h:'מוצרי מזון'},
+  bev:{e:'Beverages',h:'משקאות'},
+  tob:{e:'Tobacco',h:'טבק'},
+  dist:{e:'Distributors',h:'מפיצים'},
+  bank:{e:'Banks',h:'בנקים'},
+  cfin:{e:'Consumer Finance',h:'אשראי צרכני'},
+  capm:{e:'Capital Markets',h:'שווקי הון'},
+  ins:{e:'Insurance',h:'ביטוח'},
+  fin:{e:'Financial Services',h:'שירותים פיננסיים'},
+  pharm:{e:'Pharmaceuticals',h:'תרופות'},
+  biot:{e:'Biotechnology',h:'ביוטק'},
+  hcps:{e:'HC Providers & Services',h:'שירותי בריאות'},
+  hces:{e:'HC Equipment & Supplies',h:'ציוד וחומרים רפואיים'},
+  lsts:{e:'Life Sciences Tools',h:'כלים ללייף-סייאנס'},
+  oil:{e:'Oil, Gas & Fuels',h:'נפט וגז'},
+  oilsvc:{e:'Energy Equipment & Svcs',h:'ציוד ושירותי אנרגיה'},
+  aero:{e:'Aerospace & Defense',h:'אווירונאוטיקה וביטחון'},
+  mach:{e:'Machinery',h:'מכונות'},
+  icong:{e:'Industrial Conglomerates',h:'קונגלומרטים תעשייתיים'},
+  css:{e:'Commercial Services',h:'שירותים מסחריים'},
+  prof:{e:'Professional Services',h:'שירותים מקצועיים'},
+  gtrans:{e:'Ground Transportation',h:'הובלה יבשתית'},
+  airf:{e:'Air Freight & Logistics',h:'הובלה אווירית ולוגיסטיקה'},
+  airline:{e:'Passenger Airlines',h:'חברות תעופה'},
+  bldg:{e:'Building Products',h:'מוצרי בנייה'},
+  ceng:{e:'Construction & Engineering',h:'בנייה והנדסה'},
+  ee:{e:'Electrical Equipment',h:'ציוד חשמלי'},
+  td:{e:'Trading Companies',h:'חברות סחר והפצה'},
+  chem:{e:'Chemicals',h:'כימיקלים'},
+  metal:{e:'Metals & Mining',h:'מתכות וכרייה'},
+  cmat:{e:'Construction Materials',h:'חומרי בניין'},
+  cp:{e:'Containers & Packaging',h:'אריזות ומיכולים'},
+  paper:{e:'Paper & Forest',h:'נייר ויערנות'},
+  spreit:{e:'Specialized REITs',h:'REITs מיוחדות'},
+  dreit:{e:'Diversified REITs',h:'REITs מגוונות'},
+  rreit:{e:'Residential REITs',h:'REITs מגורים'},
+  remd:{e:'Real Estate Mgmt & Dev',h:'ניהול ופיתוח נדל״ן'},
+  elutil:{e:'Electric Utilities',h:'חשמל'},
+  multutil:{e:'Multi-Utilities',h:'שירותי תשתית משולבים'},
+  gasutil:{e:'Gas Utilities',h:'גז'},
+  watutil:{e:'Water Utilities',h:'מים'},
+  ipwr:{e:'Independent Power',h:'חברות חשמל עצמאיות'},
+};
+
+const SYM_SUBIND = {"NVDA":"semi","AAPL":"thw","MSFT":"sw","AMZN":"bret","GOOGL":"imds","GOOG":"imds","AVGO":"semi","META":"imds","TSLA":"auto","BRK.B":"fin","WMT":"csdr","JPM":"bank","LLY":"pharm","V":"fin","XOM":"oil","JNJ":"pharm","MU":"semi","ORCL":"sw","MA":"fin","AMD":"semi","COST":"csdr","NFLX":"ent","BAC":"bank","CAT":"mach","ABBV":"biot","CVX":"oil","PLTR":"sw","HD":"sret","INTC":"semi","PG":"hhp","CSCO":"commeq","LRCX":"semi","KO":"bev","GE":"aero","AMAT":"semi","MS":"capm","UNH":"hcps","MRK":"pharm","GS":"capm","GEV":"ee","RTX":"aero","WFC":"bank","PM":"tob","IBM":"itsvc","KLAC":"semi","LIN":"chem","AXP":"cfin","C":"bank","MCD":"hrl","TMUS":"wtel","PEP":"bev","TXN":"semi","ANET":"commeq","TMO":"lsts","VZ":"dtel","NEE":"elutil","AMGN":"biot","DIS":"ent","APH":"elec","T":"dtel","ADI":"semi","TJX":"sret","BA":"aero","GILD":"biot","ABT":"hces","CRM":"sw","ISRG":"hces","BLK":"capm","APP":"sw","SCHW":"capm","DE":"mach","ETN":"ee","UBER":"gtrans","PFE":"pharm","BKNG":"hrl","UNP":"gtrans","WELL":"dreit","HON":"icong","QCOM":"semi","COP":"oil","GLW":"elec","LOW":"sret","DHR":"lsts","LMT":"aero","PANW":"sw","SNDK":"thw","PLD":"dreit","SYK":"hces","SPGI":"capm","CB":"ins","COF":"cfin","DELL":"thw","WDC":"thw","NEM":"metal","PH":"mach","BMY":"pharm","STX":"thw","ACN":"itsvc","PGR":"ins","VRT":"ee","SBUX":"hrl","VRTX":"biot","MDT":"hces","HCA":"hcps","INTU":"sw","CRWD":"sw","EQIX":"spreit","CEG":"elutil","MO":"tob","CMCSA":"media","SO":"elutil","MCK":"hcps","TT":"bldg","CME":"capm","HWM":"aero","FCX":"metal","BX":"capm","NOW":"sw","MAR":"hrl","DUK":"elutil","CVS":"hcps","ADBE":"sw","BSX":"hces","NOC":"aero","FDX":"airf","BK":"capm","KKR":"capm","ICE":"capm","GD":"aero","UPS":"airf","PNC":"bank","PWR":"ceng","WM":"css","USB":"bank","WMB":"oil","CMI":"mach","JCI":"bldg","SNPS":"sw","CDNS":"sw","SHW":"chem","AMT":"spreit","MMC":"ins","ABNB":"hrl","EMR":"ee","HOOD":"capm","MCO":"capm","MMM":"icong","ADP":"prof","CSX":"gtrans","DASH":"hrl","REGN":"biot","SLB":"oilsvc","ITW":"mach","ORLY":"sret","CRH":"cmat","HLT":"hrl","ECL":"chem","RCL":"hrl","MNST":"bev","GM":"auto","MDLZ":"food","CI":"hcps","MSI":"commeq","ROST":"sret","AEP":"elutil","TEL":"elec","MPWR":"semi","APO":"fin","CIEN":"commeq","CTAS":"css","TDG":"aero","KMI":"oil","AON":"ins","ELV":"hcps","DLR":"spreit","WBD":"ent","CL":"hhp","EOG":"oil","NKE":"appar","NSC":"gtrans","SPG":"dreit","VLO":"oil","PCAR":"mach","LHX":"aero","APD":"chem","COHR":"elec","RSG":"css","TRV":"ins","LITE":"commeq","COR":"hcps","MPC":"oil","TFC":"bank","PSX":"oil","SRE":"multutil","O":"dreit","FTNT":"sw","TER":"semi","BKR":"oilsvc","AFL":"ins","AZO":"sret","FIX":"ceng","TGT":"csdr","KEYS":"elec","AJG":"ins","ALL":"ins","CVNA":"sret","VST":"ipwr","GWW":"td","D":"multutil","NXPI":"semi","COIN":"capm","PSA":"spreit","AME":"ee","CTVA":"chem","OXY":"oil","ETR":"elutil","OKE":"oil","FAST":"td","F":"auto","GRMN":"hhd","ZTS":"pharm","CARR":"bldg","ADSK":"sw","EA":"ent","MET":"ins","FANG":"oil","XEL":"elutil","TRGP":"oil","NDAQ":"capm","CAH":"hcps","URI":"td","EXC":"elutil","DAL":"airline","EBAY":"bret","IDXX":"hces","ROK":"ee","EW":"hces","CMG":"hrl","PYPL":"fin","FITB":"bank","ODFL":"gtrans","BDX":"hces","YUM":"hrl","WAB":"mach","DDOG":"sw","NUE":"metal","CBRE":"remd","DHI":"hhd","XYZ":"fin","MCHP":"semi","AIG":"ins","KR":"csdr","MSCI":"capm","AMP":"capm","PEG":"multutil","ED":"multutil","CCL":"hrl","VTR":"dreit","STT":"capm","TTWO":"ent","HSY":"food","CCI":"spreit","SATS":"media","HIG":"ins","LVS":"hrl","VMC":"cmat","PCG":"elutil","WEC":"multutil","MLM":"cmat","ROP":"sw","LYV":"ent","EQT":"oil","SYY":"csdr","IBKR":"capm","KDP":"bev","EME":"ceng","NRG":"elutil","PRU":"ins","IRM":"spreit","HPE":"thw","ACGL":"ins","A":"lsts","HBAN":"bank","FISV":"fin","GEHC":"hces","JBL":"elec","KVUE":"pcp","IR":"mach","RMD":"hces","UAL":"airline","PAYX":"prof","KMB":"hhp","ON":"semi","EXPE":"hrl","AXON":"aero","ADM":"food","CPRT":"css","WAT":"lsts","MTB":"bank","WDAY":"sw","OTIS":"mach","TPR":"appar","CBOE":"capm","AEE":"multutil","HAL":"oilsvc","VICI":"spreit","ATO":"gasutil","EXR":"spreit","DTE":"multutil","RJF":"capm","IQV":"lsts","DOV":"mach","NTRS":"capm","CHTR":"media","TDY":"elec","PPL":"elutil","CTSH":"itsvc","XYL":"mach","TPL":"oil","STLD":"metal","FE":"elutil","Q":"semi","HUBB":"ee","STZ":"bev","CNP":"multutil","WTW":"ins","DG":"csdr","CASY":"csdr","EL":"pcp","DVN":"oil","CFG":"bank","EIX":"elutil","SYF":"cfin","MTD":"lsts","KHC":"food","ROL":"css","ARES":"capm","BIIB":"biot","ES":"elutil","CINF":"ins","PPG":"chem","AWK":"watutil","DOW":"chem","FICO":"sw","WRB":"ins","VRSN":"itsvc","FIS":"fin","HUM":"hcps","DXCM":"hces","PHM":"hhd","ULTA":"sret","AVB":"rreit","RF":"bank","CMS":"multutil","TSCO":"sret","EFX":"prof","SBAC":"spreit","WSM":"sret","EQR":"rreit","CTRA":"oil","RL":"appar","KEY":"bank","VRSK":"prof","ALB":"chem","JBHT":"gtrans","NI":"multutil","BG":"food","EXE":"oil","DRI":"hrl","BRO":"ins","CHD":"hhp","L":"ins","LEN":"hhd","TSN":"food","OMC":"media","VLTO":"css","LH":"hcps","SW":"cp","STE":"hces","CPAY":"fin","DGX":"hcps","CHRW":"airf","LYB":"chem","MRNA":"biot","TROW":"capm","LUV":"airline","DLTR":"csdr","PFG":"ins","NTAP":"thw","FSLR":"semi","GPN":"fin","SNA":"mach","WST":"lsts","IP":"cp","EXPD":"airf","LDOS":"prof","INCY":"biot","NVR":"hhd","DD":"chem","IFF":"chem","AMCR":"cp","LULU":"appar","BR":"itsvc","PKG":"cp","EVRG":"elutil","GIS":"food","LNT":"elutil","CNC":"hcps","FTV":"mach","ZBH":"hces","HPQ":"thw","WY":"spreit","FFIV":"commeq","CF":"chem","BALL":"cp","SMCI":"thw","CDW":"elec","VTRS":"pharm","LII":"bldg","CSGP":"remd","PTC":"sw","ESS":"rreit","KIM":"dreit","INVH":"rreit","TRMB":"elec","DECK":"appar","TXT":"aero","GPC":"dist","NDSN":"mach","HII":"aero","IEX":"mach","J":"prof","MAA":"rreit","REG":"dreit","PNR":"mach","MKC":"food","TYL":"sw","TKO":"ent","HST":"dreit","BEN":"capm","AKAM":"itsvc","PODD":"hces","EG":"ins","BBY":"sret","COO":"hces","HAS":"leis","ALGN":"hces","MAS":"bldg","BF.B":"bev","AVY":"cp","FOX":"media","FOXA":"media","PSKY":"media","ERIE":"ins","APTV":"autop","CLX":"hhp","APA":"oil","PNW":"elutil","DPZ":"hrl","GNRC":"ee","ALLE":"bldg","SOLV":"hces","GEN":"sw","DOC":"dreit","GL":"ins","HRL":"food","UDR":"rreit","GDDY":"itsvc","WYNN":"hrl","AIZ":"ins","ZBRA":"elec","UHS":"hcps","JKHY":"fin","SWK":"mach","IVZ":"capm","IT":"itsvc","CPT":"rreit","TTD":"media","RVTY":"lsts","AES":"ipwr","SJM":"food","DVA":"hcps","MGM":"hrl","FRT":"dreit","BAX":"hces","NCLH":"hrl","NWSA":"media","BLDR":"bldg","TECH":"lsts","BXP":"dreit","CRL":"lsts","HSIC":"hcps","AOS":"bldg","SWKS":"semi","FDS":"capm","ARE":"dreit","TAP":"bev","POOL":"dist","MOS":"chem","CAG":"food","EPAM":"itsvc","CPB":"food","NWS":"media","FLEX":"elec","FN":"commeq","PSTG":"thw","LSCC":"semi","MKSI":"semi","ENTG":"semi","MANH":"sw","CGNX":"elec","DOX":"itsvc","AMKR":"semi","APPF":"sw","ARW":"td","BLKB":"sw","BOX":"sw","CVLT":"sw","DBX":"sw","GLOB":"itsvc","IPGP":"elec","KD":"itsvc","MTSI":"semi","NSIT":"itsvc","NOVT":"elec","PEGA":"sw","RMBS":"semi","SANM":"elec","SMTC":"semi","TDC":"sw","TENB":"sw","VRNS":"sw","XRX":"thw","ZD":"media","QRVO":"semi","CRUS":"semi","VSH":"semi","ALGM":"semi","MKL":"ins","JEF":"capm","EWBC":"bank","WBS":"bank","FHN":"bank","CFR":"bank","PNFP":"bank","WTFC":"bank","LPLA":"capm","UMBF":"bank","OZK":"bank","AFG":"ins","RLI":"ins","ZION":"bank","SNV":"bank","RBA":"css","RGA":"ins","FNF":"ins","ORI":"ins","UNM":"ins","AMG":"capm","ALLY":"cfin","COLB":"bank","CMA":"bank","CBSH":"bank","WTM":"ins","SEIC":"capm","HOMB":"bank","PB":"bank","FFIN":"bank","GBCI":"bank","MTG":"ins","RNR":"ins","SLM":"cfin","ESNT":"ins","RDN":"ins","BOKF":"bank","WAL":"bank","PFSI":"fin","AGO":"ins","NLY":"spreit","STWD":"spreit","AGNC":"spreit","PRI":"ins","FTI":"oilsvc","MTDR":"oil","CHRD":"oil","RRC":"oil","AR":"oil","CIVI":"oil","MGY":"oil","SM":"oil","NOV":"oilsvc","CHX":"oilsvc","OII":"oilsvc","PTEN":"oilsvc","NFG":"oil","MUR":"oil","CNX":"oil","VNOM":"oil","WFRD":"oilsvc","LBRT":"oilsvc","HP":"oilsvc","DINO":"oil","PBF":"oil","SWN":"oil","CRK":"oil","AM":"oil","WES":"oil","ENLC":"oil","DK":"oil","AROC":"oilsvc","GPOR":"oil","UTHR":"biot","ILMN":"lsts","THC":"hcps","JAZZ":"pharm","PEN":"hces","MOH":"hcps","BIO":"lsts","BRKR":"lsts","HAE":"hces","LIVN":"hces","CHE":"hcps","MEDP":"lsts","SHC":"hces","ACHC":"hcps","ENSG":"hcps","EHC":"hcps","AMED":"hcps","AVTR":"lsts","EXEL":"biot","HALO":"biot","ICUI":"hces","IONS":"biot","NBIX":"biot","SRPT":"biot","PRGO":"pharm","OMCL":"hces","QDEL":"hces","CNMD":"hces","GKOS":"hces","LNTH":"pharm","HIMS":"hcps","ITGR":"hces","PRVA":"hcps","MMSI":"hces","NHC":"hcps","BKD":"hcps","CORT":"biot","RDY":"pharm","NYT":"media","IAC":"media","CABO":"media","SIRI":"media","GCI":"media","NXST":"media","SSP":"media","MSGS":"ent","MSGE":"ent","SHEN":"dtel","ATUS":"media","CW":"aero","WWD":"aero","XPO":"gtrans","ATI":"metal","MTZ":"ceng","NVT":"ee","BWXT":"aero","RBC":"mach","GGG":"mach","JBT":"mach","SAIA":"gtrans","WCC":"td","BLD":"bldg","WMS":"bldg","RHI":"prof","MLI":"mach","TREX":"bldg","KNX":"gtrans","AAL":"airline","AAON":"bldg","ACM":"ceng","AGCO":"mach","AIT":"td","ALK":"airline","ALSN":"mach","AYI":"ee","AZZ":"ee","BCC":"bldg","BECN":"td","CLH":"css","CR":"mach","DY":"ceng","EXPO":"prof","FBIN":"bldg","FLS":"mach","GATX":"td","GTLS":"mach","HEES":"td","HXL":"aero","ICFI":"prof","JBLU":"airline","KAI":"mach","KEX":"gtrans","LECO":"ee","LSTR":"gtrans","MAN":"prof","MATX":"gtrans","MOG.A":"aero","MSA":"mach","MSM":"td","OC":"bldg","OSK":"mach","PLPC":"ee","R":"gtrans","SAIC":"prof","SITE":"td","STRL":"ceng","TKR":"mach","TTC":"mach","UHAL":"gtrans","VMI":"ee","WSO":"td","AWI":"bldg","MIDD":"mach","WTS":"mach","ESAB":"mach","CXT":"mach","FLR":"ceng","CSL":"bldg","BC":"leis","G":"prof","CACI":"prof","MOD":"mach","CRS":"metal","RGLD":"metal","OLN":"chem","RPM":"chem","EXP":"cmat","ATR":"cp","ASH":"chem","MTX":"chem","SLGN":"cp","SXT":"chem","WOR":"metal","AA":"metal","AXTA":"chem","HUN":"chem","CC":"chem","CBT":"chem","GEF":"cp","KNF":"cmat","LPX":"bldg","SON":"cp","SUM":"cmat","VSTS":"css","EMN":"chem","FUL":"chem","HBM":"metal","IOSP":"chem","CUBE":"spreit","NNN":"dreit","EPR":"spreit","FR":"dreit","RHP":"spreit","STAG":"dreit","CDP":"dreit","LAMR":"spreit","EGP":"dreit","KRG":"dreit","BRX":"dreit","OHI":"spreit","GLPI":"spreit","APLE":"spreit","PEB":"spreit","ELS":"rreit","SUI":"rreit","AMH":"rreit","ADC":"dreit","REXR":"dreit","SLG":"dreit","SBRA":"spreit","HIW":"dreit","PK":"spreit","DEI":"dreit","MAC":"dreit","KRC":"dreit","CUZ":"dreit","NSA":"spreit","LXP":"dreit","PSTL":"dreit","IDA":"elutil","ALE":"elutil","AVA":"multutil","POR":"elutil","OGE":"elutil","BKH":"multutil","NWE":"elutil","NJR":"gasutil","UGI":"gasutil","SWX":"gasutil","SR":"gasutil","OTTR":"multutil","MGEE":"elutil","OGS":"gasutil","HE":"elutil","PNM":"elutil","USFD":"csdr","FLO":"food","LW":"food","POST":"food","INGR":"food","PFGC":"csdr","ACI":"csdr","UVV":"tob","ENR":"hhp","SPB":"hhp","BJ":"csdr","COTY":"pcp","ELF":"pcp","BRBR":"food","FIZZ":"bev","HAIN":"food","HLF":"pcp","LANC":"food","MUSA":"csdr","PRMW":"bev","REYN":"hhp","SFM":"csdr","UNFI":"csdr","BURL":"sret","CROX":"appar","PVH":"appar","UAA":"appar","KMX":"sret","M":"bret","GPS":"sret","ANF":"sret","DKS":"sret","TOL":"hhd","CAVA":"hrl","CHDN":"hrl","CZR":"hrl","BYD":"hrl","FND":"sret","ETSY":"bret","THO":"leis","BBWI":"sret","WEN":"hrl","CHWY":"bret","AN":"sret","ALV":"autop","BWA":"autop","CBRL":"hrl","CVCO":"hhd","DENN":"hrl","FL":"sret","GME":"sret","GNTX":"autop","GT":"autop","HOG":"leis","IBP":"hhd","JACK":"hrl","JWN":"bret","KBH":"hhd","KSS":"bret","LAD":"sret","LKQ":"dist","MAT":"leis","MHO":"hhd","MTH":"hhd","MTN":"hrl","PATK":"leis","PAG":"sret","PII":"leis","SCI":"css","SIG":"sret","SKX":"appar","TMHC":"hhd","TXRH":"hrl","VC":"autop","WH":"hrl","WING":"hrl","YETI":"leis","OLLI":"sret","RH":"sret","CWH":"sret","TPH":"hhd","GPI":"sret","ABG":"sret","VSCO":"sret","SHAK":"hrl","WLY":"media","XM":"sw","PRGS":"sw","WWE":"ent","TDS":"dtel"};
+
+// Return Hebrew sub-industry name for a ticker; null if unmapped.
+const getSubIndHe = (sym) => {
+  const code = SYM_SUBIND[sym];
+  return code && SI_LABELS[code] ? SI_LABELS[code].h : null;
 };
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -4760,6 +5027,26 @@ const getCurrentHoldings = () => UNIVERSES[currentUniverse].holdings;
 const getCurrentMethodology = () => METHODOLOGIES[currentMethodology];
 // Per-universe AND per-methodology cache — switching either is instant if cached
 const getCacheKey = () => `${CACHE_KEY_BASE}_${currentUniverse}_${currentMethodology}`;
+
+/**
+ * Load cached scan for current (universe, methodology). Returns the
+ * cached object or null. Automatically backfills sub-industry on
+ * stocks cached before that field existed — so users don't have to
+ * re-scan to see the new pill in the detail panel.
+ */
+function loadCachedScan() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(getCacheKey()));
+    if (!cached || Date.now() - cached.timestamp >= CACHE_TTL) return null;
+    if (cached.stocks) {
+      cached.stocks.forEach(s => {
+        if (s.subInd === undefined) s.subInd = SYM_SUBIND[s.sym] || null;
+        if (s.subIndName === undefined) s.subIndName = getSubIndHe(s.sym);
+      });
+    }
+    return cached;
+  } catch(e) { return null; }
+}
 
 // Symbol → sector/name maps, rebuilt whenever the universe changes.
 const SYM_SECTOR = {};
@@ -4807,15 +5094,8 @@ function advisorBoot() {
   syncUniverseUI();
   syncMethodologyUI();
   // Try load from cache for this (universe, methodology)
-  try {
-    const cached = JSON.parse(localStorage.getItem(getCacheKey()));
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      scanData = cached;
-      showResults();
-      renderWatchlist();
-      return;
-    }
-  } catch(e){}
+  scanData = loadCachedScan();
+  if (scanData) { showResults(); renderWatchlist(); return; }
   renderWatchlist();
   startMarketClock();
 } // advisorBoot end
@@ -5113,6 +5393,57 @@ function scoreDualMomentum(m, pct) {
   return { score, factors: { ABS, REL, INT } };
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+   WEINSTEIN STAGE ANALYSIS — "Secrets for Profiting in Bull and Bear
+   Markets" (1988). Core rule: buy ONLY Stage 2 (markup). A stock is in
+   Stage 2 when:
+     1. Price > 30-week MA (we use sma40 — weekly data ≈ 40 weeks ≈ 200d)
+     2. The MA itself is RISING (positive slope)
+     3. Price > short-term MA > long-term MA (sma10 > sma40)
+   Anything else is Stage 1 (basing), Stage 3 (topping), or Stage 4
+   (decline) — Weinstein's disqualification, so score = 0.
+   After the gate, we rank by MA slope, relative strength, and stickiness.
+   ───────────────────────────────────────────────────────────────────── */
+function scoreWeinstein(m, pct) {
+  const inStage2 = m.sma40 != null && m.price > m.sma40 &&
+                   m.sma10 != null && m.sma10 > m.sma40 &&
+                   m.sma10Slope != null && m.sma10Slope > 0;
+  if (!inStage2) {
+    return { score: 0, factors: { STG: 0, SLP: 0, RS: 0, STK: 0 } };
+  }
+  const STG = 100;                                 // gate passed
+  const SLP = pct.sma10Slope(m.sma10Slope);        // steeper MA ascent = better
+  const RS  = pct.rs12m(m.rs12m);                  // beats SPY by more = better
+  const STK = Math.min(100, (m.stickiness || 0) * 100); // % time above MA
+  const score = STG * 0.20 + SLP * 0.35 + RS * 0.30 + STK * 0.15;
+  return { score, factors: { STG, SLP, RS, STK } };
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   DARVAS BOX THEORY — "How I Made $2,000,000 in the Stock Market" (1960).
+   Nicolas Darvas traded only near 52-week / all-time highs, on stocks
+   that had climbed through multiple price "boxes" (consolidation ranges).
+   Without tick-level data we approximate:
+     - ATH proximity (fromHi)
+     - Multi-month climb (ret12m percentile = "boxes traversed")
+     - Current breakout ignition (1m return + above rising SMA10)
+     - Position in 52w range (rangePos — higher = better)
+   Distinct from the Breakout methodology by heavier weight on long-term
+   climb (Darvas held for months/years) and stronger ATH bias.
+   ───────────────────────────────────────────────────────────────────── */
+function scoreDarvas(m, pct) {
+  const ATH = pct.fromHi(m.fromHi);
+  const CLM = pct.ret12m(m.ret12m);
+  let BRK = 0;
+  if (m.ret1m != null && m.ret1m > 0) BRK += 40;
+  if (m.sma10 != null && m.price > m.sma10) BRK += 30;
+  if (m.sma10Slope != null && m.sma10Slope > 0) BRK += 30;
+  BRK = Math.min(100, BRK);
+  const POS = Math.min(100, (m.rangePos || 0) * 100);
+  const score = ATH * 0.35 + CLM * 0.30 + BRK * 0.20 + POS * 0.15;
+  return { score, factors: { ATH, CLM, BRK, POS } };
+}
+
 const METHODOLOGIES = {
   momentum: {
     label:'Momentum', labelHe:'מומנטום',
@@ -5193,6 +5524,34 @@ const METHODOLOGIES = {
     ],
     compute: scoreDualMomentum,
   },
+  weinstein: {
+    label:'Stage Analysis', labelHe:'Weinstein',
+    subtitle:'Stage 2 only',
+    desc:'רק מניות בשלב Markup — מעל MA30w עולה',
+    theory:'Stage Analysis של Stan Weinstein מתוך "Secrets for Profiting in Bull and Bear Markets" (1988). מחלק מחירים ל-4 שלבים: Stage 1 Basing, Stage 2 Markup, Stage 3 Top, Stage 4 Decline. קונה אך ורק Stage 2 — מניה מעל ממוצע נע 30-שבועות שהוא עצמו עולה. בשאר השלבים המניה מוסרת כליל (ציון 0), גם אם נראית "טובה" לפי מדדים אחרים. זה המסנן האיכותי החשוב ביותר של הגישה.',
+    bestWhen:'סלקטיביות מקסימלית · מניעת early entries',
+    factors:[
+      {k:'STG', label:'שער Stage 2',  weight:20, desc:'price > MA40, MA עולה'},
+      {k:'SLP', label:'שיפוע מגמה',    weight:35, desc:'MA rising fast'},
+      {k:'RS',  label:'חוזק יחסי',     weight:30, desc:'מול SPY'},
+      {k:'STK', label:'יציבות מגמה',   weight:15, desc:'% זמן מעל MA'},
+    ],
+    compute: scoreWeinstein,
+  },
+  darvas: {
+    label:'Box Theory', labelHe:'Darvas',
+    subtitle:'Climb through boxes',
+    desc:'ליד שיא, אחרי טיפוס דרך תיבות קונסולידציה',
+    theory:'Box Theory של Nicolas Darvas מתוך "How I Made $2,000,000 in the Stock Market" (1960). דארווס זיהה "תיבות" — טווחי קונסולידציה של המחיר — ורכש רק כאשר המחיר שבר את גג התיבה עם volume. קנה כמעט בלעדית ליד שיא 52-שבועי. המודל מחקה זאת: קירבה לשיא + טיפוס רב-חודשי (תיבות שנחצו) + פריצה נוכחית.',
+    bestWhen:'trending markets · momentum runners · bull phase',
+    factors:[
+      {k:'ATH', label:'קירבה לשיא',    weight:35, desc:'fromHi קרוב ל-0'},
+      {k:'CLM', label:'טיפוס שנתי',     weight:30, desc:'ret12m percentile'},
+      {k:'BRK', label:'פריצה',          weight:20, desc:'1m+ + מעל SMA10'},
+      {k:'POS', label:'מיקום בטווח',    weight:15, desc:'ליד 52w high'},
+    ],
+    compute: scoreDarvas,
+  },
 };
 
 function computeScores(stocksData, spyCloses, methodologyKey) {
@@ -5235,6 +5594,8 @@ function computeScores(stocksData, spyCloses, methodologyKey) {
       name: SYM_NAME[sym] || sym,
       sector: SYM_SECTOR[sym] || '—',
       sectorName: SECTOR_NAMES[SYM_SECTOR[sym]] || '—',
+      subInd: SYM_SUBIND[sym] || null,            // GICS sub-industry code
+      subIndName: getSubIndHe(sym),                // Hebrew sub-industry label; null if unmapped
       score: Math.round(score),
       scores: roundedFactors,
       metrics: m,
@@ -5261,7 +5622,9 @@ async function runScan() {
   const symbols = Array.from(symbolsSet);
 
   showScreen('adv-screen-loading');
-  $('loading-msg').textContent = `אוסף נתוני 52 שבועות עבור ${symbols.length} מניות (בנצ׳מרק: SPY)...`;
+  // Estimate scan time: ~1.5s per ticker through the proxy (rough empirical)
+  const estMinutes = Math.ceil(symbols.length * 1.5 / 60);
+  $('loading-msg').textContent = `אוסף נתוני 52 שבועות עבור ${symbols.length} מניות (בנצ׳מרק: SPY) · משוער: ~${estMinutes} דק׳`;
   $('prog-txt').textContent = `0 / ${symbols.length}`;
   $('prog-fill').style.width = '0%';
 
@@ -5298,17 +5661,46 @@ async function runScan() {
     universe: currentUniverse,
   };
   try {
+    // Lean cache payload — drops the `closes` array (mini-chart falls back to
+    // a static placeholder when restored from cache; user can re-scan for live
+    // charts) and keeps only minimal metrics needed for the detail panel.
     const lean = {
       timestamp: scanData.timestamp,
       universeSize: scanData.universeSize,
       methodology: scanData.methodology,
       universe: scanData.universe,
       stocks: stocks.map(s => ({
-        ...s,
-        metrics: { ...s.metrics, closes: s.metrics.closes.slice(-26) }
+        sym: s.sym, name: s.name, sector: s.sector, sectorName: s.sectorName,
+        subInd: s.subInd, subIndName: s.subIndName,
+        score: s.score, scores: s.scores, rank: s.rank,
+        price: s.price, y1: s.y1, m3: s.m3, m1: s.m1, fromHi: s.fromHi,
+        // Only the metrics actually used by the detail panel logic.
+        // No `closes` → mini-chart shows a "re-scan for chart" placeholder on cache-load.
+        metrics: {
+          price: s.metrics.price,
+          fromHi: s.metrics.fromHi,
+          ret1m: s.metrics.ret1m,
+          sma10: s.metrics.sma10,
+          sma40: s.metrics.sma40,
+          sma10Slope: s.metrics.sma10Slope,
+        },
       })),
     };
-    localStorage.setItem(getCacheKey(), JSON.stringify(lean));
+    const key = getCacheKey();
+    const payload = JSON.stringify(lean);
+    try {
+      localStorage.setItem(key, payload);
+    } catch(quota) {
+      // Quota exceeded — free space by clearing OTHER methodology caches for
+      // this universe (keeping most-recent implicit by writing current one last),
+      // then retry. If it still fails, give up gracefully.
+      console.warn('cache quota hit, purging stale scan caches…');
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('advisor_scan_cache_') && k !== key)
+        .forEach(k => localStorage.removeItem(k));
+      try { localStorage.setItem(key, payload); }
+      catch(e2) { console.warn('cache still too large, skipping save'); }
+    }
   } catch(e) { console.warn('cache save failed', e); }
   showResults();
 }
@@ -5507,16 +5899,13 @@ function setMethodology(key) {
   }
 
   // Try cache for this (universe, methodology) combo
-  try {
-    const cached = JSON.parse(localStorage.getItem(getCacheKey()));
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      scanData = cached;
-      if (!modalOpen) showResults();
-      else { renderKPIs(); renderTable(); }
-      renderWatchlist();
-      return;
-    }
-  } catch(e){}
+  scanData = loadCachedScan();
+  if (scanData) {
+    if (!modalOpen) showResults();
+    else { renderKPIs(); renderTable(); }
+    renderWatchlist();
+    return;
+  }
 
   // No cache → reset KPIs; only show welcome screen if modal is closed
   ['kpi-universe','kpi-avg','kpi-sector','kpi-sector-sub','kpi-time','kpi-cache']
@@ -5560,15 +5949,8 @@ function setUniverse(u, btn) {
   syncUniverseUI();
 
   // Try to load cached scan for THIS universe
-  try {
-    const cached = JSON.parse(localStorage.getItem(getCacheKey()));
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      scanData = cached;
-      showResults();
-      renderWatchlist();
-      return;
-    }
-  } catch(e){}
+  scanData = loadCachedScan();
+  if (scanData) { showResults(); renderWatchlist(); return; }
 
   // No cache → reset KPIs and drop back to welcome screen, inviting a fresh scan
   ['kpi-universe','kpi-avg','kpi-sector','kpi-sector-sub','kpi-time','kpi-cache']
@@ -5730,6 +6112,7 @@ function openDetail(sym) {
         <div class="dt-score-lbl">#${s.rank} מתוך ${scanData.universeSize}</div>
         <div class="dt-score-title">${s.name}</div>
         <div class="dt-score-desc">${s.sectorName} · $${fmt(s.price)} · ${fmtPct(s.y1)} שנתי</div>
+        ${s.subIndName ? `<div class="dt-score-subind">${s.subIndName}</div>` : ''}
       </div>
     </div>
 
@@ -5815,7 +6198,11 @@ function closeDetailDirect() {
 }
 
 function renderMiniChart(closes) {
-  if (!closes || closes.length < 4) return '<div style="color:var(--dim);font-size:11px;padding:20px;text-align:center">אין מספיק נתונים</div>';
+  if (!closes || closes.length < 4) {
+    // After cache restore, closes are dropped to save quota. Offer an explicit
+    // re-scan CTA instead of a dead "no data" message.
+    return '<div style="color:var(--dim);font-size:11px;padding:20px;text-align:center;line-height:1.6">גרף זמין לאחר סריקה חדשה<br><span style="font-size:10px;opacity:.7">לחץ על "סריקה" ברצועת הבקרה לרענון עם נתונים חיים</span></div>';
+  }
   const last26 = closes.slice(-26);
   const min = Math.min(...last26);
   const max = Math.max(...last26);
