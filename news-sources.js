@@ -9,18 +9,14 @@ const HEBREW_NEWS_FEEDS = [
   { name: 'כסף עולמי',     url: 'https://rss.walla.co.il/feed/112',   domain: 'walla.co.il' },
   { name: 'קריפטו',        url: 'https://rss.walla.co.il/feed/13373', domain: 'walla.co.il' },
   { name: 'וואלה TECH',    url: 'https://rss.walla.co.il/feed/4000',  domain: 'walla.co.il' },
-  { name: 'חדשות בעולם',   url: 'https://rss.walla.co.il/feed/2',     domain: 'walla.co.il' },
   { name: 'דעות כסף',      url: 'https://rss.walla.co.il/feed/4997',  domain: 'walla.co.il' },
   { name: 'רשתות חברתיות', url: 'https://rss.walla.co.il/feed/13019', domain: 'walla.co.il' },
 ];
 
 // ── English ───────────────────────────────────────────────────
 const EN_NEWS_FEEDS = [
-  { name: 'Donald Trump',       url: 'https://rss.app/feeds/pmmyLkzKSZZLcau2.xml', domain: 'x.com' },
   { name: 'Benzinga Markets',   url: 'https://rss.app/feeds/6xoFWSgjRpOcDBAX.xml', domain: 'benzinga.com' },
   { name: 'Benzinga Financial', url: 'https://rss.app/feeds/GlMwezZhdiLNXGNT.xml', domain: 'benzinga.com' },
-  { name: 'Benzinga Long Ideas',  url: 'https://rss.app/feeds/djJ62cwc1d2vpH8w.xml', domain: 'benzinga.com' },
-  { name: 'Benzinga Short Ideas', url: 'https://rss.app/feeds/tvj0z6mPGCJUhSD7.xml', domain: 'benzinga.com' },
   // { name: 'MarketWatch',    url: 'https://feeds.content.dowjones.io/public/rss/mw_realtimeheadlines', domain: 'marketwatch.com' },
   // { name: 'CNBC Markets',   url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258', domain: 'cnbc.com' },
   // { name: 'Reuters',        url: 'https://feeds.reuters.com/reuters/businessNews', domain: 'reuters.com' },

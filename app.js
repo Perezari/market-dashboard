@@ -380,7 +380,6 @@ function _renderNewsGrid(items, lang, feeds) {
     if (!grpItems.length) return;
     const domain = _getDomain(feed);
     const fav = domain ? `<img src="${_faviconUrl(domain)}" class="news-src-favicon" alt="" onerror="this.style.display='none'">` : '';
-    html += `<div class="news-src-header">${fav}<span>${feed.name}</span></div>`;
     grpItems.sort((a,b) => new Date(b.pub||0) - new Date(a.pub||0)).slice(0, 6).forEach(item => {
       const time = item.pub ? new Date(item.pub).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}) : '';
       const imgHtml = item.img ? `<div class="news-thumb"><img src="${item.img}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'"></div>` : '';
@@ -803,52 +802,22 @@ async function runScreener() {
 
 function renderSectorsWithSkeleton(){
   const sk='<td class="lc">&nbsp;</td>';
-  const frozenRows = SECTORS.map(s =>
-    `<div class="tbl-frozen-row"><span class="sym">${s.sym}</span>${s.name}</div>`
-  ).join('') + '<div class="tbl-frozen-row tbl-frozen-avg">ממוצע</div>';
-  $('sector-frozen').innerHTML = '<div class="tbl-frozen-hdr">סקטור</div>' + frozenRows;
-
-  // כל התאים skeleton — נתונים מגיעים יחד בסוף
-  const rows = SECTORS.map(() =>
-    `<tr>${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}</tr>`
+  const stky = s => `<td class="stky"><span class="sym">${s.sym}</span>${s.name}</td>`;
+  // 11 תאי data skeleton + עמודת סקטור דביקה בסוף כל שורה (סה"כ 12)
+  const rows = SECTORS.map(s =>
+    `<tr onclick="openSectorModal('${s.sym}','${s.name}')" style="cursor:pointer">${sk.repeat(11)}${stky(s)}</tr>`
   );
-  rows.push(`<tr class="avgrow">${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}${sk}<td class="lc">&nbsp;</td><td class="lc">&nbsp;</td></tr>`);
+  rows.push(`<tr class="avgrow">${sk.repeat(11)}<td class="stky">ממוצע סקטורים</td></tr>`);
   $('sector-tbody').innerHTML = rows.join('');
-  syncFrozenRows();
 }
 
-let _syncTimer = null;
-function syncFrozenRows() {
-  if (_syncTimer) clearTimeout(_syncTimer);
-  _syncTimer = setTimeout(_doSyncFrozenRows, 30);
-}
-function _doSyncFrozenRows() {
-  const rows = document.querySelectorAll('#sector-tbody tr');
-  const frozenRows = document.querySelectorAll('#sector-frozen .tbl-frozen-row');
-  const th = document.querySelector('.t th');
-  const fh = document.querySelector('.tbl-frozen-hdr');
-  // Account for CSS zoom on body
-  const zoomLevel = document.body.classList.contains('zoomed') ? 1.4 : 1;
-  if (th && fh) fh.style.height = (th.getBoundingClientRect().height / zoomLevel) + 'px';
-  rows.forEach((tr, i) => {
-    if (frozenRows[i]) frozenRows[i].style.height = (tr.getBoundingClientRect().height / zoomLevel) + 'px';
-  });
-}
-// ResizeObserver fires whenever table re-layouts — works on all devices
-function initSyncObserver() {
-  const tbody = document.getElementById('sector-tbody');
-  if (!tbody || !window.ResizeObserver) return;
-  new ResizeObserver(() => syncFrozenRows()).observe(tbody);
-}
+// ── פונקציות הסנכרון הישנות — מיותרות אחרי איחוד לטבלה יחידה, נשארות כ-no-op ──
+function syncFrozenRows() {}
+function _doSyncFrozenRows() {}
+function initSyncObserver() {}
 
 function renderSectors(){
-  // עמודת שמות קפואה (לא sticky — אין ריצוד)
-  const frozen = $('sector-frozen');
-  if(frozen) frozen.innerHTML = '<div class="tbl-frozen-hdr">סקטור</div>'
-    + SECTORS.map(s=>`<div class="tbl-frozen-row" onclick="openSectorModal('${s.sym}','${s.name}')" style="cursor:pointer"><span class="sym">${s.sym}</span>${s.name}</div>`).join('')
-    + '<div class="tbl-frozen-row tbl-frozen-avg">ממוצע סקטורים</div>';
-
-  // טבלת נתונים (ללא עמודת שמות)
+  // טבלה יחידה — עמודת סקטור דביקה בסוף כל שורה (sticky right)
   const rows=SECTORS.map(s=>{
     const d=qmap[s.sym]||{};
     const h=histMap[s.sym]||{};
@@ -865,10 +834,11 @@ function renderSectors(){
       const vc = vr > 1.5 ? 'vol-high' : vr < 0.7 ? 'vol-low' : 'vol-norm';
       volTd = `<td class="${vc}" title="${(vr*100).toFixed(0)}% מהממוצע">${vi} ${(vr*100).toFixed(0)}%</td>`;
     }
-    return`<tr onclick="openSectorModal('${s.sym}','${s.name}')" title="לחץ לראות אחזקות">
+    return`<tr onclick="openSectorModal('${s.sym}','${s.name}')" title="לחץ לראות אחזקות" style="cursor:pointer">
       ${td(d.d1)}${td(h.w1)}${td(h.m1)}${td(h.m3)}${td(h.m6)}${td(h.y1)}${hiTd}${loTd}${volTd}
       ${getSectorMacroTd(s.sym)}
       <td class="${cellCls(a)}">${pct(a)}</td>
+      <td class="stky"><span class="sym">${s.sym}</span>${s.name}</td>
     </tr>`;
   });
   const periodAvgs=[0,1,2,3,4,5].map(pi=>avg(SECTORS.map(s=>{
@@ -879,9 +849,9 @@ function renderSectors(){
   rows.push(`<tr class="avgrow">
     ${periodAvgs.map((v)=>`<td class="${cellCls(v)}">${pct(v)}</td>`).join('')}<td></td><td></td><td></td><td></td>
     <td class="${cellCls(ov)}"><b>${pct(ov)}</b></td>
+    <td class="stky">ממוצע סקטורים</td>
   </tr>`);
   $('sector-tbody').innerHTML=rows.join('');
-  syncFrozenRows();
 }
 
 function renderSummary(){
@@ -1967,6 +1937,8 @@ async function init(){
     renderMarketInternals();
     runInsights();
     runAIBrief();
+    // Auto-run breadth scan (no user click required) — will refresh AI Brief when done
+    setTimeout(() => { try { runBreadth(); } catch(e) { console.warn('breadth auto-scan failed', e); } }, 800);
     const pos=SECTORS.filter(s=>(qmap[s.sym]||{}).d1>0).length;
     $('footer').textContent=`${pos}/${SECTORS.length} סקטורים חיוביים • Yahoo Finance • ${now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}`;
 
@@ -2218,9 +2190,13 @@ function renderCorrelationMatrix() {
 // ── 5. BREADTH INDICATOR (200-day SMA) ───────
 async function runBreadth() {
   const btn = document.querySelector('.breadth-btn');
-  if (btn) { btn.textContent = 'סורק...'; btn.disabled = true; }
+  if (btn) { btn.textContent = '...סורק'; btn.disabled = true; }
   $('breadth-big').textContent = '⏳';
-  $('breadth-sub').textContent = 'מחשב ממוצע 200 יום...';
+  $('breadth-sub').textContent = 'סורק 60 מניות מובילות...';
+  $('breadth-above').textContent = '–';
+  $('breadth-total').textContent = '–';
+  const adviceEl = $('breadth-advice');
+  if (adviceEl) { adviceEl.innerHTML = ''; adviceEl.className = 'breadth-advice'; }
 
   const holdingsSet = new Set();
   Object.values(ETF_HOLDINGS).forEach(sector => sector.forEach(h => holdingsSet.add(h.s)));
@@ -2243,17 +2219,73 @@ async function runBreadth() {
     } catch(e) {}
   }));
 
-  if (btn) { btn.textContent = 'רענן'; btn.disabled = false; }
-  if (!total) { $('breadth-big').textContent = '?'; return; }
+  // Show the refresh button for subsequent re-scans (Hebrew)
+  const refreshBtn = document.getElementById('breadth-refresh-btn');
+  if (btn) { btn.textContent = '↻ רענן'; btn.disabled = false; }
+  if (refreshBtn) refreshBtn.style.display = '';
+
+  if (!total) {
+    $('breadth-big').textContent = '?';
+    $('breadth-sub').textContent = 'שגיאת טעינה';
+    if (adviceEl) {
+      adviceEl.className = 'breadth-advice warn';
+      adviceEl.innerHTML = `<span class="br-headline">לא ניתן לטעון נתונים</span>בדוק חיבור לאינטרנט. לחץ על רענן כדי לנסות שוב.`;
+    }
+    return;
+  }
+
   const pct = Math.round((above / total) * 100);
-  const color = pct >= 60 ? 'var(--green)' : pct >= 40 ? '#f59e0b' : 'var(--red)';
+  // Color tiers: >=85 overheated (amber), 60-84 healthy green, 40-59 mixed amber, 25-39 orange, <25 red
+  const color = pct >= 85 ? '#f59e0b'
+              : pct >= 60 ? 'var(--green)'
+              : pct >= 40 ? '#f59e0b'
+              : pct >= 25 ? '#f97316'
+              : 'var(--red)';
   $('breadth-big').textContent = pct + '%';
   $('breadth-big').style.color = color;
   $('breadth-fill').style.width = pct + '%';
   $('breadth-fill').style.background = color;
-  $('breadth-above').textContent = `${above} מניות מעל`;
+  $('breadth-above').textContent = `${above} מעל`;
   $('breadth-total').textContent = `מתוך ${total}`;
-  $('breadth-sub').textContent = pct >= 60 ? '↑ שוק בריא — עלייה רחבה' : pct >= 40 ? '≈ מעורב — בדוק סקטור ספציפי' : '↓ רוב המניות מתחת לממוצע — סימן חולשה';
+
+  // ── Tiered Hebrew insight + actionable advice ──
+  let subText, adviceClass, adviceHead, adviceBody;
+  if (pct >= 85) {
+    subText = 'שוק מתוח מדי';
+    adviceClass = 'warn';
+    adviceHead = 'שוק במצב "מתוח" (overextended)';
+    adviceBody = `מעל 85% מהמניות מעל הממוצע — רמה נדירה שבעבר קידמה <b>תיקון של 2-5%</b>. אם יש רווחים פתוחים — שקול לנעול ${pct >= 90 ? '30-50%' : '20-30%'} מהפוזיציות. <b>לא הזמן להגדיל חשיפה</b> או לרדוף אחרי עליות.`;
+  } else if (pct >= 60) {
+    subText = 'שוק בריא — עלייה רחבה';
+    adviceClass = '';
+    adviceHead = 'מגמה חיובית עם תמיכה רחבה';
+    adviceBody = `רוב המניות מעל הממוצע — ראלי בריא, לא מוטה מניות בודדות. <b>אפשר לפתוח לונג</b> בסקטורים מובילים. שים Trailing Stop של 2-3% מתחת למחיר כדי להגן על רווחים. העדף מניות במשקל גבוה בסקטור המוביל.`;
+  } else if (pct >= 40) {
+    subText = 'שוק מעורב — בדוק סקטור';
+    adviceClass = 'warn';
+    adviceHead = 'רוחב מעורב — סלקטיביות חשובה';
+    adviceBody = `רק ${pct}% מהמניות מעל הממוצע — המדדים אולי עולים, אבל <b>העלייה לא רחבה</b>. לפעמים זה מוקדם לפני תיקון. אם נכנסים לפוזיציה — בחר <b>סקטור מוביל ספציפי</b> בלבד, עם Stop Loss של 3%. אל תרכוש סל רחב.`;
+  } else if (pct >= 25) {
+    subText = 'רוחב חלש — הקטן חשיפה';
+    adviceClass = 'danger';
+    adviceHead = 'רוב המניות מתחת לממוצע';
+    adviceBody = `רק ${above} מתוך ${total} מניות מעל ממוצע 200 יום. <b>זו לא עלייה בריאה</b>, גם אם S&P נראה חזק. הקטן חשיפה ל-50%, עבור לסקטורים דפנסיביים (XLP/XLU/XLV). <b>אל תתפוס תחתית</b> בסקטורים חלשים — חכה ל-3 ימים ירוקים רצופים.`;
+  } else {
+    subText = 'פירוק שוק — אזהרה';
+    adviceClass = 'danger';
+    adviceHead = 'פירוק שוק נרחב — סיכון גבוה';
+    adviceBody = `פחות מרבע מהמניות מעל הממוצע. היסטורית, רמות כאלה מלוות ב<b>המשך ירידות</b> לפני התייצבות. המלצה: <b>שמור מזומן</b>, אל תפתח פוזיציות חדשות, שקול הגנה על פוזיציות קיימות (Stop Loss קרוב או Put options). חכה לאות הפוך לפני חזרה.`;
+  }
+  $('breadth-sub').textContent = subText;
+  if (adviceEl) {
+    adviceEl.className = 'breadth-advice' + (adviceClass ? ' ' + adviceClass : '');
+    adviceEl.innerHTML = `<span class="br-headline">${adviceHead}</span>${adviceBody}`;
+  }
+
+  // Refresh AI Brief so its Breadth card picks up the new value
+  if (typeof window.simpleAIBrief === 'function') {
+    setTimeout(() => { try { window.simpleAIBrief(); } catch(e){} }, 30);
+  }
 }
 
 // ══════════════════════════════════════

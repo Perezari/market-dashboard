@@ -1408,10 +1408,7 @@ body.light .lo52{color:#cc1a3a}
   flex-shrink:0;
   position:relative;
 }
-.macro-item+.macro-item::before{
-  content:'';position:absolute;right:0;top:25%;height:50%;
-  width:1px;background:var(--border);
-}
+
 .macro-name{font-size:9px;color:var(--dim);font-weight:700;text-transform:uppercase;letter-spacing:.6px}
 .macro-price{font-family:var(--mono);font-size:12px;font-weight:800;color:var(--text)}
 .macro-chg{font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px}

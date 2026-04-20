@@ -2,578 +2,794 @@
 <html dir="rtl" lang="he">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#1e1d1c">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0b1311">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="שוק אמריקאי">
-<meta name="mobile-web-app-capable" content="yes">
-<title>דשבורד שוק אמריקאי</title>
+<meta name="apple-mobile-web-app-title" content="StockPulse">
+<title>StockPulse · Terminal</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="apple-touch-icon" href="favicon.svg">
+<!-- Auto-skip login if already connected -->
+<script>
+  try {
+    // Only auto-skip when no ?login=1 query arg (force login screen)
+    if (localStorage.getItem('app_proxy_url') && !location.search.includes('login=1')) {
+      location.replace('dashboard.html' + (location.hash || ''));
+    }
+  } catch(e){}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════
+   StockPulse Terminal — Isolated login page
+   No app.css interaction. Pure, standalone.
+   ═══════════════════════════════════════════════════════════ */
+:root{
+  --bg:#0b1311;
+  --bg2:#121a18;
+  --bg3:#1a2320;
+  --bg4:#233029;
+  --border:#d6d5d41e;
+  --border2:#d6d5d434;
+  --text:#dfe4e0;
+  --dim:#dfe4e080;
+  --dimmer:#dfe4e04d;
+  --green:#4fc78a;
+  --green-soft:#4fc78a26;
+  --green-dim:#4fc78a66;
+  --red:#e77385;
+  --sans:'Rubik',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--sans);
+  font-size:13px;
+  overflow:hidden;
+  position:relative;
+  -webkit-font-smoothing:antialiased;
+  -webkit-user-select:none;
+  user-select:none;
+}
+/* grid-dot pattern */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    linear-gradient(var(--border) 1px,transparent 1px),
+    linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:48px 48px;
+  opacity:.4;
+  -webkit-mask-image:radial-gradient(ellipse at center, #000 20%, transparent 70%);
+  mask-image:radial-gradient(ellipse at center, #000 20%, transparent 70%);
+}
+/* ambient green glow */
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(ellipse 800px 500px at 50% 85%, rgba(79,199,138,.08), transparent 70%),
+    radial-gradient(ellipse 600px 400px at 15% 50%, rgba(79,199,138,.04), transparent 70%),
+    radial-gradient(ellipse 600px 400px at 85% 50%, rgba(79,199,138,.04), transparent 70%);
+}
+
+/* ═══════════ TOP TERMINAL BAR ═══════════ */
+.term-bar{
+  position:relative;z-index:10;
+  display:flex;align-items:center;justify-content:space-between;
+  height:30px;padding:0 18px;
+  background:rgba(10,17,15,.7);
+  border-bottom:1px solid var(--border);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  direction:ltr;
+}
+.tb-group{display:flex;align-items:center;gap:14px}
+.tb-item{display:flex;align-items:baseline;gap:6px;font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text);white-space:nowrap}
+.tb-item .tb-suffix{font-size:8px;font-weight:700;color:var(--dimmer);letter-spacing:1.2px;text-transform:uppercase}
+.tb-item .tb-feed{color:var(--text);font-weight:500}
+.tb-sep{width:1px;height:12px;background:var(--border2)}
+.tb-live{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;font-weight:800;color:var(--green);letter-spacing:1.4px}
+.tb-live::before{
+  content:'';width:6px;height:6px;border-radius:50%;
+  background:var(--green);box-shadow:0 0 10px var(--green);
+  animation:pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.85)}}
+
+/* ═══════════ BACKGROUND DECORATIVE DASHBOARD ═══════════ */
+.dash-bg{
+  position:absolute;inset:30px 0 0 0;z-index:1;
+  display:grid;grid-template-columns:360px 1fr 360px;gap:0;
+  padding:14px 18px;pointer-events:none;
+  opacity:.85;
+}
+.dash-bg > *{min-width:0}
+
+.sec-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 0 7px 0;margin-bottom:8px;
+  font-family:var(--mono);font-size:9px;letter-spacing:1.4px;text-transform:uppercase;
+  color:var(--dim);
+}
+.sec-hdr .sec-title{
+  display:flex;align-items:center;gap:7px;
+  font-weight:700;color:var(--dim);
+}
+.sec-hdr .sec-title::after{
+  content:'';width:2px;height:11px;background:var(--green);border-radius:1px;
+}
+.sec-hdr .sec-meta{color:var(--dimmer);font-weight:500;font-size:9px}
+
+.bg-left{display:flex;flex-direction:column;gap:18px}
+.sec-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.sec-cell{
+  position:relative;padding:10px 6px;border-radius:5px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  font-family:var(--mono);
+  border:1px solid transparent;
+}
+.sec-cell.up{background:rgba(79,199,138,.1);border-color:rgba(79,199,138,.28);color:var(--green)}
+.sec-cell.down{background:rgba(231,115,133,.1);border-color:rgba(231,115,133,.28);color:var(--red)}
+.sec-cell .sec-name{font-size:9px;font-weight:800;letter-spacing:1.2px;opacity:.9}
+.sec-cell .sec-pct{font-size:10px;font-weight:700;letter-spacing:.3px}
+
+.movers-list{display:flex;flex-direction:column}
+.movers-list li{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:7px 2px;border-bottom:1px solid var(--border);
+  font-family:var(--mono);list-style:none;
+}
+.movers-list li:last-child{border-bottom:none}
+.movers-list .m-pct{font-size:11px;font-weight:700}
+.movers-list .m-pct.up{color:var(--green)}
+.movers-list .m-pct.down{color:var(--red)}
+.movers-list .m-sym{font-size:12px;font-weight:700;color:var(--text);letter-spacing:.4px}
+
+.events-list{display:flex;flex-direction:column}
+.events-list li{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:7px 2px;border-bottom:1px solid var(--border);
+  list-style:none;
+}
+.events-list li:last-child{border-bottom:none}
+.events-list .e-val{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--text);min-width:38px}
+.events-list .e-val:empty::before{content:'—';color:var(--dimmer)}
+.events-list .e-right{display:flex;align-items:center;gap:10px}
+.events-list .e-name{font-size:11px;color:var(--text);font-weight:500}
+.events-list .e-time{font-family:var(--mono);font-size:10px;color:var(--green);font-weight:700}
+
+.bg-right{display:flex;flex-direction:column;gap:18px}
+.idx-list{display:flex;flex-direction:column;direction:ltr}
+.idx-row{
+  display:grid;grid-template-columns:58px 80px 1fr 60px;
+  align-items:center;gap:10px;
+  padding:7px 0;border-bottom:1px solid var(--border);
+}
+.idx-row:last-child{border-bottom:none}
+.idx-pct{font-family:var(--mono);font-size:11px;font-weight:700;text-align:left}
+.idx-pct.up{color:var(--green)}
+.idx-pct.down{color:var(--red)}
+.idx-price{font-family:var(--mono);font-size:13px;font-weight:800;color:var(--text);text-align:left;letter-spacing:-.2px}
+.idx-spark{width:100%;height:22px;display:block}
+.idx-name{font-family:var(--mono);font-size:9px;font-weight:800;color:var(--dim);text-align:right;letter-spacing:1.2px;text-transform:uppercase}
+
+.breadth-big{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.breadth-big .b-label{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--dim);letter-spacing:1.2px}
+.breadth-big .b-val{font-family:var(--mono);font-size:20px;font-weight:800;color:var(--green);letter-spacing:-.3px}
+.breadth-bar{height:6px;border-radius:3px;overflow:hidden;background:var(--bg3);display:flex;margin-bottom:8px;box-shadow:inset 0 0 0 1px var(--border)}
+.breadth-bar .b-fill-red{height:100%;background:linear-gradient(90deg,#e77385,#e77385aa)}
+.breadth-bar .b-fill-green{height:100%;background:linear-gradient(90deg,#4fc78a88,#4fc78a)}
+.breadth-stats{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--dim);font-weight:600;letter-spacing:.6px}
+.breadth-stats .bs-up{color:var(--green)}
+.breadth-stats .bs-down{color:var(--red)}
+
+.vix-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:6px}
+.vix-gauge-wrap{position:relative;width:180px;height:100px}
+.vix-gauge-wrap svg{width:100%;height:100%;display:block}
+.vix-num{
+  position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+  font-family:var(--mono);font-size:32px;font-weight:800;color:var(--text);letter-spacing:-1px;
+  line-height:1;
+}
+.vix-lbl{font-family:var(--mono);font-size:8px;font-weight:700;color:var(--dim);letter-spacing:1.6px;text-transform:uppercase}
+
+/* ═══════════ GREEN WAVE DECORATION ═══════════ */
+.wave-deco{
+  position:fixed;bottom:0;left:0;right:0;height:55%;pointer-events:none;z-index:2;
+  opacity:.55;
+}
+.wave-deco svg{width:100%;height:100%;display:block}
+
+/* ═══════════ LOGIN MODAL ═══════════ */
+.login-shell{
+  position:fixed;inset:30px 0 0 0;z-index:20;
+  display:flex;align-items:center;justify-content:center;
+  padding:40px 20px;
+  pointer-events:none;
+}
+.login-window{
+  pointer-events:auto;
+  width:100%;max-width:490px;
+  background:linear-gradient(180deg,#1a2320 0%,#121a18 100%);
+  border:1px solid var(--border2);
+  border-radius:14px;
+  overflow:hidden;
+  box-shadow:
+    0 0 0 1px rgba(79,199,138,.06),
+    0 24px 80px rgba(0,0,0,.7),
+    0 10px 30px rgba(0,0,0,.5),
+    inset 0 1px 0 rgba(255,255,255,.04);
+  position:relative;
+  animation:modal-in .5s cubic-bezier(.2,.9,.3,1.1);
+}
+@keyframes modal-in{
+  from{opacity:0;transform:translateY(10px) scale(.98)}
+  to{opacity:1;transform:none}
+}
+
+.win-titlebar{
+  display:flex;align-items:center;justify-content:space-between;
+  height:38px;padding:0 14px;
+  background:rgba(0,0,0,.3);
+  border-bottom:1px solid var(--border);
+  direction:ltr;
+}
+.win-version{
+  font-family:var(--mono);font-size:9px;font-weight:800;color:var(--green);
+  letter-spacing:1.2px;text-transform:uppercase;
+  padding:3px 7px;border-radius:4px;
+  border:1px solid var(--green-dim);
+  background:var(--green-soft);
+}
+.win-title{
+  font-family:var(--mono);font-size:11px;color:var(--dim);
+  letter-spacing:.3px;
+}
+.win-title .win-scheme{color:var(--dimmer)}
+.traffic-lights{display:flex;gap:7px}
+.traffic-lights i{
+  width:11px;height:11px;border-radius:50%;display:block;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3), 0 0 0 .5px rgba(0,0,0,.3);
+}
+.traffic-lights i:nth-child(1){background:#ff5f57}
+.traffic-lights i:nth-child(2){background:#febc2e}
+.traffic-lights i:nth-child(3){background:#28c941}
+
+.win-body{padding:30px 38px 26px}
+
+.brand{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  margin-bottom:4px;
+}
+.brand h1{
+  font-family:var(--sans);font-size:26px;font-weight:800;
+  color:var(--text);letter-spacing:-.7px;line-height:1;
+}
+.brand-icon{
+  display:flex;align-items:center;justify-content:center;
+  width:36px;height:36px;border-radius:8px;
+  background:var(--green-soft);
+  border:1px solid var(--green-dim);
+  color:var(--green);
+}
+.brand-icon svg{width:20px;height:20px}
+.brand-tagline{
+  text-align:center;
+  font-family:var(--mono);font-size:9px;font-weight:600;
+  color:var(--dim);letter-spacing:1.8px;text-transform:uppercase;
+  margin-bottom:24px;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  direction:ltr;
+}
+.brand-tagline span{display:inline-flex;align-items:center;gap:10px}
+.brand-tagline .dot{width:3px;height:3px;border-radius:50%;background:var(--green);opacity:.6}
+
+.login-title{
+  text-align:center;
+  font-size:20px;font-weight:700;color:var(--text);
+  margin-bottom:7px;letter-spacing:-.3px;
+}
+.login-subtitle{
+  text-align:center;font-size:12px;color:var(--dim);
+  line-height:1.6;margin-bottom:22px;
+}
+
+.input-group{margin-bottom:13px}
+.input-labels{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:6px;padding:0 2px;
+  font-family:var(--mono);font-size:8.5px;font-weight:700;
+  letter-spacing:1.4px;text-transform:uppercase;
+  direction:ltr;
+}
+.input-labels .il-left{color:var(--green)}
+.input-labels .il-right{color:var(--dim)}
+.input-shell{
+  position:relative;
+  background:rgba(0,0,0,.35);
+  border:1px solid var(--border2);
+  border-radius:8px;
+  transition:all .2s;
+}
+.input-shell:focus-within{
+  border-color:var(--green);
+  box-shadow:0 0 0 3px var(--green-soft), inset 0 0 0 1px rgba(79,199,138,.1);
+}
+.login-input{
+  width:100%;background:transparent;border:none;outline:none;
+  padding:13px 38px 13px 14px;
+  font-family:var(--mono);font-size:12px;color:var(--text);
+  letter-spacing:.2px;direction:ltr;
+  -webkit-user-select:text;user-select:text;
+}
+.login-input::placeholder{color:var(--dimmer)}
+.input-shell::after{
+  content:'';position:absolute;top:50%;left:14px;transform:translateY(-50%);
+  width:6px;height:6px;border-radius:50%;background:var(--dimmer);
+}
+.input-shell:focus-within::after{background:var(--green);box-shadow:0 0 8px var(--green)}
+
+.login-btn{
+  width:100%;margin-top:6px;
+  background:linear-gradient(180deg,#4fc78a 0%,#3fb179 100%);
+  color:#041612;
+  border:none;border-radius:8px;
+  padding:14px 16px;
+  font-family:var(--sans);font-size:14px;font-weight:800;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  letter-spacing:-.1px;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.2) inset,
+    0 -1px 0 rgba(0,0,0,.15) inset,
+    0 4px 14px rgba(79,199,138,.2),
+    0 1px 3px rgba(0,0,0,.3);
+  transition:all .15s;
+}
+.login-btn:hover:not(.loading){
+  background:linear-gradient(180deg,#5ed395 0%,#4cc488 100%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.25) inset,
+    0 -1px 0 rgba(0,0,0,.15) inset,
+    0 6px 20px rgba(79,199,138,.3),
+    0 1px 3px rgba(0,0,0,.3);
+  transform:translateY(-1px);
+}
+.login-btn:active{transform:translateY(0)}
+.login-btn.loading{opacity:.7;pointer-events:none}
+.login-btn svg{width:14px;height:14px}
+
+.feature-pills{
+  display:flex;flex-wrap:wrap;justify-content:center;gap:6px;
+  margin-top:22px;padding-top:20px;
+  border-top:1px solid var(--border);
+  direction:ltr;
+}
+.pill{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:4px 10px;
+  border:1px solid var(--border2);
+  border-radius:14px;
+  font-family:var(--mono);font-size:8.5px;font-weight:700;
+  color:var(--dim);letter-spacing:1.2px;text-transform:uppercase;
+  transition:all .2s;cursor:default;
+}
+.pill:hover{color:var(--green);border-color:var(--green-dim);background:var(--green-soft)}
+.pill .pill-dot{width:4px;height:4px;border-radius:50%;background:var(--green);opacity:.7}
+
+.key-err{
+  display:none;margin-top:10px;
+  font-family:var(--mono);font-size:10px;color:var(--red);text-align:center;
+  letter-spacing:.4px;
+}
+.key-err.show{display:block;animation:shake .4s}
+@keyframes shake{
+  0%,100%{transform:translateX(0)}
+  25%{transform:translateX(-4px)}
+  75%{transform:translateX(4px)}
+}
+
+/* ═══════════ RESPONSIVE ═══════════ */
+@media(max-width:1100px){
+  .dash-bg{grid-template-columns:1fr 1fr;gap:20px}
+  .bg-left,.bg-right{gap:14px}
+}
+@media(max-width:760px){
+  .dash-bg{display:none}
+  .wave-deco{height:40%}
+  .win-body{padding:24px 22px 22px}
+  .brand h1{font-size:22px}
+  .feature-pills{gap:5px}
+  .pill{font-size:8px;padding:3px 8px}
+  .term-bar{padding:0 10px;gap:6px}
+  .tb-group{gap:8px}
+  .tb-item{font-size:10px}
+  .tb-item .tb-suffix{font-size:7px}
+}
+@media(max-width:500px){
+  .tb-hide-sm{display:none}
+}
+</style>
 </head>
 <body>
 
-<!-- KEY INPUT -->
-<div id="screen-key">
-  <div class="key-box">
-    <div class="key-title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-left:6px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> כניסה למערכת</div>
-    <div class="key-steps">
-      הזן את מפתח המערכת (Worker URL) כדי לגשת לדשבורד.
+<!-- ═══════ TOP TERMINAL BAR ═══════ -->
+<div class="term-bar">
+  <div class="tb-group">
+    <div class="tb-item">
+      <span id="clock-tlv">—:—:—</span>
+      <span class="tb-suffix">TLV</span>
     </div>
-    <input class="key-input" id="key-input" type="text"
-      placeholder="https://your-worker..." autocomplete="off"
-      onkeydown="if(event.key==='Enter')startWithKey()" />
-    <div class="key-err" id="key-err">המפתח לא תקין, נסה שוב.</div>
-    <button class="key-btn" onclick="startWithKey()">היכנס ←</button>
+    <div class="tb-sep"></div>
+    <div class="tb-item">
+      <span id="clock-ny">—:—:—</span>
+      <span class="tb-suffix">NY</span>
+    </div>
+  </div>
+  <div class="tb-group">
+    <div class="tb-item tb-hide-sm">
+      <span class="tb-feed">Yahoo · Reuters · Bloomberg</span>
+      <span class="tb-suffix">FEED</span>
+    </div>
+    <div class="tb-sep tb-hide-sm"></div>
+    <div class="tb-item tb-hide-sm">
+      <span id="latency">—ms</span>
+      <span class="tb-suffix">LATENCY</span>
+    </div>
+    <div class="tb-sep tb-hide-sm"></div>
+    <div class="tb-item tb-hide-sm">
+      <span id="session-label">Pre-market</span>
+      <span class="tb-suffix">SESSION</span>
+    </div>
+    <div class="tb-sep tb-hide-sm"></div>
+    <div class="tb-live">LIVE</div>
   </div>
 </div>
 
-<!-- LOADING -->
-<div id="screen-loading">
-  <div class="loader-ring"></div>
-  <div class="loader-text">מביא נתוני שוק חיים...</div>
-  <div class="loader-sub" id="progress">Yahoo Finance • מתחבר...</div>
+<!-- ═══════ BACKGROUND DECORATIVE DASHBOARD ═══════ -->
+<div class="dash-bg">
+
+  <aside class="bg-left">
+    <section>
+      <div class="sec-hdr">
+        <div class="sec-meta">% · 1D</div>
+        <div class="sec-title">Sector Heatmap</div>
+      </div>
+      <div class="sec-grid">
+        <div class="sec-cell up"><span class="sec-name">HEAL</span><span class="sec-pct">+0.12%</span></div>
+        <div class="sec-cell up"><span class="sec-name">CONS</span><span class="sec-pct">+0.55%</span></div>
+        <div class="sec-cell up"><span class="sec-name">COMM</span><span class="sec-pct">+0.99%</span></div>
+        <div class="sec-cell up"><span class="sec-name">TECH</span><span class="sec-pct">+1.51%</span></div>
+        <div class="sec-cell down"><span class="sec-name">ENER</span><span class="sec-pct">&minus;0.83%</span></div>
+        <div class="sec-cell down"><span class="sec-name">REAL</span><span class="sec-pct">&minus;0.48%</span></div>
+        <div class="sec-cell down"><span class="sec-name">INDU</span><span class="sec-pct">&minus;0.23%</span></div>
+        <div class="sec-cell down"><span class="sec-name">FIN</span><span class="sec-pct">&minus;0.14%</span></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-hdr">
+        <div class="sec-meta">S&amp;P 500</div>
+        <div class="sec-title">Top Movers</div>
+      </div>
+      <ul class="movers-list">
+        <li><span class="m-pct up">+4.68%</span><span class="m-sym">NVDA</span></li>
+        <li><span class="m-pct up">+3.10%</span><span class="m-sym">META</span></li>
+        <li><span class="m-pct up">+1.38%</span><span class="m-sym">AAPL</span></li>
+        <li><span class="m-pct up">+0.58%</span><span class="m-sym">MSFT</span></li>
+        <li><span class="m-pct down">&minus;2.12%</span><span class="m-sym">TSLA</span></li>
+        <li><span class="m-pct down">&minus;3.45%</span><span class="m-sym">AMD</span></li>
+      </ul>
+    </section>
+
+    <section>
+      <div class="sec-hdr">
+        <div class="sec-meta">Today</div>
+        <div class="sec-title">Next Events</div>
+      </div>
+      <ul class="events-list">
+        <li>
+          <span class="e-val">3.2%</span>
+          <div class="e-right">
+            <span class="e-name">CPI · Core YoY</span>
+            <span class="e-time">15:30</span>
+          </div>
+        </li>
+        <li>
+          <span class="e-val"></span>
+          <div class="e-right">
+            <span class="e-name">US Open · NYSE</span>
+            <span class="e-time">16:30</span>
+          </div>
+        </li>
+        <li>
+          <span class="e-val">5.25%</span>
+          <div class="e-right">
+            <span class="e-name">FOMC Decision</span>
+            <span class="e-time">21:00</span>
+          </div>
+        </li>
+      </ul>
+    </section>
+  </aside>
+
+  <div></div>
+
+  <aside class="bg-right">
+    <section>
+      <div class="sec-hdr">
+        <div class="sec-meta"><span id="est-time">EST —:—:—</span></div>
+        <div class="sec-title">US Indices</div>
+      </div>
+      <div class="idx-list">
+        <div class="idx-row">
+          <span class="idx-pct up">+0.27%</span>
+          <span class="idx-price">5,840.02</span>
+          <svg class="idx-spark" viewBox="0 0 100 22" preserveAspectRatio="none"><polyline fill="none" stroke="#4fc78a" stroke-width="1.4" points="0,14 10,12 20,16 30,10 40,13 50,8 60,11 70,6 80,9 90,4 100,5"/></svg>
+          <span class="idx-name">S&amp;P 500</span>
+        </div>
+        <div class="idx-row">
+          <span class="idx-pct down">&minus;0.21%</span>
+          <span class="idx-price">18,919.25</span>
+          <svg class="idx-spark" viewBox="0 0 100 22" preserveAspectRatio="none"><polyline fill="none" stroke="#e77385" stroke-width="1.4" points="0,6 10,8 20,5 30,12 40,9 50,14 60,11 70,16 80,13 90,17 100,15"/></svg>
+          <span class="idx-name">NASDAQ</span>
+        </div>
+        <div class="idx-row">
+          <span class="idx-pct up">+0.41%</span>
+          <span class="idx-price">42,341.51</span>
+          <svg class="idx-spark" viewBox="0 0 100 22" preserveAspectRatio="none"><polyline fill="none" stroke="#4fc78a" stroke-width="1.4" points="0,16 10,13 20,14 30,11 40,9 50,12 60,8 70,10 80,6 90,7 100,3"/></svg>
+          <span class="idx-name">DOW</span>
+        </div>
+        <div class="idx-row">
+          <span class="idx-pct up">+1.22%</span>
+          <span class="idx-price">2,184.08</span>
+          <svg class="idx-spark" viewBox="0 0 100 22" preserveAspectRatio="none"><polyline fill="none" stroke="#4fc78a" stroke-width="1.4" points="0,18 10,15 20,16 30,12 40,13 50,9 60,10 70,6 80,7 90,4 100,2"/></svg>
+          <span class="idx-name">RUSSELL</span>
+        </div>
+        <div class="idx-row">
+          <span class="idx-pct up">+0.15%</span>
+          <span class="idx-price">104.83</span>
+          <svg class="idx-spark" viewBox="0 0 100 22" preserveAspectRatio="none"><polyline fill="none" stroke="#4fc78a" stroke-width="1.4" points="0,12 10,11 20,10 30,13 40,9 50,10 60,8 70,9 80,7 90,8 100,6"/></svg>
+          <span class="idx-name">DXY</span>
+        </div>
+        <div class="idx-row">
+          <span class="idx-pct down">&minus;0.03%</span>
+          <span class="idx-price">4.28</span>
+          <svg class="idx-spark" viewBox="0 0 100 22" preserveAspectRatio="none"><polyline fill="none" stroke="#e77385" stroke-width="1.4" points="0,8 10,10 20,9 30,12 40,11 50,14 60,13 70,15 80,14 90,16 100,15"/></svg>
+          <span class="idx-name">10Y</span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-hdr">
+        <div class="sec-meta">S&amp;P 500</div>
+        <div class="sec-title">Breadth</div>
+      </div>
+      <div class="breadth-big">
+        <span class="b-label">Advancers</span>
+        <span class="b-val">65%</span>
+      </div>
+      <div class="breadth-bar">
+        <div class="b-fill-red" style="width:35%"></div>
+        <div class="b-fill-green" style="width:65%"></div>
+      </div>
+      <div class="breadth-stats">
+        <span class="bs-down">DOWN 177</span>
+        <span class="bs-up">UP 323</span>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-hdr">
+        <div class="sec-meta">VIX · CBOE</div>
+        <div class="sec-title">Volatility</div>
+      </div>
+      <div class="vix-wrap">
+        <div class="vix-gauge-wrap">
+          <svg viewBox="0 0 180 100">
+            <path d="M 20 90 A 70 70 0 0 1 160 90" fill="none" stroke="#dfe4e025" stroke-width="7" stroke-linecap="round"/>
+            <path d="M 20 90 A 70 70 0 0 1 80 24" fill="none" stroke="#4fc78a" stroke-width="7" stroke-linecap="round"/>
+          </svg>
+          <div class="vix-num">13.05</div>
+        </div>
+        <div class="vix-lbl">Low Volatility Regime</div>
+      </div>
+    </section>
+  </aside>
 </div>
 
-<!-- ERROR -->
-<div id="screen-error" style="display:none">
-  <div class="err-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-left:6px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> שגיאה</div>
-  <div class="err-body" id="err-msg"></div>
-  <div class="err-code" id="err-code" style="display:none"></div>
-  <div class="btn-row">
-    <button class="btn primary" onclick="init()">↻ נסה שוב</button>
-    <button class="btn" onclick="showKey()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-left:4px"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M21 2l-9.6 9.6"/><path d="M15.5 7.5l3 3L22 7l-3-3"/></svg> שנה Key</button>
-  </div>
+<!-- ═══════ GREEN WAVE DECORATION ═══════ -->
+<div class="wave-deco">
+  <svg viewBox="0 0 1600 600" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="waveFill1" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#4fc78a" stop-opacity="0.12"/>
+        <stop offset="100%" stop-color="#4fc78a" stop-opacity="0.01"/>
+      </linearGradient>
+      <linearGradient id="waveFill2" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#4fc78a" stop-opacity="0.18"/>
+        <stop offset="100%" stop-color="#4fc78a" stop-opacity="0.02"/>
+      </linearGradient>
+      <linearGradient id="waveLine" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#4fc78a" stop-opacity="0.3"/>
+        <stop offset="50%" stop-color="#4fc78a" stop-opacity="0.8"/>
+        <stop offset="100%" stop-color="#4fc78a" stop-opacity="0.3"/>
+      </linearGradient>
+    </defs>
+    <path d="M 0 400 Q 200 280, 400 320 T 800 260 T 1200 340 T 1600 300 L 1600 600 L 0 600 Z" fill="url(#waveFill1)"/>
+    <path d="M 0 450 Q 200 340, 400 380 T 800 320 T 1200 400 T 1600 360 L 1600 600 L 0 600 Z" fill="url(#waveFill2)"/>
+    <path d="M 0 450 Q 200 340, 400 380 T 800 320 T 1200 400 T 1600 360" fill="none" stroke="url(#waveLine)" stroke-width="1.5"/>
+  </svg>
 </div>
 
-<!-- APP -->
-<div id="app">
-  <div class="hdr">
-    <div class="hdr-left">
-      <!-- לוגו -->
-      <div class="hdr-logo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
+<!-- ═══════ LOGIN MODAL ═══════ -->
+<div class="login-shell">
+  <div class="login-window">
+
+    <div class="win-titlebar">
+      <div class="win-version">V2.4.1</div>
+      <div class="win-title">
+        <span class="win-scheme">stockpulse://</span>terminal/auth
+      </div>
+      <div class="traffic-lights"><i></i><i></i><i></i></div>
+    </div>
+
+    <div class="win-body">
+      <div class="brand">
+        <h1>StockPulse</h1>
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+            <polyline points="16 7 22 7 22 13"/>
+          </svg>
+        </div>
+      </div>
+      <div class="brand-tagline">
+        <span>Real-Time</span>
+        <span class="dot"></span>
+        <span>Institutional Grade</span>
+        <span class="dot"></span>
+        <span>Since 2026</span>
+      </div>
+
+      <div class="login-title">כניסה לטרמינל</div>
+      <div class="login-subtitle">חבר את פרוקסי ה-Worker שלך וגש לנתוני שוק בזמן אמת.</div>
+
+      <div class="input-group">
+        <div class="input-labels">
+          <span class="il-left">Cloudflare</span>
+          <span class="il-right">Worker Endpoint</span>
+        </div>
+        <div class="input-shell">
+          <input class="login-input" id="key-input" type="text"
+            placeholder="https://your-worker.workers.dev"
+            autocomplete="off" spellcheck="false"
+            onkeydown="if(event.key==='Enter')startWithKey()">
+        </div>
+        <div class="key-err" id="key-err">המפתח לא תקין, נסה שוב.</div>
+      </div>
+
+      <button class="login-btn" id="login-btn" onclick="startWithKey()">
+        <span class="login-btn-text">התחבר לטרמינל</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
         </svg>
-      </div>
-      <div class="hdr-title-wrap">
-        <span class="hdr-title">דשבורד שוק אמריקאי</span>
-        <span class="hdr-sub">Yahoo Finance · Real-Time</span>
-      </div>
-      <div class="live-pill">
-        <div class="live-dot"></div>
-        <span class="live-label">LIVE</span>
-      </div>
-      <div class="hdr-clock-inline" id="hdr-clock-inline">
-        <div class="hdr-clock-status">
-          <div class="market-dot closed" id="market-dot"></div>
-          <span class="market-label closed" id="market-label">טוען...</span>
-        </div>
-        <div class="hdr-clock-time" id="market-countdown"></div>
-      </div>
-    </div>
-    <div class="hdr-right">
-      <!-- שעה (desktop) -->
-      <div class="ts-badge" id="ts-badge" style="display:none">
-        <span class="ts-date" id="ts-date"></span>
-        <span class="ts-time" id="ts-time"></span>
-      </div>
-      <!-- icon buttons always visible -->
-      <button class="icon-btn" id="refresh-btn" onclick="init()" title="רענן">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-      </button>
-      <button class="icon-btn" id="theme-btn" onclick="toggleTheme()" title="מצב בהיר/כהה">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-      </button>
-      <button class="icon-btn" id="zoom-btn" onclick="toggleZoom()" title="מצב מוגדל">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
-      </button>
-      <!-- המבורגר — mobile + desktop -->
-      <button class="icon-btn" id="hdr-menu-btn" onclick="toggleMobileMenu()" title="תפריט">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-      </button>
-    </div>
-  </div>
-
-  <div class="ticker-wrap"><div class="ticker" id="ticker"></div></div>
-
-
-
-  <!-- מאקרו -->
-  <div class="macro-bar" id="macro-bar">
-    <div class="macro-item"><span class="macro-name">EUR/USD</span><span class="macro-price lc" id="mp-EURUSD">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="macro-chg lc" id="mc-EURUSD">&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
-    <div class="macro-item"><span class="macro-name">USD/ILS</span><span class="macro-price lc" id="mp-USDILS">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="macro-chg lc" id="mc-USDILS">&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
-    <div class="macro-item"><span class="macro-name">נפט גולמי</span><span class="macro-price lc" id="mp-OIL">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="macro-chg lc" id="mc-OIL">&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
-    <div class="macro-item"><span class="macro-name">גז טבעי</span><span class="macro-price lc" id="mp-GAS">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="macro-chg lc" id="mc-GAS">&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
-    <div class="macro-item"><span class="macro-name">זהב</span><span class="macro-price lc" id="mp-GOLD">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="macro-chg lc" id="mc-GOLD">&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
-    <div class="macro-item"><span class="macro-name">10Y Treasury</span><span class="macro-price lc" id="mp-TNX">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="macro-chg lc" id="mc-TNX">&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
-  </div>
-  <!-- Overlay -->
-  <div class="mob-overlay" id="mob-overlay" onclick="closeMobileMenu()"></div>
-
-  <!-- Sidebar menu -->
-  <div class="mobile-menu" id="mobile-menu">
-    <!-- Header -->
-    <div class="mob-hdr">
-      <div class="mob-hdr-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
-        </svg>
-      </div>
-      <div class="mob-hdr-text">
-        <span class="mob-hdr-title">דשבורד שוק</span>
-        <span class="mob-hdr-sub">Yahoo Finance · Real-Time</span>
-      </div>
-    </div>
-
-    <!-- Items -->
-    <div class="mob-items">
-      <button class="mob-item active" onclick="closeMobileMenu()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-        <span class="mob-item-label">דשבורד נוכחי</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
       </button>
 
-      <button class="mob-item" onclick="openLabModal();closeMobileMenu()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
-        <span class="mob-item-label">מעבדת תיקים</span>
-      </button>
-
-      <button class="mob-item" onclick="init();closeMobileMenu()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-        <span class="mob-item-label">רענן נתונים</span>
-      </button>
-
-      <button class="mob-item" onclick="exportDashboardPDF();closeMobileMenu()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        <span class="mob-item-label">ייצוא PDF</span>
-      </button>
-
-      <button class="mob-item" onclick="toggleTheme()">
-        <svg id="mob-theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-        <span class="mob-item-label" id="mob-theme-label">מצב כהה</span>
-      </button>
-
-      <div class="mob-sep"></div>
-
-      <button class="mob-item" onclick="logout()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        <span class="mob-item-label">יציאה</span>
-      </button>
-    </div>
-
-    <!-- Footer -->
-    <div class="mob-footer">
-      <div class="mob-ts" id="mob-ts"></div>
-    </div>
-  </div>
-
-  <div class="indices-section">
-    <div class="indices-main" id="idx-main"></div>
-    <div class="indices-other" id="idx-other"></div>
-  </div>
-
-  <!-- AI MARKET BRIEF -->
-  <div class="ai-brief-section" id="ai-brief-section" style="display:none">
-    <!-- Smart Alert Banner -->
-    <div class="ai-alert-banner" id="ai-alert-banner" style="display:none"></div>
-    
-    <div class="ai-brief-card">
-      <div class="ai-brief-hdr">
-        <div class="ai-brief-title-wrap">
-          <div class="ai-brain-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
-              <path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"/>
-              <line x1="9" y1="21" x2="15" y2="21"/><line x1="10" y1="24" x2="14" y2="24"/>
-              <path d="M9.5 2.5C10 .5 14 .5 14.5 2.5"/>
-            </svg>
-          </div>
-          <div>
-            <div class="ai-brief-title">ניתוח AI — מה קורה עכשיו?</div>
-            <div class="ai-brief-sub">סריקת שוק אוטומטית • מבוסס על כל הנתונים בזמן אמת</div>
-          </div>
-        </div>
-        <div class="ai-brief-actions">
-          <button class="ai-edu-toggle" id="ai-edu-toggle" onclick="toggleEduMode()" title="מצב הסברים">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-            <span id="edu-toggle-label">הסברים</span>
-          </button>
-        </div>
-      </div>
-      <!-- AI Verdict -->
-      <div class="ai-verdict" id="ai-verdict">
-        <div class="ai-verdict-icon" id="ai-verdict-icon"></div>
-        <div class="ai-verdict-text" id="ai-verdict-text">מחשב...</div>
-      </div>
-      <!-- 3 Key Signals -->
-      <div class="ai-signals" id="ai-signals"></div>
-      <!-- Action Plan -->
-      <div class="ai-actions" id="ai-actions"></div>
-      <!-- Beginner Educational Context (hidden by default) -->
-      <div class="ai-edu-panel" id="ai-edu-panel" style="display:none">
-        <div class="ai-edu-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          מילון מושגים — לחץ על כל מושג להסבר
-        </div>
-        <div class="ai-edu-grid" id="ai-edu-grid"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Education Tooltip (global, positioned absolutely) -->
-  <div class="edu-tooltip" id="edu-tooltip" style="display:none">
-    <div class="edu-tooltip-arrow"></div>
-    <div class="edu-tooltip-title" id="edu-tooltip-title"></div>
-    <div class="edu-tooltip-body" id="edu-tooltip-body"></div>
-    <div class="edu-tooltip-example" id="edu-tooltip-example"></div>
-  </div>
-
-  <div class="content">
-    <div>
-      <div class="sectors-card">
-        <div class="card-hdr"><div class="section-label">ביצועי סקטורים — SPDR ETFs</div></div>
-        <div class="tbl-scroll-hint">← גלול לצד לכל העמודות →</div>
-        <div class="tbl-container">
-          <div class="tbl-frozen" id="sector-frozen">
-            <div class="tbl-frozen-hdr">סקטור</div>
-          </div>
-          <div class="tbl-wrap">
-          <table class="t">
-            <thead>
-              <tr><th>יום %</th><th>שבוע</th><th>חודש</th><th>3 חד׳</th><th>6 חד׳</th><th>שנה</th><th>שיא 52W</th><th>שפל 52W</th><th>נפח</th><th style="border-left:2px solid var(--border2)">מאקרו</th><th>ממוצע</th></tr>
-            </thead>
-            <tbody id="sector-tbody"></tbody>
-          </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- YTD + Correlation — inline below sectors table -->
-      <div id="ytd-section" style="display:none;margin-top:10px">
-        <div class="ytd-card">
-          <div class="card-hdr"><div class="section-label">תשואה מתחילת השנה (YTD)</div></div>
-          <div class="ytd-bars" id="ytd-bars"></div>
-        </div>
-      </div>
-
-      <div id="corr-section" style="display:none;margin-top:10px">
-        <div class="sectors-card">
-          <div class="card-hdr">
-            <div class="section-label">מתאם בין סקטורים</div>
-            <div style="font-size:9px;color:var(--dim)">1=מתאם מלא | 0=עצמאי | &#x2212;1=הפוך</div>
-          </div>
-          <div class="corr-wrap"><div id="corr-table-wrap"></div></div>
-        </div>
-      </div>
-
-      <!-- מזנקות והצוללות — inside left column -->
-      <div style="margin-top:10px">
-        <div class="movers-card" id="movers-section">
-          <div class="card-hdr"><div class="section-label">המזנקות והצוללות (S&P 500)</div></div>
-          <div class="card-cnt" style="padding:10px 14px">
-            <div class="movers-grid" id="movers-grid">
-            <div style="grid-column:1/-1;text-align:center;color:var(--dim);font-size:11px;padding:12px">
-              <div class="mini-ring" style="margin:0 auto 8px"></div>
-              סורק 220 מניות ברקע...
-            </div>
-          </div>
-          </div>
-        </div>
-      </div>
-
-
-	<div class="modal-overlay" id="lab-overlay" onclick="closeLab(event)">
-  <div class="modal" id="lab-modal" style="max-width: 800px;">
-    <div class="modal-hdr">
-      <div>
-        <div class="modal-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-left:6px"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> מעבדת תיקים מתקדמת</div>
-        <div class="modal-sub">סימולטור, בדיקת סיכונים וסורק דיבידנדים</div>
-      </div>
-      <button class="modal-close" onclick="closeLabDirect()">×</button>
-    </div>
-    <div class="modal-body" id="lab-body" style="background: var(--bg2);">
-      <div class="lab-grid">
-        
-        <div class="lab-card" style="grid-column: 1 / -1;">
-          <div class="lab-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-left:5px"><path d="M8 3v8l-4 6h16l-4-6V3"/><line x1="8" y1="3" x2="16" y2="3"/></svg> סימולטור "מה-אם" ומדד פיזור</div>
-          <div style="font-size: 11px; color: var(--dim);">בנה תיק וירטואלי (עד 3 נכסים) ובדוק את הביצועים והסיכון שלו.</div>
-          
-          <div id="sim-assets">
-            <div class="lab-control" style="margin-bottom: 8px;">
-              <select class="lab-select" id="sim-sel-1"></select>
-              <input type="number" class="lab-input" id="sim-w-1" value="50" style="max-width: 80px;" placeholder="משקל %">
-            </div>
-            <div class="lab-control" style="margin-bottom: 8px;">
-              <select class="lab-select" id="sim-sel-2"></select>
-              <input type="number" class="lab-input" id="sim-w-2" value="30" style="max-width: 80px;" placeholder="משקל %">
-            </div>
-            <div class="lab-control">
-              <select class="lab-select" id="sim-sel-3"></select>
-              <input type="number" class="lab-input" id="sim-w-3" value="20" style="max-width: 80px;" placeholder="משקל %">
-            </div>
-          </div>
-          
-          <button class="lab-btn" onclick="runSimulator()">חשב ביצועים וסיכון</button>
-          
-          <div style="display: flex; justify-content: space-around; margin-top: 10px;">
-            <div>
-              <div style="font-size: 10px; color: var(--dim); text-align: center;">תשואה יומית וירטואלית</div>
-              <div class="lab-result" id="sim-res-day">–</div>
-            </div>
-            <div>
-              <div style="font-size: 10px; color: var(--dim); text-align: center;">תשואה שנתית וירטואלית</div>
-              <div class="lab-result" id="sim-res-year">–</div>
-            </div>
-          </div>
-          <div class="lab-score" id="sim-risk">ציון פיזור: ממתין לחישוב...</div>
-        </div>
-
-        <div class="lab-card" style="grid-column: 1 / -1;">
-          <div class="lab-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-left:5px"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> סורק "פרות מזומנים" (דיבידנדים)</div>
-          <div style="font-size: 11px; color: var(--dim); display: flex; justify-content: space-between; align-items: center;">
-            מוצא את החברות המחלקות את התשואה הגבוהה ביותר (מתוך 220 אחזקות ה-SPDR).
-            <button class="lab-btn" onclick="runScreener()">סרוק עכשיו</button>
-          </div>
-          <div id="screener-results" style="margin-top: 10px; max-height: 200px; overflow-y: auto;">
-            <div style="text-align: center; color: var(--dim); font-size: 12px; padding: 20px;">לחץ על 'סרוק עכשיו' כדי להביא נתונים מיאהו</div>
-          </div>
-        </div>
-
-		<div class="lab-card" style="grid-column: 1 / -1;">
-          <div class="lab-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-left:5px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg> מפת חום (60 המניות הגדולות)</div>
-          <div style="font-size: 11px; color: var(--dim); display: flex; justify-content: space-between; align-items: center;">
-            תמונת מצב חיה של השוק. צבע עוצמתי מעיד על תנודה יומית חזקה.
-            <button class="lab-btn" onclick="renderHeatmap()">רענן מפה</button>
-          </div>
-          <div class="heatmap-grid" id="heatmap-container">
-            <div style="color:var(--dim); font-size:12px; padding:20px;">טוען מפת חום...</div>
-          </div>
-        </div>
-
-        <div class="lab-card" style="grid-column: 1 / -1;">
-          <div class="lab-title"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-left:5px"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> סורק איתותים (מומנטום ו-RSI)</div>
-          <div style="font-size: 11px; color: var(--dim); display: flex; justify-content: space-between; align-items: center;">
-            מאתר אוטומטית מניות הנמצאות במכירת יתר (הזדמנות קניה) או קניית יתר.
-            <button class="lab-btn" onclick="runTechScreener()">סרוק איתותים</button>
-          </div>
-          <div id="tech-results" style="margin-top: 10px; max-height: 220px; overflow-y: auto;">
-            <div style="text-align: center; color: var(--dim); font-size: 12px; padding: 20px;">לחץ על 'סרוק איתותים' כדי לחשב מדדים טכניים מתוך הגרפים</div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </div>
-</div>
-    </div><!-- /left-col -->
-    <div class="right-col">
-      <div>
-        <div class="chart-box">
-          <div class="card-hdr"><div class="section-label">ביצוע יומי</div></div>
-          <canvas id="chart" width="266" height="264"></canvas>
-        </div>
-      </div>
-      <div>
-        <div class="pos-card" id="pos-card">
-          <div class="card-hdr"><div class="section-label">סיכום יום</div></div>
-          <div class="card-cnt">
-            <div class="pos-card-top">
-              <span class="pos-card-label">חיוביות יומית</span>
-              <span class="pos-pct" id="pos-pct">–</span>
-            </div>
-            <div class="pos-mini-bar"><div class="pos-fill" id="pos-fill"></div></div>
-            <div class="pos-mood" id="pos-mood"></div>
-          </div>
-        </div>
-        <div class="sum-grid" id="summary"></div>
-      </div>
-      <!-- Fear & Greed -->
-      <div>
-        <div class="fg-card">
-          <div class="card-hdr"><div class="section-label">מדד פחד &amp; חמדנות</div></div>
-          <div class="card-cnt">
-            <div class="fg-gauge-wrap">
-              <canvas id="fg-canvas" width="160" height="88"></canvas>
-              <div class="fg-center">
-                <div class="fg-num" id="fg-num">–</div>
-                <div class="fg-lbl" id="fg-lbl">ממתין...</div>
-              </div>
-            </div>
-            <div class="fg-components" id="fg-components"></div>
-          </div>
-        </div>
-      </div>
-      <!-- Breadth Indicator -->
-      <div>
-        <div class="breadth-card">
-          <div class="card-hdr">
-            <div class="section-label">בריאות שוק (Breadth)</div>
-            <button class="breadth-btn" onclick="runBreadth()">סרוק</button>
-          </div>
-          <div class="card-cnt">
-            <div class="breadth-title" style="font-size:11px;color:var(--dim);margin-bottom:8px">מניות מעל ממוצע 200 יום</div>
-            <div class="breadth-big" id="breadth-big">–</div>
-            <div class="breadth-bar-wrap"><div class="breadth-bar-fill" id="breadth-fill" style="width:0%"></div></div>
-            <div class="breadth-stats"><span id="breadth-above">–</span><span id="breadth-sub">לחץ סרוק</span><span id="breadth-total">–</span></div>
-          </div>
-        </div>
-      </div>
-      <!-- Market Internals -->
-      <div>
-        <div class="pc-card" id="pc-card">
-          <div class="card-hdr"><div class="section-label">פנים השוק (Market Internals)</div></div>
-          <div class="card-cnt">
-            <div class="mi-row">
-              <div class="mi-item">
-                <div class="mi-label">עולים / יורדים</div>
-                <div class="mi-val" id="mi-adv">–</div>
-                <div class="mi-sub" id="mi-adv-sub">סקטורים</div>
-              </div>
-              <div class="mi-divider"></div>
-              <div class="mi-item">
-                <div class="mi-label">ממוצע יומי</div>
-                <div class="mi-val" id="mi-avg">–</div>
-                <div class="mi-sub">כל הסקטורים</div>
-              </div>
-              <div class="mi-divider"></div>
-              <div class="mi-item">
-                <div class="mi-label">קרבה לשיא 52W</div>
-                <div class="mi-val" id="mi-hi52">–</div>
-                <div class="mi-sub">ממוצע מרחק</div>
-              </div>
-            </div>
-            <div class="mi-bar-wrap">
-              <div class="mi-bar-fill" id="mi-bar" style="width:50%"></div>
-            </div>
-            <div class="mi-mood" id="mi-mood">ממתין לנתונים...</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-
-  <!-- Bottom row: 3 columns on desktop -->
-  <div class="bottom-row">
-
-    <!-- לוח אירועים כלכליים -->
-    <div class="econ-section">
-      <div class="econ-section-card">
-        <div class="econ-section-hdr">
-          <div class="section-label">לוח אירועים כלכליים — 30 ימים קרובים</div>
-        </div>
-        <div class="econ-wrap" id="econ-wrap">
-          <div class="modal-loading" style="padding:20px;font-size:11px"><div class="mini-ring" style="margin:0 auto 8px"></div>טוען...</div>
-        </div>
+      <div class="feature-pills">
+        <span class="pill"><span class="pill-dot"></span>Portfolio</span>
+        <span class="pill"><span class="pill-dot"></span>Alerts</span>
+        <span class="pill"><span class="pill-dot"></span>AI Brief</span>
+        <span class="pill"><span class="pill-dot"></span>Sector Heatmap</span>
+        <span class="pill"><span class="pill-dot"></span>Live Quotes</span>
       </div>
     </div>
 
-    <!-- תובנות שוק -->
-    <div class="insights-section">
-      <div class="insights-card">
-        <div class="card-hdr">
-          <div class="section-label">תובנות שוק</div>
-          <span class="insights-disclaimer">לצורך מידע בלבד — אינו מהווה ייעוץ השקעות</span>
-        </div>
-        <div class="insights-wrap">
-          <div id="insights-grid" class="insights-grid">
-            <div class="insight-empty">טוען נתונים...</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- חדשות שוק -->
-    <div class="news-section">
-      <div class="news-section-card">
-        <div class="news-section-hdr">
-          <div class="section-label">חדשות שוק</div>
-        </div>
-        <div class="news-grid" id="news-grid">
-          <div class="modal-loading" style="color:var(--dim); font-size:12px;">טוען חדשות...</div>
-        </div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- לוח רווחים (hidden by default, full width) -->
-  <div class="earnings-section" id="earnings-section" style="display:none">
-    <div class="sectors-card">
-      <div class="card-hdr"><div class="section-label">לוח רווחים — S&P 500 (7 ימים קרובים)</div></div>
-      <div style="padding:10px 12px">
-        <div class="earnings-grid" id="earnings-grid"></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="footer" id="footer"></div>
-</div>
-<!-- STOCK DETAIL PANEL -->
-<div class="stock-overlay" id="stock-overlay" onclick="closeStockDetail(event)">
-  <div class="stock-panel" id="stock-panel">
-    <div class="sp-hdr">
-      <button class="sp-close-btn" onclick="closeStockDetail()">×</button>
-      <div class="sp-hdr-center">
-        <div class="sp-sym" id="sp-sym">–</div>
-        <div class="sp-name" id="sp-name">–</div>
-      </div>
-      <div class="sp-hdr-right">
-        <div class="sp-price" id="sp-price">–</div>
-        <div class="sp-chg" id="sp-chg">–</div>
-      </div>
-    </div>
-    <!-- Tabs -->
-    <div class="sp-tabs" id="sp-tabs">
-      <button class="sp-tab active" onclick="switchStockTab('chart')" id="tab-chart">גרף</button>
-      <button class="sp-tab" onclick="switchStockTab('fundamentals')" id="tab-fundamentals">פונדמנטלס</button>
-      <button class="sp-tab" onclick="switchStockTab('news')" id="tab-news">חדשות</button>
-    </div>
-    <div class="sp-layout">
-      <div class="sp-sidebar" id="sp-sidebar"></div>
-      <div class="sp-body" id="sp-body">
-        <div class="modal-loading" style="padding:40px"><div class="mini-ring" style="margin:0 auto 10px"></div>טוען...</div>
-      </div>
-      <div class="sp-sidebar-right" id="sp-sidebar-right"></div>
-    </div>
-  </div>
-</div>
-<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
-  <div class="modal" id="modal">
-    <div class="modal-hdr">
-      <div>
-        <div class="modal-title" id="modal-title">אחזקות סקטור</div>
-        <div class="modal-sub" id="modal-sub"></div>
-      </div>
-      <div class="modal-hdr-actions">
-        <div class="modal-search-wrap" id="modal-search-wrap">
-          <input class="modal-search-input" id="modal-search-input" type="text"
-            placeholder="סמל מניה (e.g. TSLA)"
-            onkeydown="if(event.key==='Enter')searchFromModal();if(event.key==='Escape')toggleModalSearch()"
-            autocomplete="off" autocapitalize="characters" />
-          <button class="modal-search-go" onclick="searchFromModal()">→</button>
-        </div>
-        <button class="modal-search-btn" id="modal-search-btn" onclick="toggleModalSearch()" title="חיפוש מניה">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        </button>
-        <button class="modal-close" onclick="closeModalDirect()">×</button>
-      </div>
-    </div>
-    <div class="modal-body" id="modal-body">
-      <div class="modal-loading"><div class="mini-ring"></div>טוען אחזקות...</div>
-    </div>
-    <div class="modal-footer" id="modal-footer">מקור: Yahoo Finance ETF Holdings</div>
   </div>
 </div>
 
+<script>
+// ═══════════ Clocks ═══════════
+function tickClocks(){
+  try {
+    const now = new Date();
+    const tlv = now.toLocaleTimeString('en-GB',{hour12:false,timeZone:'Asia/Jerusalem'});
+    const ny = now.toLocaleTimeString('en-GB',{hour12:false,timeZone:'America/New_York'});
+    const t = document.getElementById('clock-tlv'); if(t) t.textContent = tlv;
+    const n = document.getElementById('clock-ny'); if(n) n.textContent = ny;
+    const e = document.getElementById('est-time'); if(e) e.textContent = 'EST ' + ny;
+    // Market session
+    const nyH = parseInt(ny.slice(0,2),10);
+    const nyM = parseInt(ny.slice(3,5),10);
+    const mins = nyH*60 + nyM;
+    let session;
+    if (mins >= 9*60+30 && mins < 16*60) session = 'Market Open';
+    else if (mins >= 4*60 && mins < 9*60+30) session = 'Pre-market';
+    else if (mins >= 16*60 && mins < 20*60) session = 'After-hours';
+    else session = 'Closed';
+    const s = document.getElementById('session-label'); if(s) s.textContent = session;
+  } catch(e){}
+}
+tickClocks();
+setInterval(tickClocks, 1000);
 
-<script src="news-sources.js"></script>
-<script src="etf-holdings.js"></script>
-<script src="app.js"></script>
+// ═══════════ Latency simulator ═══════════
+setInterval(() => {
+  const el = document.getElementById('latency');
+  if (el) el.textContent = (52 + Math.floor(Math.random()*45)) + 'ms';
+}, 1400);
+
+// ═══════════ Prefill URL from storage ═══════════
+try {
+  const saved = localStorage.getItem('app_proxy_url');
+  if (saved) document.getElementById('key-input').value = saved;
+} catch(e){}
+
+// ═══════════ Show error if redirected from dashboard ═══════════
+try {
+  const params = new URLSearchParams(location.search);
+  if (params.get('err') === 'bad') {
+    const err = document.getElementById('key-err');
+    err.textContent = 'החיבור ל-Worker נכשל. בדוק את הכתובת ונסה שוב.';
+    err.classList.add('show');
+  }
+} catch(e){}
+
+// ═══════════ Login logic ═══════════
+async function startWithKey(){
+  const input = document.getElementById('key-input');
+  const err = document.getElementById('key-err');
+  const btn = document.getElementById('login-btn');
+  const btnText = btn.querySelector('.login-btn-text');
+  const val = (input.value || '').trim();
+
+  if (!val) {
+    err.textContent = 'אנא הזן את כתובת ה-Worker.';
+    err.classList.add('show');
+    input.focus();
+    return;
+  }
+  if (!val.startsWith('http')) {
+    err.textContent = 'הכתובת חייבת להתחיל ב-https://';
+    err.classList.add('show');
+    return;
+  }
+
+  const cleanUrl = val.endsWith('/') ? val.slice(0, -1) : val;
+  const originalText = btnText.textContent;
+
+  err.classList.remove('show');
+  btn.classList.add('loading');
+  btnText.textContent = 'מוודא הרשאות...';
+
+  try {
+    const testUrl = 'https://query1.finance.yahoo.com/v7/finance/spark?symbols=SPY&range=1d&interval=1d';
+    const r = await fetch(`${cleanUrl}/?url=${encodeURIComponent(testUrl)}`);
+    const d = await r.json();
+    if (d.spark && d.spark.result) {
+      // Success — save and redirect
+      localStorage.setItem('app_proxy_url', cleanUrl);
+      btnText.textContent = 'מתחבר...';
+      setTimeout(() => {
+        location.href = 'dashboard.html';
+      }, 300);
+    } else {
+      throw new Error('Invalid response');
+    }
+  } catch (e) {
+    err.textContent = 'מפתח המערכת שגוי או שהשרת אינו מגיב.';
+    err.classList.add('show');
+    btn.classList.remove('loading');
+    btnText.textContent = originalText;
+  }
+}
+</script>
 </body>
 </html>
