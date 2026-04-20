@@ -4621,3 +4621,262 @@ body::after{
    behave exactly as if they were direct children of <body>. */
 .view { display: none; }
 .view.active { display: contents; }
+
+/* ──────────── [6] LIGHT MODE — comprehensive overrides ──────────── */
+/* The dashboard terminal design uses many hardcoded dark colors and
+   gradients that don't go through CSS variables. Here we override them
+   explicitly when body.light is active. Strategy:
+     1. Redefine the core color tokens on body.light (with !important so
+        they beat the :root !important declarations from dashboard CSS).
+     2. Override specific selectors whose rules hardcode dark colors.
+   Note: advisor and macro views had zero light-mode CSS in the original
+   source files. The overrides below target DASHBOARD components, which
+   is what the theme toggle button affects primarily. */
+body.light {
+  --bg:       #f6f8fb !important;
+  --bg2:      #ffffff !important;
+  --bg3:      #eef1f6 !important;
+  --bg4:      #dfe4ec !important;
+  --border:   rgba(18,35,63,.09) !important;
+  --border2:  rgba(18,35,63,.18) !important;
+  --text:     #12233f !important;
+  --dim:      rgba(18,35,63,.58) !important;
+  --dimmer:   rgba(18,35,63,.36);
+  --green:    #0e9848 !important;
+  --green-soft: rgba(14,152,72,.12);
+  --green-dim:  rgba(14,152,72,.35);
+  --gd:       rgba(14,152,72,.12) !important;
+  --red:      #cc1a3a !important;
+  --red-soft: rgba(204,26,58,.1);
+  --red-dim:  rgba(204,26,58,.35);
+  --rd:       rgba(204,26,58,.12) !important;
+  --blue:     #0e9848 !important;
+  --amber:    #b7780f;
+  --shadow:   rgba(18,35,63,.1) !important;
+}
+
+/* Shared chrome: term-bar (sticky top bar with LIVE indicator + clocks) */
+body.light .term-bar {
+  background: rgba(255,255,255,.94) !important;
+  border-bottom: 1px solid var(--border2) !important;
+  box-shadow: 0 1px 4px rgba(18,35,63,.06);
+}
+body.light .tb-live { color: #0e9848 !important; }
+body.light .tb-item, body.light .tb-suffix { color: var(--text); }
+
+/* Sidebar & bottom-nav */
+body.light .sp-sidenav {
+  background: linear-gradient(180deg,#ffffff 0%,#f0f3f8 100%) !important;
+  border-left: 1px solid var(--border);
+}
+body.light .sp-nav-item { color: var(--dim); }
+body.light .sp-nav-item:hover { background: var(--bg3); color: var(--text); }
+body.light .sp-nav-item.active { background: var(--green-soft); color: var(--green); }
+body.light .sp-bottomnav {
+  background: rgba(255,255,255,.96) !important;
+  border-top: 1px solid var(--border) !important;
+}
+body.light .sp-bn-item { color: var(--dim); }
+body.light .sp-bn-item.active { color: var(--green); }
+
+/* All dashboard cards that hardcode the dark gradient */
+body.light .col.main .sectors-card,
+body.light .col.main .ai-brief-card,
+body.light .col.main .ai-signals,
+body.light .col.main .ytd-card,
+body.light .col.main #corr-section .sectors-card,
+body.light .col.main .tw,
+body.light .col.main .insights-card,
+body.light .hdr-window,
+body.light .macro-bar-wrap,
+body.light .macro-bar-wrap .macro-bar,
+body.light .indices-bar,
+body.light .news-section,
+body.light .econ-section,
+body.light .movers-card,
+body.light .fg-card,
+body.light .breadth-card,
+body.light .pc-card,
+body.light .pos-card,
+body.light .chart-box,
+body.light .col aside section.compact,
+body.light .col.main section.compact,
+body.light .mobile-menu,
+body.light .ytd-card,
+body.light .meta-strip,
+body.light .meta-card {
+  background: linear-gradient(180deg,#ffffff 0%,#f4f6fa 100%) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+  box-shadow: 0 1px 3px rgba(18,35,63,.04) !important;
+}
+
+/* Market Brief — inner header strip (was rgba(0,0,0,.25)) */
+body.light .col.main .ai-brief-hdr {
+  background: rgba(18,35,63,.04) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+/* Regime signal cards inside .ai-signals (was #00ffaa08 — invisible on white) */
+body.light .col.main .ai-signals .ai-signal {
+  background: #f8fafc !important;
+  border: 1px solid var(--border2) !important;
+}
+/* Micro-stats strip */
+body.light .col.main .ai-micro-stats {
+  background: rgba(14,152,72,.04) !important;
+  border: 1px solid var(--border) !important;
+}
+/* AI verdict callout bar */
+body.light .col.main .ai-verdict {
+  background: var(--green-soft) !important;
+  border-color: var(--green-dim) !important;
+  color: var(--text) !important;
+}
+
+/* Table cells */
+/* Sector performance table: header cells */
+body.light .col.main .sectors-card .t thead th {
+  color: var(--dim) !important;
+  background: #eef1f6 !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+body.light .col.main .sectors-card .t thead {
+  background: #eef1f6 !important;
+}
+/* Sticky sector column (was hardcoded #111816) */
+body.light .col.main .sectors-card .t tbody td.sec-cell {
+  background: #ffffff !important;
+  color: var(--text) !important;
+}
+body.light .col.main .sectors-card .t tbody tr:hover td.sec-cell {
+  background: #eaeef5 !important;
+}
+body.light .col.main .sectors-card .t tbody tr.avgrow td.sec-cell,
+body.light .col.main .sectors-card .t tbody tr.avgrow td {
+  background: rgba(14,152,72,.08) !important;
+}
+/* Period-color cells: the p1/p2/p3 greens and n1/n2/n3 reds were
+   designed as pastels for a dark background. On white they become
+   low-contrast. Darken the text for readability. */
+body.light .col.main .sectors-card .t tbody td.p3 { background: rgba(14,152,72,.22) !important; color: #0a6e34 !important; }
+body.light .col.main .sectors-card .t tbody td.p2 { background: rgba(14,152,72,.14) !important; color: #0e7f3e !important; }
+body.light .col.main .sectors-card .t tbody td.p1 { background: rgba(14,152,72,.07) !important; color: #137143 !important; }
+body.light .col.main .sectors-card .t tbody td.n1 { background: rgba(204,26,58,.07) !important; color: #a31532 !important; }
+body.light .col.main .sectors-card .t tbody td.n2 { background: rgba(204,26,58,.14) !important; color: #8a1029 !important; }
+body.light .col.main .sectors-card .t tbody td.n3 { background: rgba(204,26,58,.22) !important; color: #700d20 !important; }
+body.light .col.main .sectors-card .t tbody td.hi52 { background: rgba(14,152,72,.05) !important; color: #137143 !important; }
+body.light .col.main .sectors-card .t tbody td.lo52 { background: rgba(204,26,58,.05) !important; color: #a31532 !important; }
+
+/* Ticker / macro-bar compact strip */
+body.light .ticker-wrap,
+body.light .macro-bar {
+  background: var(--bg2) !important;
+  border-color: var(--border) !important;
+}
+
+/* Sector heatmap cells keep the p/n tint but on a lighter neutral base */
+body.light .heat-cell.neu {
+  background: #eef1f6 !important;
+  color: var(--text) !important;
+}
+
+/* Generic text-on-dark fixes */
+body.light .section-label { color: var(--dim) !important; }
+body.light .sec-title, body.light .sec-meta { color: var(--text); }
+body.light .mob-hdr-title { color: var(--text) !important; }
+body.light .mob-item-label { color: var(--text); }
+
+/* Modal / overlay */
+body.light .modal { background: var(--bg2) !important; border-color: var(--border2) !important; }
+body.light .modal-hdr { border-color: var(--border) !important; }
+body.light .modal-overlay { background: rgba(18,35,63,.55) !important; }
+
+/* Body background pattern — softer grid lines on light bg */
+body.light::before { opacity: .2; }
+body.light::after {
+  background:
+    radial-gradient(ellipse 900px 500px at 50% 90%, rgba(14,152,72,.04), transparent 60%),
+    radial-gradient(ellipse 600px 400px at 15% 20%, rgba(14,152,72,.02), transparent 60%),
+    radial-gradient(ellipse 600px 400px at 85% 20%, rgba(14,152,72,.02), transparent 60%);
+}
+
+/* ═══ MACRO VIEW ═══ */
+/* KPI summary strip — was linear-gradient(#1a2320..#121a18) hardcoded */
+body.light #view-macro .kpi-strip {
+  background: linear-gradient(180deg,#ffffff 0%,#f4f6fa 100%) !important;
+  border: 1px solid var(--border2) !important;
+  box-shadow: 0 1px 3px rgba(18,35,63,.04) !important;
+}
+body.light #view-macro .kpi-item {
+  background: rgba(18,35,63,.03) !important;
+  border-left-color: var(--green-dim) !important;
+}
+body.light #view-macro .kpi-item.neg { border-left-color: var(--red-dim) !important; }
+body.light #view-macro .kpi-item.neu { border-left-color: var(--dimmer) !important; }
+body.light #view-macro .kpi-label { color: var(--dim) !important; }
+body.light #view-macro .kpi-val    { color: var(--text) !important; }
+body.light #view-macro .ind-card,
+body.light #view-macro .chart-card {
+  background: var(--bg2) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+}
+/* The small "FEDFUNDS/CPIAUCSL/..." badge inside each chart card:
+   dark mode used rgba(0,0,0,.3) which becomes a muddy grey on white.
+   In light mode use a subtle green-tinted chip that matches the theme. */
+body.light #view-macro .chart-badge {
+  background: var(--green-soft) !important;
+  color: var(--green) !important;
+  border: 1px solid var(--green-dim) !important;
+}
+body.light #view-macro .chart-title   { color: var(--text) !important; }
+body.light #view-macro .chart-loading { color: var(--dim) !important; }
+
+/* ═══ ADVISOR VIEW ═══ */
+/* Filter / controls bar — was hardcoded dark gradient */
+body.light #view-advisor .controls-bar {
+  background: linear-gradient(180deg,#ffffff 0%,#f4f6fa 100%) !important;
+  border: 1px solid var(--border2) !important;
+  box-shadow: 0 1px 3px rgba(18,35,63,.04) !important;
+}
+body.light #view-advisor .ctl-label { color: var(--dim) !important; }
+body.light #view-advisor .chip {
+  background: var(--bg3) !important;
+  border-color: var(--border) !important;
+  color: var(--dim) !important;
+}
+body.light #view-advisor .chip:hover {
+  color: var(--text) !important;
+  border-color: var(--border2) !important;
+}
+body.light #view-advisor .chip.active {
+  background: var(--green-soft) !important;
+  border-color: var(--green-dim) !important;
+  color: var(--green) !important;
+}
+body.light #view-advisor .sel {
+  background: var(--bg2) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+body.light #view-advisor .meta-card,
+body.light #view-advisor .tbl-card,
+body.light #view-advisor .screen {
+  background: var(--bg2) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+body.light #view-advisor .picks thead th,
+body.light #view-advisor .picks tbody td {
+  color: var(--text);
+  border-color: var(--border) !important;
+}
+body.light #view-advisor .picks thead th {
+  background: var(--bg3) !important;
+  color: var(--dim) !important;
+}
+body.light #view-macro table th,
+body.light #view-macro table td {
+  color: var(--text);
+  border-color: var(--border) !important;
+}

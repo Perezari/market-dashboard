@@ -1091,7 +1091,30 @@ const sunSVG=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-
 function toggleTheme(){
   isDark=!isDark;
   document.body.classList.toggle('light',!isDark);
-  $('theme-btn').innerHTML=isDark?sunSVG:moonSVG;
+  {
+    const _tb = $('theme-btn');
+    if (_tb) _tb.innerHTML = isDark ? sunSVG : moonSVG;
+    // Keep the mobile-menu theme icon in sync too.
+    const _mb = $('mob-theme-icon');
+    if (_mb) {
+      // Replace the <svg id="mob-theme-icon"> element with the new one,
+      // preserving the id so subsequent toggles keep working.
+      const tmpl = document.createElement('template');
+      tmpl.innerHTML = (isDark ? sunSVG : moonSVG).trim();
+      const fresh = tmpl.content.firstChild;
+      if (fresh && fresh.tagName && fresh.tagName.toLowerCase() === 'svg') {
+        fresh.id = 'mob-theme-icon';
+        _mb.parentNode.replaceChild(fresh, _mb);
+      }
+    }
+  }
+  // Re-render anything that caches color values (sector table cells,
+  // summary cards, heatmap) so they pick up the theme immediately.
+  try { if (typeof renderSectors==='function') renderSectors(); } catch(e){}
+  try { if (typeof renderSummary==='function') renderSummary(); } catch(e){}
+  try { if (typeof window.syncSidebarHeatmap==='function') window.syncSidebarHeatmap(); } catch(e){}
+  // Macro charts have hardcoded-at-build-time axis colors; refresh them.
+  try { if (typeof window.rerenderMacroCharts==='function') window.rerenderMacroCharts(); } catch(e){}
   drawChart();
 }
 
@@ -4372,23 +4395,23 @@ function renderChart(ind, data){
       scales: {
         x: {
           ticks: {
-            color: 'rgba(223,228,224,0.5)',
+            color: (document.body.classList.contains('light') ? 'rgba(18,35,63,0.58)' : 'rgba(223,228,224,0.5)'),
             font: { family: 'JetBrains Mono', size: 9 },
             maxRotation: 0,
             autoSkip: true,
             maxTicksLimit: 6
           },
           grid: { display: false },
-          border: { color: 'rgba(214,213,212,0.12)' }
+          border: { color: (document.body.classList.contains('light') ? 'rgba(18,35,63,0.12)' : 'rgba(214,213,212,0.12)') }
         },
         y: {
           ticks: {
-            color: 'rgba(223,228,224,0.5)',
+            color: (document.body.classList.contains('light') ? 'rgba(18,35,63,0.58)' : 'rgba(223,228,224,0.5)'),
             font: { family: 'JetBrains Mono', size: 9 },
             maxTicksLimit: 5,
             callback: function(v){ return formatValue(v, ind.format); }
           },
-          grid: { color: 'rgba(255,255,255,0.04)' },
+          grid: { color: (document.body.classList.contains('light') ? 'rgba(18,35,63,0.08)' : 'rgba(255,255,255,0.04)') },
           border: { display: false }
         }
       }
@@ -4508,6 +4531,33 @@ if (document.readyState === 'loading'){
     if (window.__macroInited) return;
     window.__macroInited = true;
     try { if (typeof loadAll === "function") loadAll(); } catch(e){ console.error(e); }
+  };
+  // Expose a re-render hook so toggleTheme() can refresh macro
+  // chart axis colors when the theme changes.
+  window.rerenderMacroCharts = function(){
+    if (!window.__macroCharts || typeof INDICATORS === "undefined") return;
+    try {
+      for (const ind of INDICATORS) {
+        const chart = window.__macroCharts[ind.id];
+        if (!chart || typeof chart.data === "undefined") continue;
+        // Re-derive color based on current theme and push to options.
+        const isL = document.body.classList.contains("light");
+        const tickColor = isL ? "rgba(18,35,63,0.58)" : "rgba(223,228,224,0.5)";
+        const gridColor = isL ? "rgba(18,35,63,0.08)" : "rgba(255,255,255,0.04)";
+        const borderColor = isL ? "rgba(18,35,63,0.12)" : "rgba(214,213,212,0.12)";
+        if (chart.options && chart.options.scales) {
+          if (chart.options.scales.x) {
+            if (chart.options.scales.x.ticks)  chart.options.scales.x.ticks.color  = tickColor;
+            if (chart.options.scales.x.border) chart.options.scales.x.border.color = borderColor;
+          }
+          if (chart.options.scales.y) {
+            if (chart.options.scales.y.ticks) chart.options.scales.y.ticks.color = tickColor;
+            if (chart.options.scales.y.grid)  chart.options.scales.y.grid.color  = gridColor;
+          }
+        }
+        chart.update("none");  // no animation, just repaint
+      }
+    } catch(e){ console.error("rerenderMacroCharts:", e); }
   };
   // Wire the `toggleMobileMenu` global (macro declared it locally).
   if (!window.toggleMobileMenu && typeof toggleMobileMenu === "function")
