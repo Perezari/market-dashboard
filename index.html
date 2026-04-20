@@ -20,7 +20,7 @@
 
 <!-- Consolidated stylesheet -->
 <!-- Consolidated stylesheet (cache-bust via ?v= to force fresh load after rebuilds) -->
-<link rel="stylesheet" href="app.css?v=8e6947b3-5c500620">
+<link rel="stylesheet" href="app.css?v=2026-04-20-mobile">
 </head>
 <body>
 
@@ -628,9 +628,9 @@
   <!-- META STRIP (KPIs) -->
   <div class="meta-strip">
     <div class="meta-card dim-card">
-      <div class="meta-label">יקום סריקה</div>
+      <div class="meta-label">מניות בסריקה</div>
       <div class="meta-value" id="kpi-universe">—</div>
-      <div class="meta-sub">large-caps</div>
+      <div class="meta-sub" id="kpi-universe-label">large-caps</div>
     </div>
     <div class="meta-card">
       <div class="meta-label">ציון ממוצע</div>
@@ -654,6 +654,11 @@
 
   <!-- CONTROLS -->
   <div class="controls-bar">
+    <div class="ctl-group">
+      <span class="ctl-label">קטגוריה</span>
+      <button class="chip" data-universe="large" onclick="setUniverse('large', this)">Large</button>
+      <button class="chip" data-universe="mid" onclick="setUniverse('mid', this)">Mid</button>
+    </div>
     <div class="ctl-group">
       <span class="ctl-label">סקטור</span>
       <select id="f-sector" class="sel" onchange="applyFilters()">
@@ -713,7 +718,7 @@
   <!-- loading screen -->
   <div class="screen" id="adv-screen-loading" style="display:none">
     <div class="spin"></div>
-    <h3>סורק את היקום</h3>
+    <h3>סורק את השוק</h3>
     <p id="loading-msg">אוסף נתוני 52 שבועות לכל מניה...</p>
     <div class="prog-wrap">
       <div class="prog-txt" id="prog-txt">0 / 0</div>
@@ -767,6 +772,7 @@
 <div class="dt-overlay" id="dt-overlay" onclick="closeDetail(event)">
   <div class="dt-panel" onclick="event.stopPropagation()">
     <div class="dt-hdr">
+      <img class="dt-hdr-logo" id="dt-logo" alt="" onerror="this.classList.add('dt-hdr-logo-err')">
       <div class="dt-hdr-sym" id="dt-sym">—</div>
       <div class="dt-hdr-name" id="dt-name">—</div>
       <button class="dt-close" onclick="closeDetailDirect()">✕</button>
@@ -814,7 +820,7 @@
       <p>מרחק משיא 52 שבועות (קרוב לשיא = חוזק) ומיקום בטווח השנתי.</p>
 
       <h4>חישוב הציון הסופי</h4>
-      <p>כל פקטור מתורגם ל-<b>Percentile Rank</b> מול כל היקום (0-100). הציון הסופי הוא ממוצע משוקלל של הדירוגים היחסיים. זה יתרון חשוב - הציון מתאים למצב השוק (אם כולם יורדים, הטובים ביותר עדיין יקבלו ציון גבוה).</p>
+      <p>כל פקטור מתורגם ל-<b>Percentile Rank</b> מול כלל המניות בסריקה (0-100). הציון הסופי הוא ממוצע משוקלל של הדירוגים היחסיים. זה יתרון חשוב - הציון מתאים למצב השוק (אם כולם יורדים, הטובים ביותר עדיין יקבלו ציון גבוה).</p>
 
       <div class="mth-warning">
         <b>חשוב להבין:</b> המודל הוא technical בלבד - הוא לא יודע אם החברה רווחית, כמה היא שווה, או אם יש קטליזטור קרב. מניה יכולה לקבל 95/100 ולקרוס אחרי earnings. הדירוג מזהה <b>חוזק יחסי וטכני</b>, לא ערך פונדמנטלי.
@@ -900,7 +906,7 @@
 
 <!-- Consolidated script -->
 <!-- Consolidated script (cache-bust via ?v=) -->
-<script src="app.js?v=8e6947b3-5c50061d"></script>
+<script src="app.js?v=2026-04-20-mobile"></script>
 
 </body>
 </html>

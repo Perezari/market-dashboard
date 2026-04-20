@@ -146,6 +146,104 @@ const ETF_HOLDINGS = {
 };
 
 
+/* ════════════════════════════════════════════════════════════════════════════
+   MID_CAP_HOLDINGS · S&P MidCap 400 — curated holdings per GICS sector.
+   Structure mirrors ETF_HOLDINGS exactly so the scan engine can swap universes
+   with a single variable change. Keys are the same sector-ETF codes used in
+   SECTOR_NAMES so all KPIs and filters keep working transparently.
+   ~187 names, curated Apr 2026 from MDY (SPDR S&P MidCap 400) constituents.
+   Feel free to add/remove tickers — the scan/ranking logic is data-agnostic.
+   ════════════════════════════════════════════════════════════════════════════ */
+const MID_CAP_HOLDINGS = {
+  XLK: [  // Technology · טכנולוגיה
+    {s:'LITE',n:'Lumentum',w:1.4},{s:'COHR',n:'Coherent',w:1.2},{s:'FLEX',n:'Flex',w:0.7},
+    {s:'FN',n:'Fabrinet',w:0.6},{s:'PSTG',n:'Pure Storage',w:0.6},{s:'CIEN',n:'Ciena',w:0.6},
+    {s:'JBL',n:'Jabil',w:0.5},{s:'STX',n:'Seagate',w:0.5},{s:'WDC',n:'Western Digital',w:0.5},
+    {s:'LSCC',n:'Lattice Semi',w:0.4},{s:'MKSI',n:'MKS Instruments',w:0.4},{s:'ENTG',n:'Entegris',w:0.4},
+    {s:'MANH',n:'Manhattan Assoc',w:0.4},{s:'CGNX',n:'Cognex',w:0.3},{s:'TRMB',n:'Trimble',w:0.3},
+    {s:'NTAP',n:'NetApp',w:0.4},{s:'DOX',n:'Amdocs',w:0.4},{s:'TYL',n:'Tyler Tech',w:0.4}
+  ],
+  XLF: [  // Financials · פיננסים
+    {s:'RBA',n:'RB Global',w:0.6},{s:'CBOE',n:'Cboe Global',w:0.6},{s:'MKL',n:'Markel',w:0.6},
+    {s:'CINF',n:'Cincinnati Financial',w:0.5},{s:'RJF',n:'Raymond James',w:0.5},{s:'JEF',n:'Jefferies',w:0.5},
+    {s:'EWBC',n:'East West Bancorp',w:0.5},{s:'WBS',n:'Webster Financial',w:0.4},{s:'FHN',n:'First Horizon',w:0.4},
+    {s:'CFR',n:'Cullen/Frost',w:0.4},{s:'PNFP',n:'Pinnacle Financial',w:0.4},{s:'WTFC',n:'Wintrust',w:0.4},
+    {s:'LPLA',n:'LPL Financial',w:0.5},{s:'UMBF',n:'UMB Financial',w:0.3},{s:'OZK',n:'Bank OZK',w:0.3},
+    {s:'AFG',n:'American Financial',w:0.4},{s:'RLI',n:'RLI Corp',w:0.3},{s:'ZION',n:'Zions Bancorp',w:0.4},
+    {s:'SNV',n:'Synovus',w:0.4}
+  ],
+  XLE: [  // Energy · אנרגיה
+    {s:'FTI',n:'TechnipFMC',w:0.8},{s:'MTDR',n:'Matador Resources',w:0.5},{s:'CHRD',n:'Chord Energy',w:0.5},
+    {s:'RRC',n:'Range Resources',w:0.4},{s:'AR',n:'Antero Resources',w:0.4},{s:'CIVI',n:'Civitas Resources',w:0.4},
+    {s:'MGY',n:'Magnolia Oil & Gas',w:0.4},{s:'SM',n:'SM Energy',w:0.3},{s:'NOV',n:'NOV Inc',w:0.4},
+    {s:'CHX',n:'ChampionX',w:0.3},{s:'OII',n:'Oceaneering',w:0.3},{s:'PTEN',n:'Patterson-UTI',w:0.3},
+    {s:'NFG',n:'National Fuel Gas',w:0.3},{s:'MUR',n:'Murphy Oil',w:0.3},{s:'CNX',n:'CNX Resources',w:0.3},
+    {s:'VNOM',n:'Viper Energy',w:0.3},{s:'WFRD',n:'Weatherford',w:0.3}
+  ],
+  XLV: [  // Healthcare · בריאות
+    {s:'UTHR',n:'United Therapeutics',w:0.7},{s:'ILMN',n:'Illumina',w:0.6},{s:'THC',n:'Tenet Healthcare',w:0.6},
+    {s:'CRL',n:'Charles River Labs',w:0.5},{s:'JAZZ',n:'Jazz Pharma',w:0.5},{s:'PEN',n:'Penumbra',w:0.5},
+    {s:'MOH',n:'Molina Healthcare',w:0.5},{s:'UHS',n:'Universal Health',w:0.4},{s:'BIO',n:'Bio-Rad',w:0.4},
+    {s:'BRKR',n:'Bruker',w:0.4},{s:'HAE',n:'Haemonetics',w:0.3},{s:'LIVN',n:'LivaNova',w:0.3},
+    {s:'CHE',n:'Chemed',w:0.3},{s:'MEDP',n:'Medpace',w:0.4},{s:'SHC',n:'Sotera Health',w:0.3},
+    {s:'ACHC',n:'Acadia Healthcare',w:0.3},{s:'ENSG',n:'Ensign Group',w:0.4},{s:'EHC',n:'Encompass Health',w:0.4}
+  ],
+  XLC: [  // Communication Services · תקשורת (small sector in mid-cap)
+    {s:'IPG',n:'Interpublic',w:0.5},{s:'NYT',n:'NY Times',w:0.5},{s:'IAC',n:'IAC Inc',w:0.4},
+    {s:'FOXA',n:'Fox Corp A',w:0.5},{s:'FOX',n:'Fox Corp B',w:0.3},{s:'WBD',n:'Warner Bros Discovery',w:0.4},
+    {s:'PARA',n:'Paramount',w:0.3},{s:'CABO',n:'Cable One',w:0.2},{s:'SIRI',n:'Sirius XM',w:0.3}
+  ],
+  XLI: [  // Industrials · תעשייה  (largest sector in S&P MidCap 400, ~24%)
+    {s:'CW',n:'Curtiss-Wright',w:0.8},{s:'WWD',n:'Woodward',w:0.7},{s:'XPO',n:'XPO Inc',w:0.7},
+    {s:'ATI',n:'ATI Inc',w:0.6},{s:'MTZ',n:'MasTec',w:0.6},{s:'NVT',n:'nVent Electric',w:0.5},
+    {s:'BWXT',n:'BWX Technologies',w:0.5},{s:'RBC',n:'RBC Bearings',w:0.5},{s:'FIX',n:'Comfort Systems',w:0.7},
+    {s:'GGG',n:'Graco',w:0.5},{s:'JBT',n:'JBT Corp',w:0.4},{s:'SAIA',n:'Saia',w:0.5},
+    {s:'WCC',n:'WESCO',w:0.5},{s:'BLD',n:"TopBuild",w:0.5},{s:'WMS',n:'Advanced Drainage',w:0.5},
+    {s:'RHI',n:'Robert Half',w:0.3},{s:'MLI',n:'Mueller Industries',w:0.4},{s:'TREX',n:'Trex',w:0.4},
+    {s:'EME',n:'EMCOR Group',w:0.5},{s:'KNX',n:'Knight-Swift',w:0.4}
+  ],
+  XLB: [  // Materials · חומרים
+    {s:'CRS',n:'Carpenter Tech',w:0.6},{s:'RGLD',n:'Royal Gold',w:0.7},{s:'OLN',n:'Olin',w:0.4},
+    {s:'RPM',n:'RPM International',w:0.5},{s:'EXP',n:'Eagle Materials',w:0.4},{s:'ATR',n:'AptarGroup',w:0.4},
+    {s:'ASH',n:'Ashland',w:0.3},{s:'MTX',n:'Minerals Technologies',w:0.3},{s:'SLGN',n:'Silgan Holdings',w:0.3},
+    {s:'SXT',n:'Sensient Tech',w:0.3},{s:'WOR',n:'Worthington Industries',w:0.3},{s:'AA',n:'Alcoa',w:0.5},
+    {s:'AXTA',n:'Axalta Coating',w:0.4},{s:'HUN',n:'Huntsman',w:0.3},{s:'CC',n:'Chemours',w:0.3}
+  ],
+  XLRE: [  // Real Estate · נדל״ן
+    {s:'CUBE',n:'CubeSmart',w:0.5},{s:'REG',n:'Regency Centers',w:0.5},{s:'NNN',n:'NNN REIT',w:0.4},
+    {s:'EPR',n:'EPR Properties',w:0.3},{s:'FR',n:'First Industrial',w:0.4},{s:'RHP',n:'Ryman Hospitality',w:0.4},
+    {s:'STAG',n:'STAG Industrial',w:0.4},{s:'CDP',n:'Cousins Properties',w:0.3},{s:'LAMR',n:'Lamar Advertising',w:0.5},
+    {s:'EGP',n:'EastGroup Properties',w:0.4},{s:'KRG',n:'Kite Realty',w:0.3},{s:'BRX',n:'Brixmor Property',w:0.4},
+    {s:'OHI',n:'Omega Healthcare',w:0.4},{s:'GLPI',n:'Gaming & Leisure',w:0.5},{s:'APLE',n:'Apple Hospitality',w:0.3},
+    {s:'PEB',n:'Pebblebrook Hotel',w:0.2},{s:'ELS',n:'Equity LifeStyle',w:0.5},{s:'SUI',n:'Sun Communities',w:0.5}
+  ],
+  XLU: [  // Utilities · תשתיות
+    {s:'IDA',n:'IDACORP',w:0.4},{s:'ALE',n:'Allete',w:0.3},{s:'AVA',n:'Avista',w:0.2},
+    {s:'POR',n:'Portland General',w:0.3},{s:'OGE',n:'OGE Energy',w:0.4},{s:'BKH',n:'Black Hills',w:0.3},
+    {s:'NWE',n:'NorthWestern Energy',w:0.2},{s:'NJR',n:'NJ Resources',w:0.3},{s:'UGI',n:'UGI Corp',w:0.3},
+    {s:'SWX',n:'Southwest Gas',w:0.3},{s:'SR',n:'Spire',w:0.3},{s:'OTTR',n:'Otter Tail',w:0.2},
+    {s:'MGEE',n:'MGE Energy',w:0.2}
+  ],
+  XLP: [  // Consumer Staples · צריכה בסיסית
+    {s:'CASY',n:"Casey's",w:0.8},{s:'USFD',n:'US Foods',w:0.6},{s:'FLO',n:'Flowers Foods',w:0.3},
+    {s:'LW',n:'Lamb Weston',w:0.4},{s:'POST',n:'Post Holdings',w:0.4},{s:'INGR',n:'Ingredion',w:0.4},
+    {s:'PFGC',n:'Performance Food',w:0.5},{s:'ACI',n:'Albertsons',w:0.5},{s:'UVV',n:'Universal Corp',w:0.2},
+    {s:'ENR',n:'Energizer',w:0.2},{s:'SPB',n:'Spectrum Brands',w:0.2},{s:'BJ',n:'BJ Wholesale',w:0.5},
+    {s:'COTY',n:'Coty',w:0.3},{s:'ELF',n:'e.l.f. Beauty',w:0.5}
+  ],
+  XLY: [  // Consumer Discretionary · צריכה שיקולית
+    {s:'BURL',n:'Burlington Stores',w:0.6},{s:'WSM',n:'Williams-Sonoma',w:0.6},{s:'CROX',n:'Crocs',w:0.5},
+    {s:'RL',n:'Ralph Lauren',w:0.5},{s:'TPR',n:'Tapestry',w:0.5},{s:'PVH',n:'PVH Corp',w:0.3},
+    {s:'UAA',n:'Under Armour',w:0.3},{s:'KMX',n:'CarMax',w:0.5},{s:'M',n:"Macy's",w:0.3},
+    {s:'GPS',n:'Gap',w:0.3},{s:'ANF',n:'Abercrombie',w:0.4},{s:'DKS',n:"Dick's Sporting",w:0.5},
+    {s:'TOL',n:'Toll Brothers',w:0.5},{s:'CAVA',n:'CAVA Group',w:0.5},{s:'BLDR',n:'Builders FirstSource',w:0.5},
+    {s:'CHDN',n:'Churchill Downs',w:0.4},{s:'CZR',n:'Caesars',w:0.4},{s:'BYD',n:'Boyd Gaming',w:0.3},
+    {s:'FND',n:'Floor & Decor',w:0.4},{s:'ETSY',n:'Etsy',w:0.3},{s:'THO',n:'Thor Industries',w:0.3},
+    {s:'BBWI',n:'Bath & Body Works',w:0.3},{s:'WEN',n:"Wendy's",w:0.3},{s:'CHWY',n:'Chewy',w:0.4}
+  ]
+};
+
+
 /* ──────────── [2] CORE app.js ──────────── */
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
@@ -4599,8 +4697,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const PROXY = localStorage.getItem('app_proxy_url') || '';
 
 // Cache keys
-const CACHE_KEY = 'advisor_scan_cache_v1';
+const CACHE_KEY_BASE = 'advisor_scan_cache_v1';
 const WL_KEY = 'advisor_watchlist_v1';
+const UNIVERSE_KEY = 'advisor_universe_v1';
 const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
 
 // Sector Hebrew names
@@ -4610,11 +4709,29 @@ const SECTOR_NAMES = {
   XLU:'תשתיות', XLP:'צריכה בסיסית', XLY:'צריכה שיקולית'
 };
 
-// Build symbol -> sector map from ETF_HOLDINGS
+/* ════════════════════════════════════════════════════════════════════════════
+   UNIVERSE SWITCHING
+   Each universe uses identical structure (ETF→holdings), so all downstream
+   code (scan, KPIs, sector filter) works unchanged — we just point SYM_SECTOR
+   at the currently-active holdings object and keep caches separate per universe.
+   ════════════════════════════════════════════════════════════════════════════ */
+const UNIVERSES = {
+  large: { label:'Large Caps', labelShort:'large-caps', holdings: ETF_HOLDINGS },
+  mid:   { label:'Mid Caps',   labelShort:'mid-caps',   holdings: MID_CAP_HOLDINGS }
+};
+let currentUniverse = localStorage.getItem(UNIVERSE_KEY) || 'large';
+if (!UNIVERSES[currentUniverse]) currentUniverse = 'large';
+
+const getCurrentHoldings = () => UNIVERSES[currentUniverse].holdings;
+const getCacheKey        = () => `${CACHE_KEY_BASE}_${currentUniverse}`;
+
+// Symbol → sector/name maps, rebuilt whenever the universe changes.
 const SYM_SECTOR = {};
 const SYM_NAME = {};
-if (typeof ETF_HOLDINGS !== 'undefined') {
-  Object.entries(ETF_HOLDINGS).forEach(([etf, holdings]) => {
+function rebuildSymMaps() {
+  Object.keys(SYM_SECTOR).forEach(k => delete SYM_SECTOR[k]);
+  Object.keys(SYM_NAME).forEach(k => delete SYM_NAME[k]);
+  Object.entries(getCurrentHoldings()).forEach(([etf, holdings]) => {
     holdings.forEach(h => {
       if (!SYM_SECTOR[h.s]) {
         SYM_SECTOR[h.s] = etf;
@@ -4623,6 +4740,7 @@ if (typeof ETF_HOLDINGS !== 'undefined') {
     });
   });
 }
+rebuildSymMaps();
 
 // Current state
 let scanData = null;
@@ -4651,9 +4769,11 @@ function advisorBoot() {
     opt.value = k; opt.textContent = v;
     sel.appendChild(opt);
   });
-  // Try load from cache
+  // Sync universe chip UI + KPI subtitle with currently-active universe
+  syncUniverseUI();
+  // Try load from cache for the current universe
   try {
-    const cached = JSON.parse(localStorage.getItem(CACHE_KEY));
+    const cached = JSON.parse(localStorage.getItem(getCacheKey()));
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
       scanData = cached;
       showResults();
@@ -4664,6 +4784,15 @@ function advisorBoot() {
   renderWatchlist();
   startMarketClock();
 } // advisorBoot end
+
+// Reflect currentUniverse in the universe chip group and the KPI "large-caps"/"mid-caps" subtitle
+function syncUniverseUI() {
+  document.querySelectorAll('.chip[data-universe]').forEach(b => {
+    b.classList.toggle('active', b.dataset.universe === currentUniverse);
+  });
+  const lbl = $('kpi-universe-label');
+  if (lbl) lbl.textContent = UNIVERSES[currentUniverse].labelShort;
+}
 
 function showScreen(id) {
   ['screen-welcome','adv-screen-loading','adv-screen-error','tbl-container']
@@ -4895,25 +5024,17 @@ async function runScan() {
   if (!PROXY) { showScreen('adv-screen-error'); return; }
 
   const symbolsSet = new Set();
-  Object.values(ETF_HOLDINGS).forEach(sec => sec.forEach(s => symbolsSet.add(s.s)));
+  Object.values(getCurrentHoldings()).forEach(sec => sec.forEach(s => symbolsSet.add(s.s)));
   const symbols = Array.from(symbolsSet);
 
   showScreen('adv-screen-loading');
-  $('loading-msg').textContent = `אוסף נתוני 52 שבועות עבור ${symbols.length} מניות ו-SPY כבנצ׳מרק...`;
-  $('prog-txt').textContent = `0 / ${symbols.length + 1}`;
+  $('loading-msg').textContent = `אוסף נתוני 52 שבועות עבור ${symbols.length} מניות (בנצ׳מרק: SPY)...`;
+  $('prog-txt').textContent = `0 / ${symbols.length}`;
   $('prog-fill').style.width = '0%';
 
+  // SPY is the benchmark — fetched in the background, not counted in the visible progress
   const spyPromise = fetchChartWeekly('SPY');
-  let total = symbols.length + 1;
-  let doneCount = 0;
-  const updateProg = () => {
-    doneCount++;
-    $('prog-txt').textContent = `${doneCount} / ${total}`;
-    $('prog-fill').style.width = ((doneCount/total)*100) + '%';
-  };
-
   const spyData = await spyPromise;
-  updateProg();
 
   if (!spyData) {
     $('adv-err-msg').textContent = 'לא הצלחתי לטעון את SPY (הבנצ׳מרק). בדוק את ה-proxy ונסה שוב.';
@@ -4921,9 +5042,11 @@ async function runScan() {
     return;
   }
 
+  // Progress now reflects only stock fetches so the loading text ("185 מניות")
+  // matches the denominator the user sees on-screen.
   const stocksData = await fetchUniverseInChunks(symbols, (done, tot) => {
-    $('prog-txt').textContent = `${done + 1} / ${tot + 1}`;
-    $('prog-fill').style.width = (((done+1)/(tot+1))*100) + '%';
+    $('prog-txt').textContent = `${done} / ${tot}`;
+    $('prog-fill').style.width = ((done/tot)*100) + '%';
   });
 
   $('loading-msg').textContent = 'מחשב ציונים רב-פקטוריים...';
@@ -4948,7 +5071,7 @@ async function runScan() {
         metrics: { ...s.metrics, closes: s.metrics.closes.slice(-26) }
       })),
     };
-    localStorage.setItem(CACHE_KEY, JSON.stringify(lean));
+    localStorage.setItem(getCacheKey(), JSON.stringify(lean));
   } catch(e) { console.warn('cache save failed', e); }
   showResults();
 }
@@ -5004,6 +5127,43 @@ function setView(v, btn) {
   displayState.view = v;
   document.querySelectorAll('.chip[data-view]').forEach(b => b.classList.toggle('active', b === btn));
   renderTable();
+}
+
+/**
+ * Switch between large-cap and mid-cap universes.
+ * Each universe has its own cache entry, so switching is instant if already scanned;
+ * otherwise the user sees the welcome screen with a "Start scan" prompt.
+ */
+function setUniverse(u, btn) {
+  if (!UNIVERSES[u] || u === currentUniverse) return;
+  currentUniverse = u;
+  localStorage.setItem(UNIVERSE_KEY, u);
+
+  // Point symbol-maps at the new universe's holdings
+  rebuildSymMaps();
+
+  // Reset table state (scan data is universe-specific)
+  scanData = null;
+
+  // Update UI: active chip + KPI subtitle
+  syncUniverseUI();
+
+  // Try to load cached scan for THIS universe
+  try {
+    const cached = JSON.parse(localStorage.getItem(getCacheKey()));
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      scanData = cached;
+      showResults();
+      renderWatchlist();
+      return;
+    }
+  } catch(e){}
+
+  // No cache → reset KPIs and drop back to welcome screen, inviting a fresh scan
+  ['kpi-universe','kpi-avg','kpi-sector','kpi-sector-sub','kpi-time','kpi-cache']
+    .forEach(id => { const el = $(id); if (el) el.textContent = '—'; });
+  showScreen('screen-welcome');
+  renderWatchlist();
 }
 function sortBy(key) {
   if (displayState.sortKey === key) {
@@ -5126,12 +5286,18 @@ function openDetail(sym) {
   if (!s) return;
   $('dt-sym').textContent = s.sym;
   $('dt-name').textContent = s.name;
+  // Company logo in header (same source as picks table; gracefully hides via onerror)
+  const logo = $('dt-logo');
+  if (logo) {
+    logo.classList.remove('dt-hdr-logo-err');
+    logo.src = `https://financialmodelingprep.com/image-stock/${s.sym}.png`;
+  }
 
   const body = $('dt-body');
   const m = s.metrics;
 
   const thesis = [];
-  if (s.score >= 85) thesis.push({ t: 'ציון גבוה במיוחד - המניה בדרגת Top Tier של כל היקום.', cls: '' });
+  if (s.score >= 85) thesis.push({ t: 'ציון גבוה במיוחד - המניה בדרגת Top Tier בקטגוריה.', cls: '' });
   if (s.scores.RS >= 80) thesis.push({ t: `חוזק יחסי חזק מאוד (${s.scores.RS}/100) - עולה על S&P 500 לאורך זמן.`, cls: '' });
   if (s.scores.TRD >= 80 && m.sma10 > m.sma40) thesis.push({ t: 'מגמה נקייה: Golden Cross פעיל + SMA עולה.', cls: '' });
   if (m.fromHi > -3) thesis.push({ t: `קרוב לשיא 52 שבועות (${fmtPct(m.fromHi*100)}) - breakout potential.`, cls: '' });
@@ -5340,7 +5506,7 @@ document.addEventListener('keydown', e => {
   // toggleMobileMenu, closeMobileMenu — these already exist as
   // globals in app.js and we must NOT overwrite those.
   Object.assign(window, {
-    runScan, setMinScore, setView, sortBy, applyFilters,
+    runScan, setMinScore, setView, setUniverse, sortBy, applyFilters,
     openMethodology, closeMethodology, closeMethodologyDirect,
     openDetail, closeDetail, closeDetailDirect,
     toggleWatchlist
