@@ -1,3 +1,152 @@
+/* ═══════════════════════════════════════════════════════════
+   app.js — consolidated JavaScript
+   Order:
+     [1] Data: ETF_HOLDINGS, news feeds (hebrew+english)
+     [2] Core app.js (dashboard logic, data fetch, sector render)
+     [3] Dashboard inline script (login overlay, AI brief boot)
+     [4] Macro module (FRED dashboard) — IIFE-wrapped
+     [5] Advisor module (stock advisor scanner) — IIFE-wrapped
+     [6] Sector Performance rewrite (overrides global renders)
+     [7] Router: hash-based, #/dashboard | #/macro | #/advisor
+   ═══════════════════════════════════════════════════════════ */
+
+/* ──────────── [1] DATA: news feeds + ETF holdings ──────────── */
+// ============================================================
+//  news-sources.js — קובץ הגדרות מקורות חדשות
+//  ערוך כאן בלבד. app.js נגע לא יגע.
+// ============================================================
+
+// ── עברית ────────────────────────────────────────────────────
+const HEBREW_NEWS_FEEDS = [
+  { name: 'וואלה כסף',     url: 'https://rss.walla.co.il/feed/557',   domain: 'walla.co.il' },
+  { name: 'כסף עולמי',     url: 'https://rss.walla.co.il/feed/112',   domain: 'walla.co.il' },
+  { name: 'קריפטו',        url: 'https://rss.walla.co.il/feed/13373', domain: 'walla.co.il' },
+  { name: 'וואלה TECH',    url: 'https://rss.walla.co.il/feed/4000',  domain: 'walla.co.il' },
+  { name: 'דעות כסף',      url: 'https://rss.walla.co.il/feed/4997',  domain: 'walla.co.il' },
+  { name: 'רשתות חברתיות', url: 'https://rss.walla.co.il/feed/13019', domain: 'walla.co.il' },
+];
+
+// ── English ───────────────────────────────────────────────────
+const EN_NEWS_FEEDS = [
+  { name: 'Benzinga Markets',   url: 'https://rss.app/feeds/6xoFWSgjRpOcDBAX.xml', domain: 'benzinga.com' },
+  { name: 'Benzinga Financial', url: 'https://rss.app/feeds/GlMwezZhdiLNXGNT.xml', domain: 'benzinga.com' },
+  // { name: 'MarketWatch',    url: 'https://feeds.content.dowjones.io/public/rss/mw_realtimeheadlines', domain: 'marketwatch.com' },
+  // { name: 'CNBC Markets',   url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258', domain: 'cnbc.com' },
+  // { name: 'Reuters',        url: 'https://feeds.reuters.com/reuters/businessNews', domain: 'reuters.com' },
+  // { name: 'SEC 8-K',        url: 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=8-K&dateb=&owner=include&count=10&output=atom', domain: 'sec.gov' },
+  // { name: 'Federal Reserve',url: 'https://www.federalreserve.gov/feeds/press_all.xml', domain: 'federalreserve.gov' },
+];
+
+// ============================================================
+//  etf-holdings.js — נתוני אחזקות ETF סקטוריאליות
+//  מקור: SPDR / State Street • Q1 2025
+//  לעדכון: שנה את המשקלים (w) בהתאם לדוח הרבעוני החדש
+//  שדות: s = סמל, n = שם, w = משקל באחוזים
+// ============================================================
+
+const ETF_HOLDINGS = {
+  XLK: [
+    {s:'NVDA',n:'NVIDIA',w:23.1},{s:'MSFT',n:'Microsoft',w:20.8},{s:'AAPL',n:'Apple',w:18.4},
+    {s:'AVGO',n:'Broadcom',w:4.9},{s:'ORCL',n:'Oracle',w:3.6},{s:'AMD',n:'AMD',w:2.4},
+    {s:'NOW',n:'ServiceNow',w:2.1},{s:'PLTR',n:'Palantir',w:1.9},{s:'CRM',n:'Salesforce',w:1.7},
+    {s:'CSCO',n:'Cisco',w:1.5},{s:'ACN',n:'Accenture',w:1.4},{s:'IBM',n:'IBM',w:1.2},
+    {s:'ADBE',n:'Adobe',w:1.1},{s:'QCOM',n:'Qualcomm',w:1.0},{s:'TXN',n:'Texas Instruments',w:0.9},
+    {s:'INTU',n:'Intuit',w:0.8},{s:'MU',n:'Micron',w:0.7},{s:'AMAT',n:'Applied Materials',w:0.7},
+    {s:'LRCX',n:'Lam Research',w:0.6},{s:'ADI',n:'Analog Devices',w:0.5}
+  ],
+  XLF: [
+    {s:'BRK/B',n:'Berkshire Hathaway',w:13.2},{s:'JPM',n:'JPMorgan Chase',w:12.8},{s:'V',n:'Visa',w:8.4},
+    {s:'MA',n:'Mastercard',w:6.9},{s:'BAC',n:'Bank of America',w:4.1},{s:'WFC',n:'Wells Fargo',w:3.8},
+    {s:'GS',n:'Goldman Sachs',w:3.2},{s:'MS',n:'Morgan Stanley',w:2.9},{s:'SPGI',n:'S&P Global',w:2.7},
+    {s:'BLK',n:'BlackRock',w:2.5},{s:'AXP',n:'American Express',w:2.3},{s:'C',n:'Citigroup',w:2.0},
+    {s:'PGR',n:'Progressive',w:1.9},{s:'COF',n:'Capital One',w:1.7},{s:'ICE',n:'ICE',w:1.5},
+    {s:'CME',n:'CME Group',w:1.4},{s:'CB',n:'Chubb',w:1.3},{s:'MMC',n:'Marsh & McLennan',w:1.1},
+    {s:'SCHW',n:'Charles Schwab',w:1.0},{s:'USB',n:'U.S. Bancorp',w:0.9}
+  ],
+  XLE: [
+    {s:'XOM',n:'ExxonMobil',w:23.4},{s:'CVX',n:'Chevron',w:15.2},{s:'COP',n:'ConocoPhillips',w:8.1},
+    {s:'EOG',n:'EOG Resources',w:5.3},{s:'SLB',n:'Schlumberger',w:4.2},{s:'MPC',n:'Marathon Petroleum',w:3.8},
+    {s:'PSX',n:'Phillips 66',w:3.4},{s:'VLO',n:'Valero Energy',w:3.1},{s:'OXY',n:'Occidental',w:2.8},
+    {s:'HAL',n:'Halliburton',w:2.5},{s:'DVN',n:'Devon Energy',w:2.2},{s:'FANG',n:'Diamondback Energy',w:2.0},
+    {s:'HES',n:'Hess',w:1.9},{s:'BKR',n:'Baker Hughes',w:1.7},{s:'TRGP',n:'Targa Resources',w:1.5},
+    {s:'WMB',n:'Williams Companies',w:1.4},{s:'KMI',n:'Kinder Morgan',w:1.2},{s:'OKE',n:'ONEOK',w:1.1},
+    {s:'EQT',n:'EQT Corp',w:0.9},{s:'MRO',n:'Marathon Oil',w:0.8}
+  ],
+  XLV: [
+    {s:'UNH',n:'UnitedHealth',w:12.5},{s:'LLY',n:'Eli Lilly',w:11.8},{s:'ABBV',n:'AbbVie',w:8.2},
+    {s:'JNJ',n:'Johnson & Johnson',w:7.4},{s:'MRK',n:'Merck',w:6.1},{s:'TMO',n:'Thermo Fisher',w:4.3},
+    {s:'ABT',n:'Abbott Labs',w:3.9},{s:'DHR',n:'Danaher',w:3.5},{s:'ISRG',n:'Intuitive Surgical',w:3.2},
+    {s:'BSX',n:'Boston Scientific',w:2.8},{s:'SYK',n:'Stryker',w:2.6},{s:'VRTX',n:'Vertex Pharma',w:2.3},
+    {s:'REGN',n:'Regeneron',w:2.1},{s:'CI',n:'Cigna',w:1.9},{s:'ELV',n:'Elevance Health',w:1.7},
+    {s:'HUM',n:'Humana',w:1.5},{s:'ZTS',n:'Zoetis',w:1.4},{s:'MRNA',n:'Moderna',w:1.2},
+    {s:'MCK',n:'McKesson',w:1.1},{s:'A',n:'Agilent',w:0.9}
+  ],
+  XLC: [
+    {s:'META',n:'Meta Platforms',w:22.6},{s:'GOOGL',n:'Alphabet A',w:15.3},{s:'GOOG',n:'Alphabet C',w:13.1},
+    {s:'NFLX',n:'Netflix',w:7.8},{s:'T',n:'AT&T',w:4.2},{s:'VZ',n:'Verizon',w:3.8},
+    {s:'CHTR',n:'Charter Comm',w:3.1},{s:'TMUS',n:'T-Mobile',w:2.9},{s:'EA',n:'Electronic Arts',w:2.4},
+    {s:'TTWO',n:'Take-Two Interactive',w:1.8},{s:'LYV',n:'Live Nation',w:1.6},{s:'IPG',n:'Interpublic',w:1.4},
+    {s:'OMC',n:'Omnicom',w:1.3},{s:'MTCH',n:'Match Group',w:1.1},{s:'PARA',n:'Paramount',w:0.9},
+    {s:'WBD',n:'Warner Bros Discovery',w:0.8},{s:'FOXA',n:'Fox Corp A',w:0.7},{s:'DIS',n:'Disney',w:0.6}
+  ],
+  XLI: [
+    {s:'RTX',n:'RTX Corp (Raytheon)',w:6.8},{s:'HON',n:'Honeywell',w:6.2},{s:'CAT',n:'Caterpillar',w:5.9},
+    {s:'GE',n:'GE Aerospace',w:5.4},{s:'UNP',n:'Union Pacific',w:4.8},{s:'DE',n:'John Deere',w:4.3},
+    {s:'ETN',n:'Eaton',w:4.0},{s:'LMT',n:'Lockheed Martin',w:3.7},{s:'UPS',n:'UPS',w:3.4},
+    {s:'PH',n:'Parker Hannifin',w:3.1},{s:'ITW',n:'Illinois Tool Works',w:2.9},{s:'WM',n:'Waste Management',w:2.7},
+    {s:'EMR',n:'Emerson Electric',w:2.5},{s:'NOC',n:'Northrop Grumman',w:2.3},{s:'GD',n:'General Dynamics',w:2.1},
+    {s:'CSX',n:'CSX',w:2.0},{s:'NSC',n:'Norfolk Southern',w:1.9},{s:'FDX',n:'FedEx',w:1.7},
+    {s:'AXON',n:'Axon Enterprise',w:1.5},{s:'VRSK',n:'Verisk',w:1.3}
+  ],
+  XLB: [
+    {s:'LIN',n:'Linde',w:17.8},{s:'SHW',n:'Sherwin-Williams',w:8.4},{s:'FCX',n:'Freeport-McMoRan',w:7.2},
+    {s:'APD',n:'Air Products',w:6.1},{s:'ECL',n:'Ecolab',w:5.3},{s:'NEM',n:'Newmont',w:4.8},
+    {s:'NUE',n:'Nucor',w:4.2},{s:'ALB',n:'Albemarle',w:3.6},{s:'PPG',n:'PPG Industries',w:3.3},
+    {s:'DD',n:'DuPont',w:3.0},{s:'VMC',n:'Vulcan Materials',w:2.8},{s:'MLM',n:'Martin Marietta',w:2.6},
+    {s:'CE',n:'Celanese',w:2.3},{s:'MOS',n:'Mosaic',w:2.1},{s:'IFF',n:'Intl Flavors',w:1.9},
+    {s:'BALL',n:'Ball Corp',w:1.7},{s:'AVY',n:'Avery Dennison',w:1.5},{s:'FMC',n:'FMC Corp',w:1.3},
+    {s:'CF',n:'CF Industries',w:1.2},{s:'CTVA',n:'Corteva',w:1.0}
+  ],
+  XLRE: [
+    {s:'AMT',n:'American Tower',w:11.2},{s:'PLD',n:'Prologis',w:10.5},{s:'CCI',n:'Crown Castle',w:7.8},
+    {s:'EQIX',n:'Equinix',w:7.3},{s:'PSA',n:'Public Storage',w:5.9},{s:'SBAC',n:'SBA Comm',w:4.8},
+    {s:'O',n:'Realty Income',w:4.5},{s:'DLR',n:'Digital Realty',w:4.2},{s:'WY',n:'Weyerhaeuser',w:3.9},
+    {s:'EXR',n:'Extra Space Storage',w:3.6},{s:'SPG',n:'Simon Property',w:3.3},{s:'AVB',n:'AvalonBay',w:3.0},
+    {s:'EQR',n:'Equity Residential',w:2.8},{s:'VTR',n:'Ventas',w:2.6},{s:'ARE',n:'Alexandria RE',w:2.4},
+    {s:'ESS',n:'Essex Property',w:2.2},{s:'MAA',n:'Mid-America Apt',w:2.0},{s:'INVH',n:'Invitation Homes',w:1.8},
+    {s:'VICI',n:'VICI Properties',w:1.6},{s:'HST',n:'Host Hotels',w:1.4}
+  ],
+  XLU: [
+    {s:'NEE',n:'NextEra Energy',w:16.4},{s:'SO',n:'Southern Company',w:7.8},{s:'DUK',n:'Duke Energy',w:7.2},
+    {s:'SRE',n:'Sempra',w:5.9},{s:'AEP',n:'American Electric Power',w:5.4},{s:'EXC',n:'Exelon',w:5.1},
+    {s:'XEL',n:'Xcel Energy',w:4.8},{s:'ED',n:'Consolidated Edison',w:4.3},{s:'ETR',n:'Entergy',w:3.9},
+    {s:'ES',n:'Eversource',w:3.6},{s:'WEC',n:'WEC Energy',w:3.3},{s:'AWK',n:'American Water Works',w:3.0},
+    {s:'CMS',n:'CMS Energy',w:2.8},{s:'DTE',n:'DTE Energy',w:2.6},{s:'AES',n:'AES Corp',w:2.4},
+    {s:'NI',n:'NiSource',w:2.2},{s:'AEE',n:'Ameren',w:2.0},{s:'LNT',n:'Alliant Energy',w:1.8},
+    {s:'EVRG',n:'Evergy',w:1.6},{s:'PNW',n:'Pinnacle West',w:1.4}
+  ],
+  XLP: [
+    {s:'PG',n:'Procter & Gamble',w:16.2},{s:'KO',n:'Coca-Cola',w:11.8},{s:'PEP',n:'PepsiCo',w:11.4},
+    {s:'COST',n:'Costco',w:10.9},{s:'PM',n:'Philip Morris',w:6.3},{s:'MO',n:'Altria',w:4.8},
+    {s:'MDLZ',n:'Mondelez',w:4.2},{s:'CL',n:'Colgate',w:3.7},{s:'KMB',n:'Kimberly-Clark',w:3.3},
+    {s:'STZ',n:'Constellation Brands',w:3.0},{s:'GIS',n:'General Mills',w:2.8},{s:'SYY',n:'Sysco',w:2.6},
+    {s:'CAG',n:'Conagra Brands',w:2.4},{s:'HRL',n:'Hormel Foods',w:2.2},{s:'KHC',n:'Kraft Heinz',w:2.0},
+    {s:'TSN',n:'Tyson Foods',w:1.8},{s:'K',n:'Kellanova',w:1.6},{s:'CPB',n:'Campbell Soup',w:1.4},
+    {s:'CHD',n:'Church & Dwight',w:1.2},{s:'CLX',n:'Clorox',w:1.0}
+  ],
+  XLY: [
+    {s:'AMZN',n:'Amazon',w:24.8},{s:'TSLA',n:'Tesla',w:17.2},{s:'HD',n:'Home Depot',w:8.6},
+    {s:'MCD',n:"McDonald's",w:5.4},{s:'NKE',n:'Nike',w:4.1},{s:'LOW',n:"Lowe's",w:3.8},
+    {s:'SBUX',n:'Starbucks',w:3.5},{s:'TJX',n:'TJX Companies',w:3.2},{s:'BKNG',n:'Booking Holdings',w:2.9},
+    {s:'F',n:'Ford Motor',w:2.6},{s:'GM',n:'General Motors',w:2.4},{s:'YUM',n:'Yum! Brands',w:2.2},
+    {s:'ORLY',n:"O'Reilly Auto",w:2.0},{s:'AZO',n:'AutoZone',w:1.8},{s:'APTV',n:'Aptiv',w:1.6},
+    {s:'DHI',n:'D.R. Horton',w:1.4},{s:'LEN',n:'Lennar',w:1.3},{s:'PHM',n:'PulteGroup',w:1.2},
+    {s:'CCL',n:'Carnival',w:1.1},{s:'RCL',n:'Royal Caribbean',w:1.0}
+  ]
+};
+
+
+/* ──────────── [2] CORE app.js ──────────── */
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 
@@ -3585,3 +3734,1940 @@ if (_proxyUrl) {
 } else {
   showScreen('screen-key');
 }
+
+
+/* ──────────── [3] DASHBOARD INLINE ──────────── */
+
+/* ═══════════════════════════════════════════════════════════
+   DASHBOARD INLINE (login overlay, simpleAIBrief, misc boot)
+   Originally at the end of /dashboard.html
+   ═══════════════════════════════════════════════════════════ */
+
+(function(){
+  try{
+    if(!localStorage.getItem('app_proxy_url')){
+      var ov = document.getElementById('login-overlay');
+      if(ov) ov.classList.add('visible');
+      // שומר את ה-URL האחרון כדי למלא מראש אחרי retry
+      var saved = localStorage.getItem('app_proxy_url_last');
+      if(saved){
+        var inp = document.getElementById('lo-key-input');
+        if(inp) inp.value = saved;
+      }
+    }
+  }catch(e){}
+})();
+
+
+/* ═══════════ LOGIN OVERLAY — מחבר את ה-Worker בלי לצאת מהדשבורד ═══════════ */
+async function loStartWithKey(){
+  const input   = document.getElementById('lo-key-input');
+  const err     = document.getElementById('lo-key-err');
+  const btn     = document.getElementById('lo-login-btn');
+  const btnText = btn.querySelector('.lo-btn-text');
+  const val     = (input.value || '').trim();
+
+  if (!val) {
+    err.textContent = 'אנא הזן את כתובת ה-Worker.';
+    err.classList.add('show');
+    input.focus();
+    return;
+  }
+  if (!val.startsWith('http')) {
+    err.textContent = 'הכתובת חייבת להתחיל ב-https://';
+    err.classList.add('show');
+    return;
+  }
+
+  const cleanUrl = val.endsWith('/') ? val.slice(0, -1) : val;
+  const originalText = btnText.textContent;
+
+  err.classList.remove('show');
+  btn.classList.add('loading');
+  btnText.textContent = 'מוודא הרשאות...';
+
+  try {
+    const testUrl = 'https://query1.finance.yahoo.com/v7/finance/spark?symbols=SPY&range=1d&interval=1d';
+    const r = await fetch(`${cleanUrl}/?url=${encodeURIComponent(testUrl)}`);
+    const d = await r.json();
+    if (d.spark && d.spark.result) {
+      // Success — שומר ומטעין מחדש את הדשבורד (נשאר ב-PWA mode — אין ניווט ליעד חדש)
+      localStorage.setItem('app_proxy_url', cleanUrl);
+      localStorage.setItem('app_proxy_url_last', cleanUrl);
+      btnText.textContent = 'מתחבר...';
+      setTimeout(() => { location.reload(); }, 300);
+    } else {
+      throw new Error('Invalid response');
+    }
+  } catch (e) {
+    err.textContent = 'מפתח המערכת שגוי או שהשרת אינו מגיב.';
+    err.classList.add('show');
+    btn.classList.remove('loading');
+    btnText.textContent = originalText;
+  }
+}
+
+/* showKey override: מציג את ה-overlay עם שגיאה במקום לצאת ל-index.html */
+window.showKey = function(){
+  try {
+    const last = localStorage.getItem('app_proxy_url') || '';
+    localStorage.removeItem('app_proxy_url');
+    if (last) localStorage.setItem('app_proxy_url_last', last);
+  } catch(e) {}
+  const ov = document.getElementById('login-overlay');
+  if (ov) {
+    ov.classList.add('visible');
+    const inp = document.getElementById('lo-key-input');
+    if (inp) {
+      inp.value = localStorage.getItem('app_proxy_url_last') || '';
+      setTimeout(() => inp.focus(), 100);
+    }
+    const err = document.getElementById('lo-key-err');
+    if (err) {
+      err.textContent = 'החיבור ל-Worker נכשל. בדוק את הכתובת ונסה שוב.';
+      err.classList.add('show');
+    }
+  }
+};
+
+/* Terminal clocks + latency */
+(function(){
+  function tick(){
+    const now = new Date();
+    const fmt = {hour12:false, hour:'2-digit', minute:'2-digit'};
+    const tlv = now.toLocaleTimeString('en-GB',{...fmt,timeZone:'Asia/Jerusalem'});
+    const ny  = now.toLocaleTimeString('en-GB',{...fmt,timeZone:'America/New_York'});
+    const a=document.getElementById('term-clock-tlv'); if(a)a.textContent=tlv;
+    const b=document.getElementById('term-clock-ny');  if(b)b.textContent=ny;
+    const d=document.getElementById('hdr-build');
+    if(d){
+      const str=now.toLocaleDateString('en-US',{year:'numeric',month:'2-digit',day:'2-digit',timeZone:'Asia/Jerusalem'}).replace(/\//g,'.');
+      d.textContent = 'build · ' + str;
+    }
+  }
+  tick(); setInterval(tick,1000);
+  setInterval(()=>{
+    const el=document.getElementById('term-latency');
+    if(el) el.textContent=(50+Math.floor(Math.random()*50))+'ms';
+  },1400);
+})();
+
+/* Sidebar sector heatmap: sync from #sector-tbody */
+(function(){
+  const SECTOR_MAP = {XLK:'TECH',XLC:'COMM',XLP:'CONS',XLV:'HEAL',XLF:'FIN',XLI:'INDU',XLRE:'REAL',XLE:'ENER'};
+  function parsePct(txt){
+    if(!txt) return null;
+    const m = String(txt).match(/-?\d+\.?\d*/);
+    return m ? parseFloat(m[0]) : null;
+  }
+  function syncHeatmap(){
+    const rows = document.querySelectorAll('#sector-tbody tr:not(.avgrow)');
+    if(!rows.length) return;
+    rows.forEach(row => {
+      // הסימבול קריא מ-data-sym attribute (עמודת הסקטור כבר לא חלק מה-tr הזה)
+      const sym = row.getAttribute('data-sym');
+      if(!sym || !SECTOR_MAP[sym]) return;
+      // תא ה-1D הוא התא הראשון שאינו sec-cell (ה-sec-cell הוא עכשיו ה-td הראשון ב-tr)
+      const dayCell = row.querySelector('td:not(.sec-cell)');
+      const pct = parsePct(dayCell ? dayCell.textContent : '');
+      const cell = document.querySelector(`.heat-cell[data-sector-slot="${sym}"]`);
+      if(!cell) return;
+      const pctSpan = cell.querySelector('.heat-pct');
+      if(pct == null){ cell.className='heat-cell neu'; if(pctSpan)pctSpan.textContent='–'; return; }
+      const abs = Math.abs(pct);
+      const sign = pct>0?'+':(pct<0?'−':'');
+      if(pctSpan) pctSpan.textContent = sign + abs.toFixed(2) + '%';
+      const strong = abs >= 1.0;
+      if(pct > 0.05) cell.className = 'heat-cell up' + (strong?' strong':'');
+      else if(pct < -0.05) cell.className = 'heat-cell down' + (strong?' strong':'');
+      else cell.className = 'heat-cell neu';
+      // שם הסקטור — קריא מתא ה-.sec-cell בתוך אותה שורה
+      const sectorCell = row.querySelector('td.sec-cell');
+      const nameTxt = sectorCell ? sectorCell.textContent.replace(sym,'').trim() : sym;
+      cell.onclick = () => { if(window.openSectorModal) window.openSectorModal(sym, nameTxt); };
+      cell.style.cursor = 'pointer';
+    });
+  }
+  const tb = document.getElementById('sector-tbody');
+  if(tb){
+    const obs = new MutationObserver(() => setTimeout(syncHeatmap, 50));
+    obs.observe(tb, {childList:true, subtree:true, characterData:true});
+  }
+  setInterval(syncHeatmap, 3000);
+})();
+
+/* Concise AI Brief — reads from DOM, overrides runAIBrief */
+(function(){
+  const SECTOR_NAMES = {
+    XLK:'טכנולוגיה',XLC:'תקשורת',XLP:'צריכה בסיסית',XLV:'בריאות',
+    XLF:'פיננסים',XLI:'תעשייה',XLY:'צריכה שיקולית',XLRE:'נדל״ן',
+    XLB:'חומרים',XLU:'תשתיות',XLE:'אנרגיה'
+  };
+  function readSectorData(){
+    const rows = document.querySelectorAll('#sector-tbody tr:not(.avgrow)');
+    const out = [];
+    rows.forEach(row => {
+      const sym = row.getAttribute('data-sym');
+      if (!sym || !SECTOR_NAMES[sym]) return;
+      const td = row.querySelector('td:not(.sec-cell)');
+      const m = td ? td.textContent.match(/-?\d+\.?\d*/) : null;
+      if (!m) return;
+      const d1 = parseFloat(m[0]);
+      if (isNaN(d1)) return;
+      out.push({ sym, name: SECTOR_NAMES[sym], d1 });
+    });
+    return out;
+  }
+  function readVIX(){
+    const cards = document.querySelectorAll('.idx-card');
+    for (const c of cards){
+      const symEl = c.querySelector('.idx-card-sym');
+      if (symEl && symEl.textContent.trim() === 'VIXY'){
+        const p = c.querySelector('.idx-card-price');
+        if (p){ const m = p.textContent.match(/\d+\.?\d*/); if (m) return parseFloat(m[0]); }
+      }
+    }
+    return null;
+  }
+  function readBreadth(){
+    const el = document.getElementById('breadth-big');
+    if (!el) return null;
+    const m = el.textContent.match(/\d+/);
+    return m ? parseInt(m[0],10) : null;
+  }
+  function readFG(){
+    const numEl = document.getElementById('fg-num');
+    const lblEl = document.getElementById('fg-lbl');
+    if (!numEl) return null;
+    const m = numEl.textContent.match(/\d+/);
+    if (!m) return null;
+    return {
+      score: parseInt(m[0],10),
+      label: lblEl ? lblEl.textContent.trim() : ''
+    };
+  }
+  function readMI(){
+    const adv  = document.getElementById('mi-adv');
+    const avg  = document.getElementById('mi-avg');
+    const hi52 = document.getElementById('mi-hi52');
+    const parse = el => {
+      if (!el) return null;
+      const t = el.textContent.trim();
+      if (!t || t === '–') return null;
+      return t;
+    };
+    return {
+      adv:  parse(adv),   // "9/2" format
+      avg:  parse(avg),   // "+0.74%"
+      hi52: parse(hi52)   // "-4.4%"
+    };
+  }
+  function fmt(n){ return (n>=0?'+':'') + n.toFixed(2) + '%'; }
+
+  function simpleAIBrief(){
+    const sec = document.getElementById('ai-brief-section');
+    if (sec) sec.style.display = 'block';
+
+    const data = readSectorData();
+    if (data.length < 5) return;
+
+    const positives = data.filter(s => s.d1 > 0).length;
+    const negatives = data.filter(s => s.d1 < 0).length;
+    const total = data.length;
+    const avg = data.reduce((a,s)=>a+s.d1,0)/total;
+    const sorted = data.slice().sort((a,b)=>b.d1-a.d1);
+    const leader = sorted[0];
+    const laggard = sorted[sorted.length-1];
+    const vix = readVIX();
+    const breadth = readBreadth();
+
+    let mood = 'mixed', verdict;
+    if (avg > 0.3 && positives >= 7){
+      mood = '';
+      verdict = `<strong>יום ירוק בשוק</strong> — ${positives}/${total} סקטורים חיוביים, בהובלת <strong>${leader.name}</strong> (${fmt(leader.d1)}). ציפייה להמשך מגמה.`;
+    } else if (avg < -0.3 && negatives >= 7){
+      mood = 'neg';
+      verdict = `<strong>יום אדום בשוק</strong> — ${negatives}/${total} סקטורים שליליים. <strong>${laggard.name}</strong> מוביל ירידות (${fmt(laggard.d1)}). זהירות נדרשת.`;
+    } else {
+      verdict = `שוק <strong>מעורב</strong> — <strong>${leader.name}</strong> חזקה (${fmt(leader.d1)}), אבל <strong>${laggard.name}</strong> חלש (${fmt(laggard.d1)}).`;
+    }
+
+    const vEl = document.getElementById('ai-verdict');
+    if (vEl) vEl.className = 'ai-verdict' + (mood ? ' ' + mood : '');
+    const vIcon = document.getElementById('ai-verdict-icon');
+    if (vIcon){
+      vIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"/><line x1="9" y1="21" x2="15" y2="21"/><line x1="10" y1="24" x2="14" y2="24"/></svg>`;
+    }
+    const vText = document.getElementById('ai-verdict-text');
+    if (vText) vText.innerHTML = verdict;
+
+    const leaderPos = leader.d1 > 0;
+    const vixPos = vix != null && vix < 20;
+    const breadthPos = breadth != null && breadth > 55;
+    const breadthNeg = breadth != null && breadth < 40;
+    const breadthHot = breadth != null && breadth >= 85;  // over-extended
+    const vixDot = vix == null ? 'neu' : vixPos ? 'pos' : 'neg';
+    const vixVal = vix == null ? '' : vixPos ? 'pos' : 'neg';
+    const vixDesc = vix == null ? 'ממתין לנתונים' : vix < 15 ? 'שוק רגוע — סביבה חיובית' : vix < 20 ? 'תנודתיות מתונה' : 'תנודתיות גבוהה — זהירות';
+    const bDot = breadthHot ? 'neu' : breadthPos ? 'pos' : breadthNeg ? 'neg' : 'neu';
+    const bDesc = breadth == null ? 'מחשב...' :
+                  breadthHot ? 'מתוח — שקול רווחים' :
+                  breadthPos ? 'רוחב שוק חיובי' :
+                  breadthNeg ? 'רוחב שוק חלש' : 'רוחב שוק מעורב';
+
+    // Sentiment (Fear & Greed)
+    const fgData = readFG();
+    let sentDot = 'neu', sentVal = 'neu', sentDesc = 'מחשב...', sentScoreTxt = '–';
+    if (fgData){
+      sentScoreTxt = fgData.score + (fgData.label ? ' · ' + fgData.label : '');
+      if (fgData.score >= 75){ sentDot='neu'; sentVal='neu'; sentDesc='חמדנות קיצונית — זהירות'; }
+      else if (fgData.score >= 55){ sentDot='pos'; sentVal='pos'; sentDesc='אופטימיות בריאה'; }
+      else if (fgData.score >= 45){ sentDot='neu'; sentVal='neu'; sentDesc='סנטימנט ניטרלי'; }
+      else if (fgData.score >= 25){ sentDot='neg'; sentVal='neg'; sentDesc='פחד — סלקטיביות'; }
+      else { sentDot='pos'; sentVal='pos'; sentDesc='פחד קיצוני — הזדמנות'; }
+    }
+
+    const signalsEl = document.getElementById('ai-signals');
+    if (signalsEl){
+      signalsEl.innerHTML = `
+        <div class="ai-signal">
+          <div class="ai-s-hdr"><div class="ai-s-dot ${sentDot}"></div><div class="ai-s-label">Sentiment</div></div>
+          <div class="ai-s-val ${sentVal}">${sentScoreTxt}</div>
+          <div class="ai-s-desc">${sentDesc}</div>
+        </div>
+        <div class="ai-signal">
+          <div class="ai-s-hdr"><div class="ai-s-dot ${leaderPos?'pos':'neg'}"></div><div class="ai-s-label">Leadership</div></div>
+          <div class="ai-s-val ${leaderPos?'pos':'neg'}">${leader.name} ${fmt(leader.d1)}</div>
+          <div class="ai-s-desc">${leaderPos ? 'הסקטור המוביל היום בשוק' : 'אף סקטור לא מוביל חיובית'}</div>
+        </div>
+        <div class="ai-signal">
+          <div class="ai-s-hdr"><div class="ai-s-dot ${bDot}"></div><div class="ai-s-label">Breadth</div></div>
+          <div class="ai-s-val">${breadth!=null?breadth+'%':'–'}</div>
+          <div class="ai-s-desc">${bDesc}</div>
+        </div>
+        <div class="ai-signal">
+          <div class="ai-s-hdr"><div class="ai-s-dot ${vixDot}"></div><div class="ai-s-label">Vol Regime</div></div>
+          <div class="ai-s-val ${vixVal}">VIX ${vix!=null?vix.toFixed(2):'–'}</div>
+          <div class="ai-s-desc">${vixDesc}</div>
+        </div>`;
+    }
+
+    // ── Micro-stats strip: Up/Down · Avg 1D · vs 52W (from hidden Market Internals) ──
+    const mi = readMI();
+    const microEl = document.getElementById('ai-micro-stats');
+    if (microEl){
+      // Avg 1D: we already have `avg` computed from sector table — use it for freshness
+      const avgClass = avg > 0.15 ? 'pos' : avg < -0.15 ? 'neg' : 'neu';
+      const avgTxt = fmt(avg);
+      // Up/Down: prefer hidden MI value, else compute
+      let udTxt = mi.adv || `${positives}/${negatives}`;
+      // vs 52W: only from hidden MI (needs historical)
+      const hi52 = mi.hi52 || '–';
+      const hi52Num = parseFloat((hi52||'').replace(/[^\-\d.]/g,''));
+      const hi52Class = !isFinite(hi52Num) ? 'neu' : hi52Num > -3 ? 'pos' : hi52Num > -8 ? 'neu' : 'neg';
+
+      microEl.innerHTML = `
+        <div class="ai-mi-item">
+          <div class="ai-mi-lbl">עולים / יורדים</div>
+          <div class="ai-mi-val">${udTxt}</div>
+        </div>
+        <div class="ai-mi-sep"></div>
+        <div class="ai-mi-item">
+          <div class="ai-mi-lbl">ממוצע יומי</div>
+          <div class="ai-mi-val ${avgClass}">${avgTxt}</div>
+        </div>
+        <div class="ai-mi-sep"></div>
+        <div class="ai-mi-item">
+          <div class="ai-mi-lbl">מרחק משיא 52W</div>
+          <div class="ai-mi-val ${hi52Class}">${hi52}</div>
+        </div>`;
+    }
+
+    const watchTxt = leaderPos
+      ? `המשך הובלת <b>${leader.name}</b> — עד מתי ימשיך להוביל.`
+      : `חולשה רחבה — עקוב אחר רמות תמיכה.`;
+    const riskTxt = laggard.d1 < -0.5
+      ? `<b>${laggard.name}</b> בחולשה (${fmt(laggard.d1)}) — עלול להעיב על השוק.`
+      : `תנודתיות נמוכה יחסית — סבלנות נדרשת.`;
+    const oppTxt = positives > 6
+      ? `מומנטום חיובי — כניסות <b>סלקטיביות</b> לסקטורים מובילים.`
+      : negatives > 6
+      ? `שוק חלש — <b>חכה ליציבות</b> לפני כניסה חדשה.`
+      : `שוק מעורב — פעל <b>סלקטיבית</b> בסקטורים יחסיים.`;
+
+    // Pull the detailed breadth advice from the hidden Breadth card into the AI actions
+    const breadthAdviceRow = (() => {
+      const src = document.getElementById('breadth-advice');
+      if (!src || !src.innerHTML.trim()) return '';
+      const headline = src.querySelector('.br-headline')?.textContent?.trim() || 'רוחב שוק';
+      // Extract body = innerHTML minus the headline span
+      const clone = src.cloneNode(true);
+      const h = clone.querySelector('.br-headline');
+      if (h) h.remove();
+      const bodyHtml = clone.innerHTML.trim();
+      if (!bodyHtml) return '';
+      // Tone: advice.warn → neu (amber), advice.danger → neg (red), else pos (green)
+      const tone = src.classList.contains('danger') ? 'neg'
+                 : src.classList.contains('warn')   ? 'neu'
+                 : 'pos';
+      const pctTxt = breadth != null ? ` (${breadth}%)` : '';
+      return `<div class="ai-a-row"><div class="ai-a-dot ${tone}"></div><div class="ai-a-txt ${tone}"><b>רוחב שוק${pctTxt} — ${headline}:</b> ${bodyHtml}</div></div>`;
+    })();
+
+    const actionsEl = document.getElementById('ai-actions');
+    if (actionsEl){
+      actionsEl.innerHTML = `
+        <div class="ai-a-row"><div class="ai-a-dot"></div><div class="ai-a-txt"><b>עקוב:</b> ${watchTxt}</div></div>
+        <div class="ai-a-row"><div class="ai-a-dot"></div><div class="ai-a-txt"><b>סיכון:</b> ${riskTxt}</div></div>
+        <div class="ai-a-row"><div class="ai-a-dot"></div><div class="ai-a-txt"><b>הזדמנות:</b> ${oppTxt}</div></div>
+        ${breadthAdviceRow}`;
+    }
+
+    const edu = document.getElementById('ai-edu-panel');
+    if (edu) edu.style.display = 'none';
+  }
+
+  window.simpleAIBrief = simpleAIBrief;
+  function installOverride(){ window.runAIBrief = simpleAIBrief; }
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', installOverride);
+  } else {
+    installOverride();
+  }
+
+  let _scheduled = false;
+  function scheduleUpdate(){
+    if (_scheduled) return;
+    _scheduled = true;
+    setTimeout(() => { _scheduled = false; simpleAIBrief(); }, 250);
+  }
+  window.addEventListener('load', () => {
+    const tb = document.getElementById('sector-tbody');
+    if (tb){
+      const obs = new MutationObserver(scheduleUpdate);
+      obs.observe(tb, {childList:true, subtree:true, characterData:true});
+    }
+    setTimeout(simpleAIBrief, 1500);
+    setTimeout(simpleAIBrief, 3500);
+  });
+})();
+
+
+/* ──────────── [4] MACRO MODULE (IIFE) ──────────── */
+
+/* ═══════════════════════════════════════════════════════════
+   MACRO MODULE (FRED dashboard) — namespaced IIFE
+   Originally /macro.html inline script.
+   ═══════════════════════════════════════════════════════════ */
+(function(){
+  "use strict";
+  // Guard: only run once; later hash changes call window.initMacro
+  if (window.__macroLoaded) return;
+  window.__macroLoaded = true;
+
+  // ── BEGIN macro.html inline script ──
+
+/* ═══════════════════════════════════════════════════════════
+   MACRO DASHBOARD
+   ═══════════════════════════════════════════════════════════ */
+
+const FRED_KEY = 'aa7f8d740d367d9ff2354194b5329fbe';
+const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
+const PROXY_URL = (localStorage.getItem('app_proxy_url') || '').replace(/\/+$/, '');
+
+/* ── Mobile "More" bottom sheet ── */
+function toggleMobileMenu(){
+  const m = document.getElementById('mobile-menu');
+  const o = document.getElementById('mob-overlay');
+  if (!m) return;
+  if (m.classList.contains('open')) { closeMobileMenu(); return; }
+  m.classList.add('open');
+  if (o) o.classList.add('open');
+}
+function closeMobileMenu(){
+  const m = document.getElementById('mobile-menu');
+  const o = document.getElementById('mob-overlay');
+  if (m) m.classList.remove('open');
+  if (o) o.classList.remove('open');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMobileMenu(); });
+
+/* ── Terminal clocks ── */
+(function(){
+  function tick(){
+    const now = new Date();
+    const tlv = now.toLocaleTimeString('en-GB',{hour12:false,timeZone:'Asia/Jerusalem'});
+    const ny  = now.toLocaleTimeString('en-GB',{hour12:false,timeZone:'America/New_York'});
+    const a=document.getElementById('term-clock-tlv'); if(a)a.textContent=tlv;
+    const b=document.getElementById('term-clock-ny'); if(b)b.textContent=ny;
+    const d=document.getElementById('hdr-build');
+    if(d){
+      const str=now.toLocaleDateString('en-US',{year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\//g,'.');
+      d.textContent = 'build · ' + str;
+    }
+  }
+  tick(); setInterval(tick,1000);
+})();
+
+/* ── Indicators configuration ── */
+const INDICATORS = [
+  { id:'PAYEMS', nameHe:'שינוי תעסוקה (NFP)', nameEn:'Nonfarm Payrolls Δ', unit:'K', type:'delta', color:'#f59e0b', format:'int' },
+  { id:'CPIAUCSL', nameHe:'אינפלציה (CPI %)', nameEn:'CPI YoY', unit:'%', type:'yoy', color:'#3b82f6', format:'pct' },
+  { id:'FEDFUNDS', nameHe:'ריבית הפד', nameEn:'Fed Funds Rate', unit:'%', type:'level', color:'#8b5cf6', format:'pct' },
+  { id:'A191RL1Q225SBEA', nameHe:'צמיחת GDP (SAAR)', nameEn:'Real GDP QoQ', unit:'%', type:'level', color:'#a855f7', format:'pct', freq:'Q' },
+  { id:'UMCSENT', nameHe:'אמון הצרכן (מישיגן)', nameEn:'Consumer Confidence', unit:'', type:'level', color:'#dc2626', format:'num' },
+  { id:'RSAFS', nameHe:'מכירות קמעונאיות (MoM)', nameEn:'Retail Sales MoM', unit:'%', type:'mom', color:'#0ea5e9', format:'pct' },
+  { id:'ICSA', nameHe:'תביעות אבטלה ראשוניות', nameEn:'Initial Jobless Claims', unit:'K', type:'level', color:'#14b8a6', format:'int', scale:0.001 },
+  { id:'PPIACO', nameHe:'מחירי יצרן (PPI YoY)', nameEn:'PPI YoY', unit:'%', type:'yoy', color:'#a78bfa', format:'pct' },
+  { id:'PCEPILFE', nameHe:'Core PCE (YoY)', nameEn:'Core PCE YoY', unit:'%', type:'yoy', color:'#eab308', format:'pct' },
+  { id:'JTSJOL', nameHe:'משרות פנויות (JOLTs)', nameEn:'JOLTs Openings', unit:'M', type:'level', color:'#06b6d4', format:'dec1', scale:0.001 },
+  { id:'DGORDER', nameHe:'הזמנות בני קיימא', nameEn:'Durable Goods Orders', unit:'B$', type:'level', color:'#84cc16', format:'int', scale:0.001 },
+  { id:'PERMIT', nameHe:'היתרי בנייה', nameEn:'Building Permits', unit:'K', type:'level', color:'#f97316', format:'int' },
+  { id:'EXHOSLUSM495S', nameHe:'מכירות בתים קיימים', nameEn:'Existing Home Sales', unit:'M', type:'level', color:'#ec4899', format:'dec2', scale:0.000001 }
+];
+
+/* ── Helpers ── */
+function formatValue(v, format){
+  if (v == null || isNaN(v)) return '–';
+  if (format === 'pct') return (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+  if (format === 'int') return (v >= 0 ? '+' : '') + Math.round(v).toLocaleString();
+  if (format === 'dec1') return v.toFixed(1);
+  if (format === 'dec2') return v.toFixed(2);
+  return v.toFixed(1);
+}
+
+function formatDate(dateStr){
+  // YYYY-MM-DD → MM/YY
+  const [y,m] = dateStr.split('-');
+  return m + '/' + y.slice(2);
+}
+
+/* ── FRED fetch with cache (via Cloudflare Worker proxy) ── */
+async function fetchFred(id, limit){
+  const cacheKey = 'fred_cache_' + id;
+  try {
+    const raw = localStorage.getItem(cacheKey);
+    if (raw){
+      const cached = JSON.parse(raw);
+      if (cached.t && (Date.now() - cached.t) < CACHE_TTL && cached.data){
+        return cached.data;
+      }
+    }
+  } catch(e){}
+  if (!PROXY_URL){
+    throw new Error('Worker proxy not configured');
+  }
+  const fredUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=${id}&api_key=${FRED_KEY}&file_type=json&sort_order=desc&limit=${limit}`;
+  // Route through Cloudflare Worker (same pattern as app.js)
+  const proxiedUrl = `${PROXY_URL}/?url=${encodeURIComponent(fredUrl)}`;
+  const r = await fetch(proxiedUrl);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const d = await r.json();
+  const obs = (d.observations || [])
+    .filter(o => o.value !== '.' && o.value !== '')
+    .map(o => ({ date: o.date, value: parseFloat(o.value) }))
+    .reverse(); // oldest-first
+  try { localStorage.setItem(cacheKey, JSON.stringify({ t: Date.now(), data: obs })); } catch(e){}
+  return obs;
+}
+
+/* ── Transform ── */
+function transformData(obs, type, scale){
+  let out;
+  if (type === 'level'){
+    out = obs.slice(-12);
+  } else if (type === 'yoy'){
+    const tmp = [];
+    for (let i = 12; i < obs.length; i++){
+      if (obs[i-12].value > 0){
+        const yoy = ((obs[i].value / obs[i-12].value) - 1) * 100;
+        tmp.push({ date: obs[i].date, value: yoy });
+      }
+    }
+    out = tmp.slice(-12);
+  } else if (type === 'mom'){
+    const tmp = [];
+    for (let i = 1; i < obs.length; i++){
+      if (obs[i-1].value !== 0){
+        const mom = ((obs[i].value / obs[i-1].value) - 1) * 100;
+        tmp.push({ date: obs[i].date, value: mom });
+      }
+    }
+    out = tmp.slice(-12);
+  } else if (type === 'delta'){
+    const tmp = [];
+    for (let i = 1; i < obs.length; i++){
+      tmp.push({ date: obs[i].date, value: obs[i].value - obs[i-1].value });
+    }
+    out = tmp.slice(-12);
+  } else {
+    out = obs.slice(-12);
+  }
+  if (scale && scale !== 1){
+    out = out.map(o => ({ date: o.date, value: o.value * scale }));
+  }
+  return out;
+}
+
+/* ── Chart rendering ── */
+function renderChart(ind, data){
+  const canvas = document.getElementById('chart-' + ind.id);
+  if (!canvas) return;
+  const labels = data.map(d => formatDate(d.date));
+  const values = data.map(d => d.value);
+
+  // Show positive as green, negative as red, when data spans zero
+  const hasNeg = values.some(v => v < 0);
+  const hasPos = values.some(v => v >= 0);
+  const chartType = (hasNeg && hasPos && ind.type !== 'delta') ? 'line' : 'bar';
+
+  let backgroundColor, borderColor;
+  if (chartType === 'bar'){
+    // Color per bar based on sign (for delta/mom/yoy)
+    if (ind.type === 'delta' || ind.type === 'mom' || ind.type === 'yoy'){
+      backgroundColor = values.map(v => v >= 0 ? ind.color + 'dd' : '#e77385dd');
+    } else {
+      backgroundColor = ind.color + 'cc';
+    }
+  }
+
+  const cfg = {
+    type: chartType,
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: chartType === 'bar' ? backgroundColor : (ind.color + '20'),
+        borderColor: chartType === 'line' ? ind.color : undefined,
+        borderWidth: chartType === 'line' ? 2 : 0,
+        borderRadius: chartType === 'bar' ? 3 : 0,
+        pointRadius: chartType === 'line' ? 3 : 0,
+        pointBackgroundColor: ind.color,
+        fill: chartType === 'line',
+        tension: chartType === 'line' ? 0.3 : 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 400 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(11,19,17,0.95)',
+          borderColor: 'rgba(79,199,138,0.4)',
+          borderWidth: 1,
+          titleFont: { family: 'JetBrains Mono', size: 10, weight: '700' },
+          bodyFont: { family: 'JetBrains Mono', size: 11, weight: '800' },
+          titleColor: '#4fc78a',
+          bodyColor: '#dfe4e0',
+          padding: 8,
+          cornerRadius: 5,
+          displayColors: false,
+          callbacks: {
+            label: (ctx) => formatValue(ctx.parsed.y, ind.format) + (ind.unit || '')
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: 'rgba(223,228,224,0.5)',
+            font: { family: 'JetBrains Mono', size: 9 },
+            maxRotation: 0,
+            autoSkip: true,
+            maxTicksLimit: 6
+          },
+          grid: { display: false },
+          border: { color: 'rgba(214,213,212,0.12)' }
+        },
+        y: {
+          ticks: {
+            color: 'rgba(223,228,224,0.5)',
+            font: { family: 'JetBrains Mono', size: 9 },
+            maxTicksLimit: 5,
+            callback: function(v){ return formatValue(v, ind.format); }
+          },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          border: { display: false }
+        }
+      }
+    }
+  };
+
+  if (window.__macroCharts && window.__macroCharts[ind.id]){
+    try { window.__macroCharts[ind.id].destroy(); } catch(e){}
+  }
+  window.__macroCharts = window.__macroCharts || {};
+  window.__macroCharts[ind.id] = new Chart(canvas, cfg);
+}
+
+/* ── KPI rendering ── */
+function renderKpi(ind, data){
+  const el = document.getElementById('kpi-' + ind.id);
+  if (!el) return;
+  if (!data.length){
+    el.innerHTML = `<div class="kpi-label">${ind.nameHe}</div><div class="kpi-val-row"><span class="kpi-val">–</span></div>`;
+    return;
+  }
+  const latest = data[data.length-1];
+  const prev = data.length > 1 ? data[data.length-2] : null;
+  const isPct = ind.type === 'yoy' || ind.type === 'mom' || ind.type === 'delta';
+  const valClass = (isPct && latest.value > 0) ? 'pos' : (isPct && latest.value < 0) ? 'neg' : '';
+  const borderClass = (isPct && latest.value < 0) ? 'neg' : '';
+  el.className = 'kpi-item ' + borderClass;
+  el.innerHTML = `
+    <div class="kpi-label">${ind.nameHe}</div>
+    <div class="kpi-val-row">
+      <span class="kpi-val ${valClass}">${formatValue(latest.value, ind.format)}${ind.unit||''}</span>
+      <span class="kpi-date">${formatDate(latest.date)}</span>
+    </div>`;
+}
+
+/* ── Init: render grid skeletons ── */
+function initUI(){
+  const kpiStrip = document.getElementById('kpi-strip');
+  const chartsGrid = document.getElementById('charts-grid');
+  kpiStrip.innerHTML = INDICATORS.map(ind => `
+    <div class="kpi-item neu" id="kpi-${ind.id}">
+      <div class="kpi-label">${ind.nameHe}</div>
+      <div class="kpi-val-row"><span class="kpi-val">–</span></div>
+    </div>
+  `).join('');
+  chartsGrid.innerHTML = INDICATORS.map(ind => `
+    <div class="chart-card">
+      <div class="chart-hdr">
+        <div class="chart-title">${ind.nameHe}</div>
+        <div class="chart-badge">${ind.id}</div>
+      </div>
+      <div class="chart-body">
+        <div class="chart-loading" id="load-${ind.id}"><div class="mini-ring"></div> טוען...</div>
+        <canvas id="chart-${ind.id}"></canvas>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ── Load all ── */
+async function loadAll(){
+  initUI();
+
+  // Determine fetch limit per type (yoy needs 12 more)
+  const fetches = INDICATORS.map(async ind => {
+    const baseLimit = 12;
+    let limit = baseLimit + 2;
+    if (ind.type === 'yoy') limit = baseLimit + 13;
+    if (ind.type === 'delta' || ind.type === 'mom') limit = baseLimit + 2;
+    if (ind.freq === 'Q') limit = 12; // quarterly
+    try {
+      const raw = await fetchFred(ind.id, limit);
+      const data = transformData(raw, ind.type, ind.scale || 1);
+      const loader = document.getElementById('load-' + ind.id);
+      if (loader) loader.style.display = 'none';
+      if (!data.length){
+        const body = document.querySelector(`#chart-${ind.id}`).parentElement;
+        body.innerHTML = '<div class="chart-err">אין נתונים זמינים</div>';
+        return;
+      }
+      renderChart(ind, data);
+      renderKpi(ind, data);
+    } catch (err) {
+      console.error('Failed:', ind.id, err);
+      const loader = document.getElementById('load-' + ind.id);
+      if (loader){
+        loader.innerHTML = '<span style="color:var(--red)">שגיאה בטעינה</span>';
+      }
+    }
+  });
+
+  await Promise.allSettled(fetches);
+
+  // Hide overlay
+  const overlay = document.getElementById('page-loading');
+  if (overlay) overlay.classList.add('hidden');
+
+  // Last-updated indicator
+  const lu = document.getElementById('last-updated');
+  if (lu){
+    const now = new Date();
+    lu.textContent = 'עודכן: ' + now.toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'});
+  }
+}
+
+// Run on load
+if (document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', loadAll);
+} else {
+  loadAll();
+}
+
+  // ── END macro.html inline script ──
+
+  // Expose lazy initializer (called by router when #/macro shown)
+  window.initMacro = function(){
+    if (window.__macroInited) return;
+    window.__macroInited = true;
+    try { if (typeof loadAll === "function") loadAll(); } catch(e){ console.error(e); }
+  };
+  // Wire the `toggleMobileMenu` global (macro declared it locally).
+  if (!window.toggleMobileMenu && typeof toggleMobileMenu === "function")
+    window.toggleMobileMenu = toggleMobileMenu;
+  if (!window.closeMobileMenu && typeof closeMobileMenu === "function")
+    window.closeMobileMenu = closeMobileMenu;
+})();
+
+/* ──────────── [5] ADVISOR MODULE (IIFE) ──────────── */
+
+/* ═══════════════════════════════════════════════════════════
+   ADVISOR MODULE (stock advisor scanner) — namespaced IIFE
+   Originally /advisor.html inline script.
+   ═══════════════════════════════════════════════════════════ */
+(function(){
+  "use strict";
+  if (window.__advisorLoaded) return;
+  window.__advisorLoaded = true;
+
+  // Advisor declared its init as an IIFE. We need to defer that
+  // until the user actually navigates to #/advisor. So we rename
+  // its self-calling init() to advisorBoot() and expose it.
+  // Regex: the file opens with `(function init() {` and we turn
+  // it into a named function.
+  // Start of advisor.html script:
+
+// ═══════════════════════════════════════════════════════════
+// StockPulse Advisor — Core Logic
+// ═══════════════════════════════════════════════════════════
+
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// Get proxy URL from localStorage (set by index.html / dashboard.html)
+const PROXY = localStorage.getItem('app_proxy_url') || '';
+
+// Cache keys
+const CACHE_KEY = 'advisor_scan_cache_v1';
+const WL_KEY = 'advisor_watchlist_v1';
+const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
+
+// Sector Hebrew names
+const SECTOR_NAMES = {
+  XLK:'טכנולוגיה', XLF:'פיננסים', XLE:'אנרגיה', XLV:'בריאות',
+  XLC:'תקשורת', XLI:'תעשייה', XLB:'חומרים', XLRE:'נדל״ן',
+  XLU:'תשתיות', XLP:'צריכה בסיסית', XLY:'צריכה שיקולית'
+};
+
+// Build symbol -> sector map from ETF_HOLDINGS
+const SYM_SECTOR = {};
+const SYM_NAME = {};
+if (typeof ETF_HOLDINGS !== 'undefined') {
+  Object.entries(ETF_HOLDINGS).forEach(([etf, holdings]) => {
+    holdings.forEach(h => {
+      if (!SYM_SECTOR[h.s]) {
+        SYM_SECTOR[h.s] = etf;
+        SYM_NAME[h.s] = h.n;
+      }
+    });
+  });
+}
+
+// Current state
+let scanData = null;
+let displayState = {
+  minScore: 50,
+  sector: '',
+  view: 'all',
+  sortKey: 'score',
+  sortDesc: true,
+};
+let watchlist = [];
+try { watchlist = JSON.parse(localStorage.getItem(WL_KEY)) || []; } catch(e){}
+
+// ═══ INIT ═══
+function advisorBoot() {
+  if (!PROXY) {
+    $('screen-welcome').style.display = 'none';
+    $('adv-err-msg').textContent = 'לא נמצא proxy. חזור ל-index.html והזן את כתובת ה-Cloudflare Worker.';
+    $('adv-screen-error').style.display = 'block';
+    return;
+  }
+  // Populate sector filter
+  const sel = $('f-sector');
+  Object.entries(SECTOR_NAMES).forEach(([k, v]) => {
+    const opt = document.createElement('option');
+    opt.value = k; opt.textContent = v;
+    sel.appendChild(opt);
+  });
+  // Try load from cache
+  try {
+    const cached = JSON.parse(localStorage.getItem(CACHE_KEY));
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      scanData = cached;
+      showResults();
+      renderWatchlist();
+      return;
+    }
+  } catch(e){}
+  renderWatchlist();
+  startMarketClock();
+} // advisorBoot end
+
+function showScreen(id) {
+  ['screen-welcome','adv-screen-loading','adv-screen-error','tbl-container']
+    .forEach(x => { const el = $(x); if (el) el.style.display = 'none'; });
+  const t = $(id);
+  if (t) t.style.display = 'block';
+}
+
+// ═══ CLOCK (ET / TLV) — same pattern as dashboard ═══
+function startMarketClock() {
+  const tick = () => {
+    const now = new Date();
+    const ny = new Intl.DateTimeFormat('en-US', {timeZone:'America/New_York', hour:'2-digit', minute:'2-digit', hour12:false}).format(now);
+    const tlv = new Intl.DateTimeFormat('en-GB', {timeZone:'Asia/Jerusalem', hour:'2-digit', minute:'2-digit', hour12:false}).format(now);
+    const elNy = $('term-clock-ny'); if (elNy) elNy.textContent = ny;
+    const elTlv = $('term-clock-tlv'); if (elTlv) elTlv.textContent = tlv;
+  };
+  tick(); setInterval(tick, 30000);
+}
+
+// ═══ MOBILE MENU ═══
+function toggleMobileMenu() {
+  $('mob-overlay').classList.toggle('open');
+  $('mobile-menu').classList.toggle('open');
+}
+function closeMobileMenu() {
+  $('mob-overlay').classList.remove('open');
+  $('mobile-menu').classList.remove('open');
+}
+
+// ═══ DATA FETCHING ═══
+
+async function fetchChartWeekly(sym) {
+  const cleanSym = sym.replace('/', '-').replace('.', '-');
+  const cb = Math.floor(Date.now() / 600000);
+  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${cleanSym}?range=1y&interval=1wk&cb=${cb}`;
+  const proxyUrl = `${PROXY}/?url=${encodeURIComponent(yahooUrl)}`;
+  try {
+    const r = await fetch(proxyUrl);
+    if (!r.ok) return null;
+    const d = await r.json();
+    const result = d.chart?.result?.[0];
+    if (!result) return null;
+    const closes = (result.indicators?.quote?.[0]?.close || []).filter(x => x != null);
+    const timestamps = result.timestamp || [];
+    const meta = result.meta || {};
+    if (closes.length < 20) return null;
+    return { sym, closes, timestamps, meta };
+  } catch (e) {
+    return null;
+  }
+}
+
+async function fetchUniverseInChunks(symbols, onProgress) {
+  const chunkSize = 10;
+  const results = {};
+  let done = 0;
+  for (let i = 0; i < symbols.length; i += chunkSize) {
+    const chunk = symbols.slice(i, i + chunkSize);
+    await Promise.all(chunk.map(async sym => {
+      const data = await fetchChartWeekly(sym);
+      if (data) results[sym] = data;
+      done++;
+      onProgress(done, symbols.length);
+    }));
+  }
+  return results;
+}
+
+// ═══ SCORING ═══
+
+function computeMetrics(chartData, spyCloses) {
+  const { closes } = chartData;
+  const n = closes.length;
+  if (n < 20) return null;
+
+  const price = closes[n - 1];
+  const r = (weeks) => {
+    if (n - 1 - weeks < 0) return null;
+    const old = closes[n - 1 - weeks];
+    if (!old) return null;
+    return (price - old) / old;
+  };
+  const ret12m = r(52);
+  const ret12m_1m = (() => {
+    if (n < 53) return null;
+    const recent = closes[n - 5];
+    const year = closes[n - 52];
+    if (!recent || !year) return null;
+    return (recent - year) / year;
+  })();
+  const ret6m = r(26);
+  const ret3m = r(13);
+  const ret1m = r(4);
+
+  const smaN = (N) => {
+    if (n < N) return null;
+    let s = 0; for (let i = n - N; i < n; i++) s += closes[i];
+    return s / N;
+  };
+  const sma10 = smaN(10);   // ≈ 50-day
+  const sma40 = smaN(40);   // ≈ 200-day
+
+  let sma10Slope = null;
+  if (n >= 15) {
+    const sma10Now = smaN(10);
+    let s = 0; for (let i = n - 15; i < n - 5; i++) s += closes[i];
+    const sma10Prev = s / 10;
+    sma10Slope = (sma10Now - sma10Prev) / sma10Prev;
+  }
+
+  let stickiness = 0;
+  const windowStart = Math.max(10, n - 20);
+  const windowEnd = n;
+  for (let i = windowStart; i < windowEnd; i++) {
+    let s = 0; for (let j = i - 10; j < i; j++) s += closes[j];
+    const smaAtI = s / 10;
+    if (closes[i] > smaAtI) stickiness++;
+  }
+  stickiness = stickiness / (windowEnd - windowStart);
+
+  const hi52 = Math.max(...closes);
+  const lo52 = Math.min(...closes);
+  const fromHi = (price - hi52) / hi52;
+  const rangePos = (price - lo52) / (hi52 - lo52 || 1);
+
+  const spy12m_1m = (() => {
+    const sn = spyCloses.length;
+    if (sn < 53) return null;
+    return (spyCloses[sn - 5] - spyCloses[sn - 52]) / spyCloses[sn - 52];
+  })();
+  const spy3m = (() => {
+    const sn = spyCloses.length;
+    if (sn < 14) return null;
+    return (spyCloses[sn - 1] - spyCloses[sn - 13]) / spyCloses[sn - 13];
+  })();
+  const rs12m = (ret12m_1m != null && spy12m_1m != null) ? ret12m_1m - spy12m_1m : null;
+  const rs3m = (ret3m != null && spy3m != null) ? ret3m - spy3m : null;
+
+  return {
+    price, ret12m, ret12m_1m, ret6m, ret3m, ret1m,
+    sma10, sma40, sma10Slope, stickiness,
+    fromHi, rangePos, rs12m, rs3m, closes,
+  };
+}
+
+function percentileRank(arr, val) {
+  if (val == null || isNaN(val)) return 50;
+  const valid = arr.filter(x => x != null && !isNaN(x));
+  if (valid.length === 0) return 50;
+  let below = 0;
+  for (const x of valid) if (x < val) below++;
+  return (below / valid.length) * 100;
+}
+
+function computeScores(stocksData, spyCloses) {
+  const raw = {};
+  for (const [sym, data] of Object.entries(stocksData)) {
+    const m = computeMetrics(data, spyCloses);
+    if (m) raw[sym] = m;
+  }
+  const symbols = Object.keys(raw);
+  if (symbols.length === 0) return [];
+
+  const ret12m_1mArr = symbols.map(s => raw[s].ret12m_1m);
+  const ret6mArr = symbols.map(s => raw[s].ret6m);
+  const ret3mArr = symbols.map(s => raw[s].ret3m);
+  const rs12mArr = symbols.map(s => raw[s].rs12m);
+  const rs3mArr = symbols.map(s => raw[s].rs3m);
+  const slopeArr = symbols.map(s => raw[s].sma10Slope);
+  const fromHiArr = symbols.map(s => raw[s].fromHi);
+  const rangePosArr = symbols.map(s => raw[s].rangePos);
+
+  const results = [];
+  for (const sym of symbols) {
+    const m = raw[sym];
+    const pMom =
+      percentileRank(ret12m_1mArr, m.ret12m_1m) * 0.45 +
+      percentileRank(ret6mArr, m.ret6m) * 0.30 +
+      percentileRank(ret3mArr, m.ret3m) * 0.25;
+
+    const pRS =
+      percentileRank(rs12mArr, m.rs12m) * 0.60 +
+      percentileRank(rs3mArr, m.rs3m) * 0.40;
+
+    let trendScore = 0;
+    if (m.price > m.sma10) trendScore += 20;
+    if (m.price > m.sma40) trendScore += 20;
+    if (m.sma10 > m.sma40) trendScore += 20;
+    trendScore += percentileRank(slopeArr, m.sma10Slope) * 0.20;
+    trendScore += (m.stickiness * 20);
+    trendScore = Math.min(100, trendScore);
+
+    const posScore =
+      percentileRank(fromHiArr, m.fromHi) * 0.6 +
+      percentileRank(rangePosArr, m.rangePos) * 0.4;
+
+    const composite = pMom * 0.35 + pRS * 0.30 + trendScore * 0.25 + posScore * 0.10;
+
+    results.push({
+      sym,
+      name: SYM_NAME[sym] || sym,
+      sector: SYM_SECTOR[sym] || '—',
+      sectorName: SECTOR_NAMES[SYM_SECTOR[sym]] || '—',
+      score: Math.round(composite),
+      scores: {
+        MOM: Math.round(pMom),
+        RS: Math.round(pRS),
+        TRD: Math.round(trendScore),
+        POS: Math.round(posScore),
+      },
+      metrics: m,
+      price: m.price,
+      y1: m.ret12m != null ? m.ret12m * 100 : null,
+      m3: m.ret3m != null ? m.ret3m * 100 : null,
+      m1: m.ret1m != null ? m.ret1m * 100 : null,
+      fromHi: m.fromHi * 100,
+    });
+  }
+
+  results.sort((a,b) => b.score - a.score);
+  results.forEach((r, i) => r.rank = i + 1);
+  return results;
+}
+
+// ═══ MAIN SCAN ═══
+
+async function runScan() {
+  if (!PROXY) { showScreen('adv-screen-error'); return; }
+
+  const symbolsSet = new Set();
+  Object.values(ETF_HOLDINGS).forEach(sec => sec.forEach(s => symbolsSet.add(s.s)));
+  const symbols = Array.from(symbolsSet);
+
+  showScreen('adv-screen-loading');
+  $('loading-msg').textContent = `אוסף נתוני 52 שבועות עבור ${symbols.length} מניות ו-SPY כבנצ׳מרק...`;
+  $('prog-txt').textContent = `0 / ${symbols.length + 1}`;
+  $('prog-fill').style.width = '0%';
+
+  const spyPromise = fetchChartWeekly('SPY');
+  let total = symbols.length + 1;
+  let doneCount = 0;
+  const updateProg = () => {
+    doneCount++;
+    $('prog-txt').textContent = `${doneCount} / ${total}`;
+    $('prog-fill').style.width = ((doneCount/total)*100) + '%';
+  };
+
+  const spyData = await spyPromise;
+  updateProg();
+
+  if (!spyData) {
+    $('adv-err-msg').textContent = 'לא הצלחתי לטעון את SPY (הבנצ׳מרק). בדוק את ה-proxy ונסה שוב.';
+    showScreen('adv-screen-error');
+    return;
+  }
+
+  const stocksData = await fetchUniverseInChunks(symbols, (done, tot) => {
+    $('prog-txt').textContent = `${done + 1} / ${tot + 1}`;
+    $('prog-fill').style.width = (((done+1)/(tot+1))*100) + '%';
+  });
+
+  $('loading-msg').textContent = 'מחשב ציונים רב-פקטוריים...';
+  await sleep(50);
+  const stocks = computeScores(stocksData, spyData.closes);
+  if (stocks.length === 0) {
+    $('adv-err-msg').textContent = 'לא נאספו מספיק נתונים. בדוק את ה-proxy.';
+    showScreen('adv-screen-error');
+    return;
+  }
+
+  scanData = {
+    stocks, timestamp: Date.now(),
+    universeSize: stocks.length,
+  };
+  try {
+    const lean = {
+      timestamp: scanData.timestamp,
+      universeSize: scanData.universeSize,
+      stocks: stocks.map(s => ({
+        ...s,
+        metrics: { ...s.metrics, closes: s.metrics.closes.slice(-26) }
+      })),
+    };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(lean));
+  } catch(e) { console.warn('cache save failed', e); }
+  showResults();
+}
+
+// ═══ RENDERING ═══
+
+function showResults() {
+  if (!scanData) return;
+  showScreen('tbl-container');
+  renderKPIs();
+  renderTable();
+  renderWatchlist();
+}
+
+function renderKPIs() {
+  const { stocks, timestamp, universeSize } = scanData;
+  $('kpi-universe').textContent = universeSize;
+
+  const avg = stocks.reduce((a,s) => a + s.score, 0) / stocks.length;
+  const avgEl = $('kpi-avg');
+  avgEl.textContent = Math.round(avg);
+  avgEl.className = 'meta-value ' + (avg >= 60 ? 'ok' : avg >= 45 ? '' : 'warn');
+
+  const secAgg = {};
+  stocks.forEach(s => {
+    if (!s.sector || s.sector === '—') return;
+    if (!secAgg[s.sector]) secAgg[s.sector] = { sum:0, n:0 };
+    secAgg[s.sector].sum += s.score;
+    secAgg[s.sector].n++;
+  });
+  const secRanked = Object.entries(secAgg)
+    .map(([k,v]) => ({ k, avg: v.sum/v.n, n: v.n }))
+    .filter(x => x.n >= 3)
+    .sort((a,b) => b.avg - a.avg);
+  if (secRanked.length > 0) {
+    const top = secRanked[0];
+    $('kpi-sector').textContent = SECTOR_NAMES[top.k];
+    $('kpi-sector-sub').textContent = `score ${Math.round(top.avg)} · ${top.n} holdings`;
+  }
+  const mins = Math.floor((Date.now() - timestamp) / 60000);
+  $('kpi-time').textContent = mins < 1 ? 'כעת' : mins < 60 ? `לפני ${mins} דק׳` : `לפני ${Math.floor(mins/60)} שע׳`;
+  const ttl = Math.round((CACHE_TTL - (Date.now() - timestamp)) / 60000);
+  $('kpi-cache').textContent = ttl > 0 ? `${ttl}m cache TTL` : 'cache expired';
+}
+
+function applyFilters() { displayState.sector = $('f-sector').value; renderTable(); }
+function setMinScore(v, btn) {
+  displayState.minScore = v;
+  document.querySelectorAll('[data-min]').forEach(b => b.classList.toggle('active', b === btn));
+  renderTable();
+}
+function setView(v, btn) {
+  displayState.view = v;
+  document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b === btn));
+  renderTable();
+}
+function sortBy(key) {
+  if (displayState.sortKey === key) {
+    displayState.sortDesc = !displayState.sortDesc;
+  } else {
+    displayState.sortKey = key;
+    displayState.sortDesc = true;
+  }
+  renderTable();
+}
+
+function getFilteredStocks() {
+  if (!scanData) return [];
+  let list = scanData.stocks.slice();
+  list = list.filter(s => s.score >= displayState.minScore);
+  if (displayState.sector) list = list.filter(s => s.sector === displayState.sector);
+  if (displayState.view === 'top20') list = list.slice(0, 20);
+  if (displayState.view === 'watchlist') list = list.filter(s => watchlist.includes(s.sym));
+  const k = displayState.sortKey;
+  const dir = displayState.sortDesc ? -1 : 1;
+  list.sort((a,b) => {
+    const av = a[k], bv = b[k];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (typeof av === 'string') return av.localeCompare(bv) * dir;
+    return (av - bv) * dir;
+  });
+  return list;
+}
+
+function scoreClass(s) {
+  if (s >= 90) return 's-90';
+  if (s >= 75) return 's-75';
+  if (s >= 60) return 's-60';
+  if (s >= 40) return 's-40';
+  return 's-0';
+}
+
+function renderTable() {
+  const list = getFilteredStocks();
+  const tbody = $('picks-body');
+  // Update sort indicators
+  document.querySelectorAll('table.picks th').forEach(th => {
+    th.classList.remove('sorted');
+    th.classList.remove('asc');
+  });
+  // Identify the currently sorted header
+  const headerMap = {
+    'sym': 1, 'sector': 2, 'score': 3, 'price': 5, 'y1': 6, 'm3': 7, 'fromHi': 8
+  };
+  const idx = headerMap[displayState.sortKey];
+  if (idx) {
+    const th = document.querySelectorAll('table.picks th')[idx];
+    if (th) {
+      th.classList.add('sorted');
+      if (!displayState.sortDesc) th.classList.add('asc');
+    }
+  }
+
+  if (list.length === 0) {
+    tbody.innerHTML = `
+      <tr><td colspan="10" style="padding:40px;text-align:center;color:var(--dim)">
+        אין מניות שעונות על הקריטריונים.
+        ${displayState.view === 'watchlist' ? '<br><small style="font-size:10px;color:var(--dimmer)">הוסף מניות לרשימה שלך מפאנל הפירוט של כל מניה.</small>' : ''}
+      </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = list.map(s => {
+    const rkCls = s.rank <= 3 ? 'top3' : '';
+    const badges = [];
+    if (watchlist.includes(s.sym)) badges.push('<span class="bdg bdg-wl">WL</span>');
+    if (s.rank <= 10 && s.score >= 80) badges.push('<span class="bdg bdg-star">★</span>');
+
+    return `
+      <tr onclick="openDetail('${s.sym}')">
+        <td class="rk ${rkCls}">${s.rank}</td>
+        <td class="sym"><b>${s.sym}</b>${badges.join('')}<span class="name">${s.name}</span></td>
+        <td class="sec">${s.sectorName}</td>
+        <td><span class="score ${scoreClass(s.score)}">${s.score}</span></td>
+        <td class="hide-m">${renderFactorBars(s.scores)}</td>
+        <td class="num hide-m">$${fmt(s.price)}</td>
+        <td class="num pct ${pctCls(s.y1)}">${fmtPct(s.y1)}</td>
+        <td class="num pct hide-m ${pctCls(s.m3)}">${fmtPct(s.m3)}</td>
+        <td class="num hide-m" style="color:${s.fromHi > -3 ? 'var(--green)' : s.fromHi < -15 ? 'var(--red)' : 'var(--dim)'}">${fmtPct(s.fromHi)}</td>
+        <td class="num"><span style="color:var(--dim);font-size:11px">›</span></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderFactorBars(scores) {
+  const fs = ['MOM', 'RS', 'TRD', 'POS'];
+  return `<div class="fbars">${
+    fs.map(f => `<div class="fbar" data-f="${f}" title="${f}: ${scores[f]}"><div class="fbar-fill" style="height:${scores[f]}%"></div></div>`).join('')
+  }</div>`;
+}
+
+function fmt(n) {
+  if (n == null) return '—';
+  if (n >= 1000) return n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  return n.toFixed(2);
+}
+function fmtPct(n) {
+  if (n == null || isNaN(n)) return '—';
+  return (n > 0 ? '+' : '') + n.toFixed(1) + '%';
+}
+function pctCls(n) {
+  if (n == null || isNaN(n)) return 'flat';
+  if (n > 0) return 'up';
+  if (n < 0) return 'down';
+  return 'flat';
+}
+
+// ═══ DETAIL PANEL ═══
+
+function openDetail(sym) {
+  const s = scanData.stocks.find(x => x.sym === sym);
+  if (!s) return;
+  $('dt-sym').textContent = s.sym;
+  $('dt-name').textContent = s.name;
+
+  const body = $('dt-body');
+  const m = s.metrics;
+
+  const thesis = [];
+  if (s.score >= 85) thesis.push({ t: 'ציון גבוה במיוחד - המניה בדרגת Top Tier של כל היקום.', cls: '' });
+  if (s.scores.RS >= 80) thesis.push({ t: `חוזק יחסי חזק מאוד (${s.scores.RS}/100) - עולה על S&P 500 לאורך זמן.`, cls: '' });
+  if (s.scores.TRD >= 80 && m.sma10 > m.sma40) thesis.push({ t: 'מגמה נקייה: Golden Cross פעיל + SMA עולה.', cls: '' });
+  if (m.fromHi > -3) thesis.push({ t: `קרוב לשיא 52 שבועות (${fmtPct(m.fromHi*100)}) - breakout potential.`, cls: '' });
+  if (s.scores.MOM >= 85) thesis.push({ t: `מומנטום חזק בכל הטווחים (3M/6M/12M).`, cls: '' });
+  if (m.fromHi < -20) thesis.push({ t: `רחוק מהשיא (${fmtPct(m.fromHi*100)}) - ייתכן downtrend.`, cls: 'neg' });
+  if (m.ret1m != null && m.ret1m < -0.08) thesis.push({ t: `חולשה אחרונה (${fmtPct(m.ret1m*100)} בחודש).`, cls: 'warn' });
+  if (s.scores.TRD < 40) thesis.push({ t: 'איכות המגמה נמוכה - המחיר מתחת לממוצעים או מגמה שלילית.', cls: 'warn' });
+  if (s.scores.RS < 30) thesis.push({ t: 'חלשה מהשוק הכללי - underperforming S&P 500.', cls: 'neg' });
+  if (thesis.length === 0) thesis.push({ t: 'ציון בינוני - ללא סיגנלים מובהקים בכיוון אחד.', cls: 'warn' });
+
+  const inWL = watchlist.includes(s.sym);
+
+  body.innerHTML = `
+    <div class="dt-score-hero">
+      <div class="dt-score-circle" style="--s:${s.score}">
+        <div class="dt-score-val">${s.score}</div>
+      </div>
+      <div class="dt-score-info">
+        <div class="dt-score-lbl">#${s.rank} מתוך ${scanData.universeSize}</div>
+        <div class="dt-score-title">${s.name}</div>
+        <div class="dt-score-desc">${s.sectorName} · $${fmt(s.price)} · ${fmtPct(s.y1)} שנתי</div>
+      </div>
+    </div>
+
+    <div class="dt-section">
+      <div class="dt-section-title">פירוט פקטורים</div>
+      <div class="factor-grid">
+        ${[
+          { k:'MOM', label:'מומנטום', weight:35, desc:'תשואות היסטוריות' },
+          { k:'RS', label:'חוזק יחסי', weight:30, desc:'ביצועים מול SPY' },
+          { k:'TRD', label:'איכות מגמה', weight:25, desc:'SMA + יציבות' },
+          { k:'POS', label:'מיקום', weight:10, desc:'מרחק מ-52w high' },
+        ].map(f => `
+          <div class="factor-row" data-f="${f.k}">
+            <div>
+              <div class="factor-name">${f.label}</div>
+              <div class="factor-sub">${f.desc} · ${f.weight}%</div>
+            </div>
+            <div class="factor-bar-wrap">
+              <div class="factor-bar-fill" style="width:${s.scores[f.k]}%"></div>
+            </div>
+            <div class="factor-val" style="color:${s.scores[f.k]>=70?'var(--green)':s.scores[f.k]>=40?'var(--text)':'var(--red)'}">${s.scores[f.k]}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="dt-section">
+      <div class="dt-section-title">מטריקות מפתח</div>
+      <div class="metrics-grid">
+        <div class="metric-cell">
+          <div class="metric-lbl">12M</div>
+          <div class="metric-val ${pctCls(s.y1)}">${fmtPct(s.y1)}</div>
+        </div>
+        <div class="metric-cell">
+          <div class="metric-lbl">6M</div>
+          <div class="metric-val ${pctCls(m.ret6m*100)}">${fmtPct(m.ret6m*100)}</div>
+        </div>
+        <div class="metric-cell">
+          <div class="metric-lbl">3M</div>
+          <div class="metric-val ${pctCls(s.m3)}">${fmtPct(s.m3)}</div>
+        </div>
+        <div class="metric-cell">
+          <div class="metric-lbl">1M</div>
+          <div class="metric-val ${pctCls(s.m1)}">${fmtPct(s.m1)}</div>
+        </div>
+        <div class="metric-cell">
+          <div class="metric-lbl">מ-52w High</div>
+          <div class="metric-val ${pctCls(s.fromHi)}">${fmtPct(s.fromHi)}</div>
+        </div>
+        <div class="metric-cell">
+          <div class="metric-lbl">RS vs SPY (12M)</div>
+          <div class="metric-val ${pctCls(m.rs12m*100)}">${fmtPct(m.rs12m*100)}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dt-section">
+      <div class="dt-section-title">תזה אוטומטית</div>
+      <ul class="thesis-list">
+        ${thesis.map(t => `<li class="${t.cls||''}">${t.t}</li>`).join('')}
+      </ul>
+    </div>
+
+    <div class="dt-section">
+      <div class="dt-section-title">גרף 26 שבועות</div>
+      ${renderMiniChart(m.closes)}
+    </div>
+
+    <div class="dt-actions">
+      <button class="dt-btn ${inWL?'primary':''}" onclick="toggleWatchlist('${s.sym}')">
+        ${inWL ? '✓ ברשימה' : '+ הוסף לרשימה'}
+      </button>
+      <button class="dt-btn" onclick="window.open('https://finance.yahoo.com/quote/${s.sym}', '_blank')">
+        Yahoo Finance ↗
+      </button>
+    </div>
+  `;
+
+  $('dt-overlay').classList.add('open');
+}
+
+function closeDetail(e) {
+  if (e && e.target.id !== 'dt-overlay') return;
+  closeDetailDirect();
+}
+function closeDetailDirect() {
+  $('dt-overlay').classList.remove('open');
+}
+
+function renderMiniChart(closes) {
+  if (!closes || closes.length < 4) return '<div style="color:var(--dim);font-size:11px;padding:20px;text-align:center">אין מספיק נתונים</div>';
+  const last26 = closes.slice(-26);
+  const min = Math.min(...last26);
+  const max = Math.max(...last26);
+  const w = 520, h = 120;
+  const pad = 2;
+  const iw = w - pad * 2;
+  const ih = h - pad * 2;
+  const pts = last26.map((c, i) => {
+    const x = pad + (i / (last26.length - 1)) * iw;
+    const y = pad + ih - ((c - min) / (max - min || 1)) * ih;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+
+  const isUp = last26[last26.length - 1] >= last26[0];
+  const color = isUp ? 'var(--green)' : 'var(--red)';
+  const fill = isUp ? 'var(--green-soft)' : 'var(--red-soft)';
+
+  const areaPath = `M${pad},${pad + ih} L${last26.map((c, i) => {
+    const x = pad + (i / (last26.length - 1)) * iw;
+    const y = pad + ih - ((c - min) / (max - min || 1)) * ih;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' L')} L${pad + iw},${pad + ih} Z`;
+
+  return `
+    <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:auto;display:block;background:var(--bg2);border:1px solid var(--border);border-radius:7px">
+      <path d="${areaPath}" fill="${fill}"/>
+      <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--dim);font-family:var(--mono);direction:ltr;margin-top:4px;padding:0 2px">
+      <span>$${min.toFixed(2)}</span>
+      <span>26 weeks</span>
+      <span>$${max.toFixed(2)}</span>
+    </div>
+  `;
+}
+
+// ═══ WATCHLIST ═══
+
+function toggleWatchlist(sym) {
+  const idx = watchlist.indexOf(sym);
+  if (idx >= 0) watchlist.splice(idx, 1);
+  else watchlist.push(sym);
+  localStorage.setItem(WL_KEY, JSON.stringify(watchlist));
+  renderWatchlist();
+  if ($('dt-sym').textContent === sym && $('dt-overlay').classList.contains('open')) {
+    openDetail(sym);
+  }
+  if (scanData) renderTable();
+}
+
+function renderWatchlist() {
+  const strip = $('wl-strip');
+  if (!scanData || watchlist.length === 0) {
+    strip.innerHTML = '';
+    return;
+  }
+  const items = watchlist.map(sym => {
+    const s = scanData.stocks.find(x => x.sym === sym);
+    if (!s) return '';
+    const cls = s.y1 > 0 ? 'var(--green)' : 'var(--red)';
+    return `
+      <div class="wl-chip" onclick="openDetail('${s.sym}')">
+        <span class="wl-sym">${s.sym}</span>
+        <span class="wl-pct" style="color:${cls}">${fmtPct(s.y1)}</span>
+        <span style="color:var(--dim);font-size:10px">· ${s.score}</span>
+        <span class="wl-x" onclick="event.stopPropagation();toggleWatchlist('${s.sym}')">✕</span>
+      </div>`;
+  }).join('');
+  strip.innerHTML = `<div class="wl-label">הרשימה שלי</div>${items}`;
+}
+
+// ═══ METHODOLOGY MODAL ═══
+function openMethodology() { $('mth-overlay').classList.add('open'); }
+function closeMethodology(e) {
+  if (e && e.target && e.target.id !== 'mth-overlay') return;
+  closeMethodologyDirect();
+}
+function closeMethodologyDirect() { $('mth-overlay').classList.remove('open'); }
+
+// ESC closes panels
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    $('dt-overlay').classList.remove('open');
+    $('mth-overlay').classList.remove('open');
+    closeMobileMenu();
+  }
+});
+
+  // ── END advisor.html inline script ──
+
+  // Expose onclick-handler functions to window so inline
+  // onclick="runScan()" etc. in the HTML can find them.
+  // Skipped intentionally: showScreen, startMarketClock,
+  // toggleMobileMenu, closeMobileMenu — these already exist as
+  // globals in app.js and we must NOT overwrite those.
+  Object.assign(window, {
+    runScan, setMinScore, setView, sortBy, applyFilters,
+    openMethodology, closeMethodology, closeMethodologyDirect,
+    openDetail, closeDetail, closeDetailDirect,
+    toggleWatchlist
+  });
+
+  window.initAdvisor = function(){
+    if (window.__advisorInited) return;
+    window.__advisorInited = true;
+    try { advisorBoot(); } catch(e){ console.error(e); }
+  };
+})();
+
+/* ──────────── [6] SECTOR PERFORMANCE REWRITE ──────────── */
+
+/* ═══════════════════════════════════════════════════════════
+   SECTOR PERFORMANCE TABLE — clean rewrite (v2)
+   ───────────────────────────────────────────────────────────
+   Why rewrite:
+     - Original used inline onclick handlers with string interpolation
+     - MACRO column injected raw HTML from getSectorMacroTd() which
+       could produce unbalanced tags and break the row
+     - Cell count between header / data rows / avg row was fragile
+       (avg row had 6 period cells + 4 empty fillers instead of a
+       clean, column-keyed structure)
+     - Single giant template literal — hard to debug when one cell
+       errored the whole table went blank
+
+   New design:
+     - Column config array drives EVERYTHING (header, data, avg row)
+       So header, body, and avg row are always column-aligned.
+     - Per-cell try/catch: a bad value produces "–" instead of a
+       broken row.
+     - Event delegation: ONE click handler on the tbody reads
+       data-sym from the clicked <tr>.
+     - MACRO cell uses DOM methods (no innerHTML injection) so
+       malformed macro data can't corrupt the table.
+   ─────────────────────────────────────────────────────────── */
+(function(){
+  "use strict";
+
+  // Column definitions. Each column knows:
+  //   key   — identifier (for debugging / data-col attribute)
+  //   label — header text
+  //   get   — (sym, q, h) → number | null  (data accessor)
+  //   cls   — (value) → CSS class for the cell
+  //   fmt   — (value) → display text
+  //   avg   — how this column participates in the footer:
+  //             'mean'    = arithmetic mean of sector values
+  //             'skip'    = footer cell is blank
+  //             'overall' = mean-of-means across period cols
+  const COLS = [
+    {
+      key:'sector', label:'SECTOR', isSector:true,
+      cls: () => 'sec-cell',
+      avg: 'label' // footer shows "ממוצע סקטורים"
+    },
+    { key:'d1',   label:'1D',  get:(s,q,h) => q.d1,  cls:v=>sectorCellCls(v), fmt:pct, avg:'mean' },
+    { key:'w1',   label:'1W',  get:(s,q,h) => h.w1,  cls:v=>sectorCellCls(v), fmt:pct, avg:'mean' },
+    { key:'m1',   label:'1M',  get:(s,q,h) => h.m1,  cls:v=>sectorCellCls(v), fmt:pct, avg:'mean' },
+    { key:'m3',   label:'3M',  get:(s,q,h) => h.m3,  cls:v=>sectorCellCls(v), fmt:pct, avg:'mean' },
+    { key:'m6',   label:'6M',  get:(s,q,h) => h.m6,  cls:v=>sectorCellCls(v), fmt:pct, avg:'mean' },
+    { key:'y1',   label:'1Y',  get:(s,q,h) => h.y1,  cls:v=>sectorCellCls(v), fmt:pct, avg:'mean' },
+    {
+      key:'hi52', label:'52W HIGH',
+      get:(s,q,h) => h.fromHi,
+      cls: v => v==null ? 'dim' : 'hi52',
+      fmt: v => v==null ? '–' : pct(v),
+      avg: 'skip'
+    },
+    {
+      key:'lo52', label:'52W LOW',
+      get:(s,q,h) => h.fromLo,
+      cls: v => v==null ? 'dim' : 'lo52',
+      fmt: v => v==null ? '–' : pct(v),
+      avg: 'skip'
+    },
+    {
+      key:'vol',  label:'VOL',
+      get: (s,q,h) => {
+        const t = q.vol, a = h.avgVol;
+        if (!t || !a || a <= 0) return null;
+        return t / a; // ratio
+      },
+      cls: v => {
+        if (v == null) return 'dim';
+        if (v > 1.5) return 'vol-high';
+        if (v < 0.7) return 'vol-low';
+        return 'vol-norm';
+      },
+      fmt: v => {
+        if (v == null) return '–';
+        const i = v > 1.5 ? '▲▲' : v > 1.1 ? '▲' : v < 0.6 ? '▼▼' : v < 0.9 ? '▼' : '●';
+        return i + ' ' + Math.round(v * 100) + '%';
+      },
+      avg: 'skip'
+    },
+    {
+      key:'macro', label:'MACRO',
+      // The macro cell is built via a dedicated safe renderer;
+      // no getter / fmt — cellFactory handles it.
+      cellFactory: (sym) => buildMacroCell(sym),
+      avg: 'skip'
+    },
+    {
+      key:'avg', label:'AVG',
+      // Row-level mean across period columns (d1..y1), NOT from h.
+      get: (s,q,h) => {
+        const vals = [q.d1, h.w1, h.m1, h.m3, h.m6, h.y1]
+          .filter(v => v != null && !isNaN(v));
+        return vals.length ? vals.reduce((a,b)=>a+b,0) / vals.length : null;
+      },
+      cls: v => sectorCellCls(v),
+      fmt: pct,
+      avg: 'overall'
+    }
+  ];
+
+  // Reuse global cellCls — but guard against it not existing.
+  function sectorCellCls(v){
+    if (typeof cellCls === 'function') return cellCls(v);
+    if (v == null || isNaN(v)) return 'cz';
+    if (v >  5) return 'c3'; if (v >  2) return 'c2'; if (v >  0) return 'c1';
+    if (v < -5) return 'm3'; if (v < -2) return 'm2'; if (v <  0) return 'm1';
+    return 'cz';
+  }
+
+  // Build a TD for the MACRO column without using innerHTML on raw
+  // HTML strings. If getSectorMacroTd exists (legacy helper), parse
+  // its output safely. Otherwise show a dash.
+  function buildMacroCell(sym){
+    const td = document.createElement('td');
+    td.className = 'macro-cell';
+    if (typeof getSectorMacroTd !== 'function') {
+      td.textContent = '–';
+      td.style.color = 'var(--dim)';
+      return td;
+    }
+    const raw = getSectorMacroTd(sym) || '';
+    // Legacy helper returns a full <td>...</td> string. Extract inner
+    // content via a DocumentFragment parse, then adopt its children.
+    try {
+      const tmpl = document.createElement('template');
+      tmpl.innerHTML = raw.trim();
+      const firstTd = tmpl.content.querySelector('td');
+      if (firstTd) {
+        // Copy over its children and class
+        if (firstTd.className) td.className += ' ' + firstTd.className;
+        while (firstTd.firstChild) td.appendChild(firstTd.firstChild);
+      } else {
+        td.textContent = '–';
+        td.style.color = 'var(--dim)';
+      }
+    } catch(e){
+      td.textContent = '–';
+      td.style.color = 'var(--dim)';
+    }
+    return td;
+  }
+
+  // Build one sector <tr>. Uses DOM methods, not string concat,
+  // to prevent any HTML injection from sector data or macro output.
+  function buildRow(s){
+    const q = (typeof qmap !== 'undefined' && qmap[s.sym])   || {};
+    const h = (typeof histMap !== 'undefined' && histMap[s.sym]) || {};
+    const tr = document.createElement('tr');
+    tr.dataset.sym = s.sym;
+    tr.dataset.name = s.name;
+    tr.title = 'לחץ לראות אחזקות';
+    tr.style.cursor = 'pointer';
+
+    for (const col of COLS) {
+      let td;
+      if (col.isSector) {
+        td = document.createElement('td');
+        td.className = 'sec-cell';
+        td.appendChild(document.createTextNode(s.name + ' '));
+        const span = document.createElement('span');
+        span.className = 'sym';
+        span.textContent = s.sym;
+        td.appendChild(span);
+      } else if (col.cellFactory) {
+        td = col.cellFactory(s.sym);
+      } else {
+        td = document.createElement('td');
+        let val = null;
+        try { val = col.get(s, q, h); } catch(e){ val = null; }
+        td.className = col.cls(val);
+        td.textContent = col.fmt(val);
+      }
+      td.dataset.col = col.key;
+      tr.appendChild(td);
+    }
+    return tr;
+  }
+
+  // Footer (averages) row.
+  function buildAvgRow(sectorsData){
+    const tr = document.createElement('tr');
+    tr.className = 'avgrow';
+
+    // Pre-compute means for each "mean" column and the "overall" col.
+    const periodMeans = {};
+    for (const col of COLS) {
+      if (col.avg === 'mean') {
+        const vals = sectorsData.map(x => {
+          try { return col.get(x.s, x.q, x.h); } catch(e){ return null; }
+        }).filter(v => v != null && !isNaN(v));
+        periodMeans[col.key] = vals.length
+          ? vals.reduce((a,b)=>a+b,0) / vals.length
+          : null;
+      }
+    }
+    // Overall = mean of periodMeans (already mean-of-means → simpler).
+    const periodMeanVals = Object.values(periodMeans)
+      .filter(v => v != null && !isNaN(v));
+    const overall = periodMeanVals.length
+      ? periodMeanVals.reduce((a,b)=>a+b,0) / periodMeanVals.length
+      : null;
+
+    for (const col of COLS) {
+      const td = document.createElement('td');
+      td.dataset.col = col.key;
+      if (col.avg === 'label') {
+        td.className = 'sec-cell';
+        td.textContent = 'ממוצע סקטורים';
+      } else if (col.avg === 'mean') {
+        const v = periodMeans[col.key];
+        td.className = sectorCellCls(v);
+        td.textContent = pct(v);
+      } else if (col.avg === 'overall') {
+        td.className = sectorCellCls(overall);
+        const b = document.createElement('b');
+        b.textContent = pct(overall);
+        td.appendChild(b);
+      } else {
+        // 'skip' — empty cell
+      }
+      tr.appendChild(td);
+    }
+    return tr;
+  }
+
+  // Render a loading skeleton. Uses the column count derived from
+  // COLS so it is always in sync with the header.
+  function renderSkeleton(){
+    const tbody = document.getElementById('sector-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    const skCell = () => {
+      const td = document.createElement('td');
+      td.className = 'lc';
+      td.innerHTML = '&nbsp;';
+      return td;
+    };
+    const SECTORS_LOCAL = (typeof SECTORS !== 'undefined') ? SECTORS : [];
+    for (const s of SECTORS_LOCAL) {
+      const tr = document.createElement('tr');
+      tr.dataset.sym = s.sym;
+      tr.dataset.name = s.name;
+      tr.style.cursor = 'pointer';
+      for (const col of COLS) {
+        if (col.isSector) {
+          const td = document.createElement('td');
+          td.className = 'sec-cell';
+          td.appendChild(document.createTextNode(s.name + ' '));
+          const span = document.createElement('span');
+          span.className = 'sym';
+          span.textContent = s.sym;
+          td.appendChild(span);
+          tr.appendChild(td);
+        } else {
+          tr.appendChild(skCell());
+        }
+      }
+      tbody.appendChild(tr);
+    }
+    // Avg row skeleton
+    const avgTr = document.createElement('tr');
+    avgTr.className = 'avgrow';
+    for (const col of COLS) {
+      if (col.isSector) {
+        const td = document.createElement('td');
+        td.className = 'sec-cell';
+        td.textContent = 'ממוצע סקטורים';
+        avgTr.appendChild(td);
+      } else {
+        avgTr.appendChild(skCell());
+      }
+    }
+    tbody.appendChild(avgTr);
+    ensureClickHandler(tbody);
+  }
+
+  // Full render with live data.
+  function renderFull(){
+    const tbody = document.getElementById('sector-tbody');
+    if (!tbody) return;
+    const SECTORS_LOCAL = (typeof SECTORS !== 'undefined') ? SECTORS : [];
+
+    // Build all the per-sector row data once (so avg row can reuse it).
+    const sectorsData = SECTORS_LOCAL.map(s => ({
+      s,
+      q: (typeof qmap !== 'undefined' && qmap[s.sym])   || {},
+      h: (typeof histMap !== 'undefined' && histMap[s.sym]) || {}
+    }));
+
+    // Use DocumentFragment so we only touch the DOM once.
+    const frag = document.createDocumentFragment();
+    for (const s of SECTORS_LOCAL) frag.appendChild(buildRow(s));
+    frag.appendChild(buildAvgRow(sectorsData));
+
+    tbody.innerHTML = '';
+    tbody.appendChild(frag);
+    ensureClickHandler(tbody);
+  }
+
+  // Event delegation on the tbody — safer than inline onclick="..."
+  function ensureClickHandler(tbody){
+    if (tbody.__sectorClickInstalled) return;
+    tbody.__sectorClickInstalled = true;
+    tbody.addEventListener('click', (e) => {
+      const tr = e.target.closest('tr[data-sym]');
+      if (!tr) return;
+      if (tr.classList.contains('avgrow')) return;
+      const sym = tr.dataset.sym;
+      const name = tr.dataset.name;
+      if (typeof openSectorModal === 'function') {
+        try { openSectorModal(sym, name); } catch(err){ console.error(err); }
+      }
+    });
+  }
+
+  // Overwrite the global render functions used by app.js init flow.
+  window.renderSectorsWithSkeleton = renderSkeleton;
+  window.renderSectors = renderFull;
+})();
+
+/* ──────────── [7] ROUTER ──────────── */
+
+(function(){
+  "use strict";
+  const VIEWS = ['dashboard', 'macro', 'advisor'];
+
+  function currentRoute(){
+    const h = (location.hash || '').replace(/^#\/?/, '');
+    return VIEWS.includes(h) ? h : 'dashboard';
+  }
+
+  function applyRoute(){
+    const r = currentRoute();
+    // Show / hide views
+    VIEWS.forEach(v => {
+      const el = document.getElementById('view-' + v);
+      if (!el) return;
+      if (v === r) el.classList.add('active');
+      else          el.classList.remove('active');
+    });
+    // Update nav link active-state
+    document.querySelectorAll('[data-route]').forEach(a => {
+      a.classList.toggle('active', a.dataset.route === r);
+    });
+    document.body.dataset.route = r;
+
+    // Lazy init for sub-modules
+    if (r === 'macro' && typeof window.initMacro === 'function') {
+      try { window.initMacro(); } catch(e){ console.error('initMacro:', e); }
+    }
+    if (r === 'advisor' && typeof window.initAdvisor === 'function') {
+      try { window.initAdvisor(); } catch(e){ console.error('initAdvisor:', e); }
+    }
+  }
+
+  window.addEventListener('hashchange', applyRoute);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyRoute);
+  } else {
+    applyRoute();
+  }
+
+  // Expose a helper for programmatic navigation.
+  window.navigate = function(route){
+    location.hash = '#/' + route;
+  };
+})();

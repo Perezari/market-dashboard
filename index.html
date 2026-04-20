@@ -2,34 +2,901 @@
 <html dir="rtl" lang="he">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0b1311">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="StockPulse">
+<meta name="apple-mobile-web-app-title" content="StockPulse Terminal">
+<meta name="mobile-web-app-capable" content="yes">
 <title>StockPulse · Terminal</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="apple-touch-icon" href="favicon.svg">
-<!--
-  index.html הוא כעת stub בלבד. כל ה-login+dashboard ממוזגים לתוך dashboard.html כ-overlay.
-  המעבר הזה שומר על מצב PWA standalone (אין יותר ניווט בין דפים שעלול לפרק את standalone).
-  אם מישהו הגיע לכאן (דרך bookmark ישן או ה-URL הראשי) — מפנים מיד לדשבורד.
--->
-<script>
-  // Preserves hash/query if any, then bounces to dashboard
-  location.replace('dashboard.html' + location.search + location.hash);
-</script>
-<style>
-html,body{margin:0;padding:0;background:#0b1311;color:#e8e6e3;font-family:system-ui,-apple-system,sans-serif;
-  min-height:100vh;display:flex;align-items:center;justify-content:center;direction:rtl}
-.fallback{text-align:center;padding:20px;font-size:14px;color:#8a8f87;letter-spacing:.3px}
-.fallback a{color:#4fc78a;text-decoration:none;font-weight:700}
-.fallback a:hover{text-decoration:underline}
-</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<!-- Chart.js: required by the Macro view (was previously loaded in macro.html) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<!-- Consolidated stylesheet -->
+<link rel="stylesheet" href="app.css">
 </head>
 <body>
-<div class="fallback">
-  מעביר לדשבורד... אם לא עובר אוטומטית, <a href="dashboard.html">לחץ כאן</a>.
+
+<!-- ─────────── SHARED CHROME (login overlay, sidebar, bottom-nav, mobile-menu) ─────────── -->
+<!-- ═══════════ LOGIN OVERLAY (מחליף את index.html בתוך הדשבורד) ═══════════ -->
+<div id="login-overlay">
+  <div class="lo-window">
+    <div class="lo-titlebar">
+      <div class="lo-version">V2.4.1</div>
+      <div class="lo-title-txt"><span class="lo-scheme">stockpulse://</span>terminal/auth</div>
+      <div class="lo-traffic"><i></i><i></i><i></i></div>
+    </div>
+    <div class="lo-body">
+      <div class="lo-brand">
+        <h1>StockPulse</h1>
+        <div class="lo-brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+            <polyline points="16 7 22 7 22 13"/>
+          </svg>
+        </div>
+      </div>
+      <div class="lo-tagline">
+        <span>Real-Time</span><span class="lo-dot"></span>
+        <span>Institutional Grade</span><span class="lo-dot"></span>
+        <span>Since 2026</span>
+      </div>
+      <div class="lo-h-title">כניסה לטרמינל</div>
+      <div class="lo-h-sub">חבר את פרוקסי ה-Worker שלך וגש לנתוני שוק בזמן אמת.</div>
+      <div class="lo-input-group">
+        <div class="lo-input-labels">
+          <span class="lo-il-left">Cloudflare</span>
+          <span class="lo-il-right">Worker Endpoint</span>
+        </div>
+        <div class="lo-input-shell">
+          <input class="lo-input" id="lo-key-input" type="text"
+            placeholder="https://your-worker.workers.dev"
+            autocomplete="off" spellcheck="false"
+            onkeydown="if(event.key==='Enter')loStartWithKey()">
+        </div>
+        <div class="lo-err" id="lo-key-err">המפתח לא תקין, נסה שוב.</div>
+      </div>
+      <button class="lo-btn" id="lo-login-btn" onclick="loStartWithKey()">
+        <span class="lo-btn-text">התחבר לטרמינל</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+      </button>
+      <div class="lo-pills">
+        <span class="lo-pill"><span class="lo-pill-dot"></span>Portfolio</span>
+        <span class="lo-pill"><span class="lo-pill-dot"></span>Alerts</span>
+        <span class="lo-pill"><span class="lo-pill-dot"></span>AI Brief</span>
+        <span class="lo-pill"><span class="lo-pill-dot"></span>Sector Heatmap</span>
+        <span class="lo-pill"><span class="lo-pill-dot"></span>Live Quotes</span>
+      </div>
+    </div>
+  </div>
 </div>
+
+<!-- סקריפט מוקדם: מציג את ה-overlay לפני ש-app.js רץ, מונע פלאש של דשבורד ריק -->
+
+
+<!-- ═══════════ BOOT SCREENS ═══════════ -->
+<div id="screen-key">
+  <div class="key-box">
+    <div class="key-title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-left:6px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> כניסה למערכת</div>
+    <div class="key-steps">הזן את מפתח המערכת (Worker URL) כדי לגשת לדשבורד.</div>
+    <input class="key-input" id="key-input" type="text" placeholder="https://your-worker..." autocomplete="off" onkeydown="if(event.key==='Enter')startWithKey()">
+    <div class="key-err" id="key-err">המפתח לא תקין, נסה שוב.</div>
+    <button class="key-btn" onclick="startWithKey()">היכנס ←</button>
+  </div>
+</div>
+
+<div id="screen-loading">
+  <div class="loader-ring"></div>
+  <div class="loader-text">מביא נתוני שוק חיים...</div>
+  <div class="loader-sub" id="progress">Yahoo Finance • מתחבר...</div>
+</div>
+
+<div id="screen-error" style="display:none">
+  <div class="err-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-left:6px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> שגיאה</div>
+  <div class="err-body" id="err-msg"></div>
+  <div class="err-code" id="err-code" style="display:none"></div>
+  <div class="btn-row">
+    <button class="btn primary" onclick="init()">↻ נסה שוב</button>
+    <button class="btn" onclick="showKey()">שנה Key</button>
+  </div>
+</div>
+
+<!-- ═══════════ UNIFIED TOP BAR (brand + market status + clocks) ═══════════ -->
+<div class="term-bar">
+  <!-- LEFT: clocks + LIVE -->
+  <div class="tb-group">
+    <div class="tb-live">LIVE</div>
+    <div class="tb-sep"></div>
+    <div class="tb-item"><span id="term-clock-ny">–</span><span class="tb-suffix">NY</span></div>
+    <div class="tb-sep"></div>
+    <div class="tb-item tb-tlv"><span id="term-clock-tlv">–</span><span class="tb-suffix">TLV</span></div>
+  </div>
+
+  <!-- CENTER: market status pill -->
+  <div class="tb-center">
+    <div class="tb-status-pill" id="hdr-clock-inline">
+      <div class="dot market-dot closed" id="market-dot"></div>
+      <span class="label market-label closed" id="market-label">טוען...</span>
+      <span class="tb-countdown" id="market-countdown"></span>
+    </div>
+  </div>
+
+  <!-- RIGHT: brand -->
+  <div class="tb-brand">
+    <span class="tb-version">V2.4.1</span>
+    <div class="tb-brand-text">
+      <div class="tb-brand-title">StockPulse Terminal</div>
+      <div class="tb-brand-sub">Yahoo Finance · Real-Time</div>
+    </div>
+    <div class="tb-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- Wave decoration -->
+<div class="wave-deco">
+  <svg viewBox="0 0 1600 600" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="wf1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4fc78a" stop-opacity="0.12"/><stop offset="100%" stop-color="#4fc78a" stop-opacity="0.01"/></linearGradient>
+      <linearGradient id="wf2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4fc78a" stop-opacity="0.18"/><stop offset="100%" stop-color="#4fc78a" stop-opacity="0.02"/></linearGradient>
+    </defs>
+    <path d="M 0 400 Q 200 280, 400 320 T 800 260 T 1200 340 T 1600 300 L 1600 600 L 0 600 Z" fill="url(#wf1)"/>
+    <path d="M 0 450 Q 200 340, 400 380 T 800 320 T 1200 400 T 1600 360 L 1600 600 L 0 600 Z" fill="url(#wf2)"/>
+  </svg>
+</div>
+
+<!-- SIDEBAR NAV (shared between dashboard.html and macro.html) -->
+<nav class="sp-sidenav" id="sp-sidenav">
+  <div class="sp-sidenav-logo" title="StockPulse Terminal">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
+    </svg>
+  </div>
+  <div class="sp-sidenav-items">
+    <a href="#/dashboard" data-route="dashboard" class="sp-nav-item" data-tooltip="דשבורד">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+    </a>
+    <a href="#/macro" data-route="macro" class="sp-nav-item" data-tooltip="מאקרו">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+    </a>
+    <a href="#/advisor" data-route="advisor" class="sp-nav-item" data-tooltip="אדווייזר">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><polyline points="8.21 13.89 7 22 12 19 17 22 15.79 13.88"/></svg>
+    </a>
+    <button class="sp-nav-item" data-tooltip="ייצוא PDF" onclick="if(window.exportDashboardPDF)exportDashboardPDF()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    </button>
+  </div>
+  <div class="sp-sidenav-bottom">
+    <button class="sp-nav-item" data-tooltip="רענן" onclick="if(window.init)init();else location.reload()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+    </button>
+    <button class="sp-nav-item" data-tooltip="מצב מוגדל" onclick="if(window.toggleZoom)toggleZoom()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+    </button>
+    <button class="sp-nav-item" data-tooltip="ערכה בהירה/כהה" onclick="if(window.toggleTheme)toggleTheme()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+    </button>
+    <button class="sp-nav-item" data-tooltip="יציאה" onclick="if(confirm('לצאת?')){logout()}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    </button>
+  </div>
+</nav>
+
+<!-- BOTTOM NAVIGATION (mobile only, <=950px) -->
+<nav class="sp-bottomnav" id="sp-bottomnav">
+  <a href="#/dashboard" data-route="dashboard" class="sp-bn-item">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+    <span class="sp-bn-label">דשבורד</span>
+  </a>
+  <a href="#/macro" data-route="macro" class="sp-bn-item">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+    <span class="sp-bn-label">מאקרו</span>
+  </a>
+  <a href="#/advisor" data-route="advisor" class="sp-bn-item">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><polyline points="8.21 13.89 7 22 12 19 17 22 15.79 13.88"/></svg>
+    <span class="sp-bn-label">אדווייזר</span>
+  </a>
+  <button class="sp-bn-item" onclick="toggleMobileMenu()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="1.5"/><circle cx="5" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+    <span class="sp-bn-label">עוד</span>
+  </button>
+</nav>
+
+<!-- ═══════════ APP ═══════════ -->
+
+<!-- Mobile "More" bottom sheet + backdrop — lifted out of #app
+     so they remain accessible from every route (dashboard / macro / advisor). -->
+<div class="mob-overlay" id="mob-overlay" onclick="closeMobileMenu()"></div>
+<div class="mobile-menu" id="mobile-menu">
+    <div class="mob-sheet-handle"></div>
+    <div class="mob-hdr">
+      <div class="mob-hdr-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
+        </svg>
+      </div>
+      <div class="mob-hdr-text">
+        <span class="mob-hdr-title">StockPulse Terminal</span>
+        <span class="mob-hdr-sub">פעולות מהירות</span>
+      </div>
+    </div>
+    <div class="mob-items">
+      <button class="mob-item" onclick="init();closeMobileMenu()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        <span class="mob-item-label">רענן נתונים</span>
+      </button>
+      <button class="mob-item" onclick="exportDashboardPDF();closeMobileMenu()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span class="mob-item-label">ייצוא PDF</span>
+      </button>
+      
+      <button class="mob-item" id="mob-zoom-item" onclick="toggleZoom()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+        <span class="mob-item-label" id="mob-zoom-label">מצב מוגדל</span>
+      </button>
+      <button class="mob-item" onclick="toggleTheme()">
+        <svg id="mob-theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+        <span class="mob-item-label" id="mob-theme-label">מצב בהיר/כהה</span>
+      </button>
+      <div class="mob-sep"></div>
+      <button class="mob-item mob-item-danger" onclick="logout()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span class="mob-item-label">יציאה</span>
+      </button>
+    </div>
+    <div class="mob-footer"><div class="mob-ts" id="mob-ts"></div></div>
+  </div>
+
+
+<!-- ─────────── DASHBOARD VIEW ─────────── -->
+<section class="view active" id="view-dashboard" data-view="dashboard">
+<div id="app">
+<div class="page">
+
+  <!-- Ticker — hidden (app.js still populates for PDF export) -->
+  <div class="ticker-wrap"><div class="ticker" id="ticker"></div></div>
+
+  <!-- MACRO BAR (compact strip) -->
+  <div class="macro-bar-wrap">
+    <div class="macro-bar" id="macro-bar">
+      <div class="macro-item"><span class="macro-name">EUR/USD</span><span class="macro-price lc" id="mp-EURUSD">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="macro-chg lc" id="mc-EURUSD">&nbsp;&nbsp;</span></div>
+      <div class="macro-item"><span class="macro-name">USD/ILS</span><span class="macro-price lc" id="mp-USDILS">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="macro-chg lc" id="mc-USDILS">&nbsp;&nbsp;</span></div>
+      <div class="macro-item"><span class="macro-name">Oil</span><span class="macro-price lc" id="mp-OIL">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="macro-chg lc" id="mc-OIL">&nbsp;&nbsp;</span></div>
+      <div class="macro-item"><span class="macro-name">Gas</span><span class="macro-price lc" id="mp-GAS">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="macro-chg lc" id="mc-GAS">&nbsp;&nbsp;</span></div>
+      <div class="macro-item"><span class="macro-name">Gold</span><span class="macro-price lc" id="mp-GOLD">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="macro-chg lc" id="mc-GOLD">&nbsp;&nbsp;</span></div>
+      <div class="macro-item"><span class="macro-name">10Y</span><span class="macro-price lc" id="mp-TNX">&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="macro-chg lc" id="mc-TNX">&nbsp;&nbsp;</span></div>
+    </div>
+  </div>
+
+  <!-- "More" bottom sheet (opened by bottom-nav "More" button on mobile) -->
+  
+  
+
+  <!-- Education Tooltip (for AI edu mode, kept hidden for now) -->
+  <div class="edu-tooltip" id="edu-tooltip" style="display:none">
+    <div class="edu-tooltip-arrow"></div>
+    <div class="edu-tooltip-title" id="edu-tooltip-title"></div>
+    <div class="edu-tooltip-body" id="edu-tooltip-body"></div>
+    <div class="edu-tooltip-example" id="edu-tooltip-example"></div>
+  </div>
+
+  <!-- ═══════════ 3-COLUMN GRID ═══════════ -->
+  <div class="grid">
+
+    <!-- ══════ LEFT SIDEBAR ══════ -->
+    <aside class="col">
+
+      <!-- Sector Heatmap (custom, synced from sector-tbody) -->
+      <section class="compact">
+        <div class="sec-label">
+          <div class="sec-meta">% · 1D</div>
+          <div class="sec-title">Sector Heatmap</div>
+        </div>
+        <div class="heat-grid" id="sb-heatmap">
+          <div class="heat-cell neu" data-sector-slot="XLK"><span class="heat-sym">TECH</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLC"><span class="heat-sym">COMM</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLP"><span class="heat-sym">CONS</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLV"><span class="heat-sym">HEAL</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLF"><span class="heat-sym">FIN</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLI"><span class="heat-sym">INDU</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLRE"><span class="heat-sym">REAL</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLE"><span class="heat-sym">ENER</span><span class="heat-pct">–</span></div>
+        </div>
+      </section>
+
+      <!-- Top Movers (app.js #movers-grid) -->
+      <section class="compact econ-section" id="movers-section">
+        <div class="sec-label">
+          <div class="sec-meta">S&amp;P 500</div>
+          <div class="sec-title">Top Movers</div>
+        </div>
+        <div class="movers-grid" id="movers-grid">
+          <div style="text-align:center;color:var(--dim);font-size:11px;padding:12px">
+            <div class="mini-ring" style="margin:0 auto 8px"></div>
+            סורק...
+          </div>
+        </div>
+      </section>
+
+      <!-- Next Events (app.js #econ-wrap) -->
+      <section class="compact econ-section">
+        <div class="sec-label">
+          <div class="sec-meta">30d</div>
+          <div class="sec-title">Next Events</div>
+        </div>
+        <div class="econ-section-card" style="background:transparent;border:none;padding:0">
+          <div class="econ-wrap" id="econ-wrap">
+            <div class="modal-loading" style="padding:14px;font-size:11px"><div class="mini-ring" style="margin:0 auto 8px"></div>טוען...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- News (app.js #news-grid) - moved to left sidebar per user request -->
+      <section class="compact news-section">
+        <div class="sec-label">
+          <div class="sec-meta">Live</div>
+          <div class="sec-title">Market News</div>
+        </div>
+        <div class="news-section-card">
+          <div class="news-section-hdr"></div>
+          <div class="news-grid" id="news-grid">
+            <div class="modal-loading" style="color:var(--dim);font-size:12px;padding:12px">טוען חדשות...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Insights (hidden — merged into AI Brief) -->
+      <section class="compact insights-section" style="display:none">
+        <div class="insights-card">
+          <div class="card-hdr"><div class="section-label">תובנות שוק</div></div>
+          <div class="insights-wrap"><div id="insights-grid" class="insights-grid"></div></div>
+        </div>
+      </section>
+
+    </aside>
+
+    <!-- ══════ CENTER MAIN ══════ -->
+    <main class="col main">
+
+      <!-- AI MARKET BRIEF -->
+      <div class="ai-brief-section" id="ai-brief-section" style="display:none">
+        <div class="ai-alert-banner" id="ai-alert-banner" style="display:none"></div>
+        <div class="ai-brief-card">
+          <div class="ai-brief-hdr">
+            <div class="ai-brief-title-wrap">
+              <div class="ai-brain-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                  <path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"/>
+                  <line x1="9" y1="21" x2="15" y2="21"/><line x1="10" y1="24" x2="14" y2="24"/>
+                </svg>
+              </div>
+              <div>
+                <div class="ai-brief-title">AI</div>
+                <div class="ai-brief-sub"></div>
+              </div>
+            </div>
+            <div class="ai-brief-actions" style="display:none">
+              <button class="ai-edu-toggle" id="ai-edu-toggle" onclick="toggleEduMode()">
+                <span id="edu-toggle-label">הסברים</span>
+              </button>
+            </div>
+          </div>
+          <div class="ai-verdict" id="ai-verdict">
+            <div class="ai-verdict-icon" id="ai-verdict-icon"></div>
+            <div class="ai-verdict-text" id="ai-verdict-text">מחשב...</div>
+          </div>
+          <div class="ai-signals" id="ai-signals"></div>
+          <div class="ai-micro-stats" id="ai-micro-stats"></div>
+          <div class="ai-actions" id="ai-actions"></div>
+          <div class="ai-edu-panel" id="ai-edu-panel" style="display:none">
+            <div class="ai-edu-title">מילון מושגים</div>
+            <div class="ai-edu-grid" id="ai-edu-grid"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sector Performance Table — single <table> with sticky Sector column (same pattern as Sector Correlation) -->
+      <div class="sectors-card">
+        <div class="card-hdr">
+          <div class="section-label">Sector Performance</div>
+        </div>
+        <div class="tbl-wrap">
+          <table class="t">
+            <thead>
+              <tr><th class="sec-col">SECTOR</th><th>1D</th><th>1W</th><th>1M</th><th>3M</th><th>6M</th><th>1Y</th><th>52W HIGH</th><th>52W LOW</th><th>VOL</th><th>MACRO</th><th>AVG</th></tr>
+            </thead>
+            <tbody id="sector-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- YTD -->
+      <div id="ytd-section" style="display:none">
+        <div class="ytd-card">
+          <div class="card-hdr"><div class="section-label">YTD Return</div></div>
+          <div class="ytd-bars" id="ytd-bars"></div>
+        </div>
+      </div>
+
+      <!-- Correlation -->
+      <div id="corr-section" style="display:none">
+        <div class="sectors-card">
+          <div class="card-hdr"><div class="section-label">Sector Correlation</div></div>
+          <div class="corr-wrap"><div id="corr-table-wrap"></div></div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- ══════ RIGHT SIDEBAR ══════ -->
+    <aside class="col">
+
+      <!-- US Indices (app.js #idx-main + #idx-other) -->
+      <section class="compact">
+        <div class="sec-label">
+          <div class="sec-meta">Real-Time</div>
+          <div class="sec-title">US Indices</div>
+        </div>
+        <div class="indices-section">
+          <div class="indices-main" id="idx-main"></div>
+          <div class="indices-other" id="idx-other"></div>
+        </div>
+      </section>
+
+      <!-- Breadth (hidden — details merged into AI Brief insights) -->
+      <section class="compact breadth-card" style="display:none">
+        <div class="card-hdr">
+          <div class="section-label">רוחב שוק</div>
+          <button class="breadth-btn breadth-refresh" onclick="runBreadth()" id="breadth-refresh-btn" title="רענן סריקה" style="display:none">↻ רענן</button>
+        </div>
+        <div class="card-cnt">
+          <div class="breadth-title">מניות מעל ממוצע 200 יום</div>
+          <div class="breadth-big" id="breadth-big">–</div>
+          <div class="breadth-bar-wrap"><div class="breadth-bar-fill" id="breadth-fill" style="width:0%"></div></div>
+          <div class="breadth-stats"><span id="breadth-above">–</span><span id="breadth-sub">טוען...</span><span id="breadth-total">–</span></div>
+          <div class="breadth-advice" id="breadth-advice"></div>
+        </div>
+      </section>
+
+      <!-- Fear & Greed (hidden — merged into AI Brief) -->
+      <section class="compact fg-card" style="display:none">
+        <div class="card-hdr"><div class="section-label">Fear &amp; Greed</div></div>
+        <div class="card-cnt">
+          <div class="fg-gauge-wrap">
+            <canvas id="fg-canvas" width="160" height="88"></canvas>
+            <div class="fg-center">
+              <div class="fg-num" id="fg-num">–</div>
+              <div class="fg-lbl" id="fg-lbl">loading...</div>
+            </div>
+          </div>
+          <div class="fg-components" id="fg-components"></div>
+        </div>
+      </section>
+
+      <!-- Market Internals (hidden — merged into AI Brief) -->
+      <section class="compact pc-card" id="pc-card" style="display:none">
+        <div class="card-hdr"><div class="section-label">Market Internals</div></div>
+        <div class="card-cnt">
+          <div class="mi-row">
+            <div class="mi-item">
+              <div class="mi-label">Up/Down</div>
+              <div class="mi-val" id="mi-adv">–</div>
+              <div class="mi-sub" id="mi-adv-sub">sectors</div>
+            </div>
+            <div class="mi-divider"></div>
+            <div class="mi-item">
+              <div class="mi-label">Avg 1D</div>
+              <div class="mi-val" id="mi-avg">–</div>
+              <div class="mi-sub">all sectors</div>
+            </div>
+            <div class="mi-divider"></div>
+            <div class="mi-item">
+              <div class="mi-label">vs 52W</div>
+              <div class="mi-val" id="mi-hi52">–</div>
+              <div class="mi-sub">avg dist</div>
+            </div>
+          </div>
+          <div class="mi-bar-wrap"><div class="mi-bar-fill" id="mi-bar" style="width:50%"></div></div>
+          <div class="mi-mood" id="mi-mood">waiting...</div>
+        </div>
+      </section>
+
+      <!-- Day Summary (hidden — merged into AI Brief) -->
+      <section class="compact pos-card" id="pos-card" style="display:none">
+        <div class="card-hdr"><div class="section-label">Day Summary</div></div>
+        <div class="card-cnt">
+          <div class="pos-card-top">
+            <span class="pos-card-label">Positivity</span>
+            <span class="pos-pct" id="pos-pct">–</span>
+          </div>
+          <div class="pos-mini-bar"><div class="pos-fill" id="pos-fill"></div></div>
+          <div class="pos-mood" id="pos-mood"></div>
+          <div class="sum-grid" id="summary"></div>
+        </div>
+      </section>
+
+      <!-- Daily Chart -->
+      <section class="compact chart-box">
+        <div class="card-hdr"><div class="section-label">Daily Chart</div></div>
+        <canvas id="chart" width="266" height="200"></canvas>
+      </section>
+
+    </aside>
+
+  </div><!-- /.grid -->
+
+  <!-- Rotation section (hidden safety) -->
+  <div id="rotation-section" style="display:none;margin-top:18px">
+    <div class="sectors-card">
+      <div class="card-hdr"><div class="section-label">Sector Rotation</div></div>
+      <div style="padding:10px 12px"><div id="rotation-svg"></div></div>
+    </div>
+  </div>
+
+  <!-- Earnings (hidden) -->
+  <div class="earnings-section" id="earnings-section" style="display:none;margin-top:18px">
+    <div class="sectors-card">
+      <div class="card-hdr"><div class="section-label">Earnings Calendar — S&amp;P 500 (Next 7 Days)</div></div>
+      <div style="padding:10px 12px"><div class="earnings-grid" id="earnings-grid"></div></div>
+    </div>
+  </div>
+
+  <div class="footer" id="footer">StockPulse Terminal · Ready</div>
+
+</div><!-- /.page -->
+</div>
+</section>
+
+<!-- ─────────── MACRO VIEW ─────────── -->
+<section class="view" id="view-macro" data-view="macro">
+<!-- Loading overlay -->
+
+
+<!-- UNIFIED TOP BAR (brand + source pill + clocks) -->
+
+
+<!-- SIDEBAR NAV (shared between dashboard.html and macro.html) -->
+
+
+<!-- BOTTOM NAVIGATION (mobile only, <=950px) -->
+
+
+<!-- "More" bottom sheet -->
+
+
+
+<!-- MAIN PAGE -->
+<div class="page">
+
+  <!-- (Old .hdr-window removed — its content lives in the unified .term-bar above) -->
+
+  <!-- KPI STRIP -->
+  <div class="kpi-strip" id="kpi-strip"></div>
+
+  <!-- CHARTS GRID -->
+  <div class="charts-grid" id="charts-grid"></div>
+
+  <!-- FOOTER -->
+  <div class="macro-footer">
+    Source: <a href="https://fred.stlouisfed.org" target="_blank">Federal Reserve Economic Data (FRED)</a>
+    · Federal Reserve Bank of St. Louis
+    · Data cached for 4 hours
+    · <span id="last-updated">–</span>
+  </div>
+
+</div>
+
+<!-- Chart.js from CDN -->
+</section>
+
+<!-- ─────────── ADVISOR VIEW ─────────── -->
+<section class="view" id="view-advisor" data-view="advisor">
+<!-- Initial loading overlay -->
+
+
+<!-- UNIFIED TOP BAR -->
+
+
+<!-- SIDEBAR NAV (shared across pages) -->
+
+
+<!-- BOTTOM NAVIGATION (mobile only) -->
+
+
+<!-- Mobile "More" bottom sheet -->
+
+
+
+<!-- MAIN PAGE -->
+<div class="page">
+
+  <!-- META STRIP (KPIs) -->
+  <div class="meta-strip">
+    <div class="meta-card dim-card">
+      <div class="meta-label">יקום סריקה</div>
+      <div class="meta-value" id="kpi-universe">—</div>
+      <div class="meta-sub">large-caps</div>
+    </div>
+    <div class="meta-card">
+      <div class="meta-label">ציון ממוצע</div>
+      <div class="meta-value" id="kpi-avg">—</div>
+      <div class="meta-sub">0-100 scale</div>
+    </div>
+    <div class="meta-card">
+      <div class="meta-label">סקטור מוביל</div>
+      <div class="meta-value" id="kpi-sector" style="font-size:13px">—</div>
+      <div class="meta-sub" id="kpi-sector-sub">—</div>
+    </div>
+    <div class="meta-card dim-card">
+      <div class="meta-label">עדכון אחרון</div>
+      <div class="meta-value dim" id="kpi-time" style="font-size:13px">—</div>
+      <div class="meta-sub" id="kpi-cache">—</div>
+    </div>
+  </div>
+
+  <!-- WATCHLIST STRIP -->
+  <div class="wl-strip" id="wl-strip"></div>
+
+  <!-- CONTROLS -->
+  <div class="controls-bar">
+    <div class="ctl-group">
+      <span class="ctl-label">סקטור</span>
+      <select id="f-sector" class="sel" onchange="applyFilters()">
+        <option value="">הכל</option>
+      </select>
+    </div>
+    <div class="ctl-group">
+      <span class="ctl-label">ציון מינ׳</span>
+      <button class="chip" data-min="0" onclick="setMinScore(0, this)">הכל</button>
+      <button class="chip active" data-min="50" onclick="setMinScore(50, this)">50+</button>
+      <button class="chip" data-min="70" onclick="setMinScore(70, this)">70+</button>
+      <button class="chip" data-min="85" onclick="setMinScore(85, this)">85+</button>
+    </div>
+    <div class="ctl-group">
+      <span class="ctl-label">תצוגה</span>
+      <button class="chip active" data-view="all" onclick="setView('all', this)">הכל</button>
+      <button class="chip" data-view="top20" onclick="setView('top20', this)">Top 20</button>
+      <button class="chip" data-view="watchlist" onclick="setView('watchlist', this)">רשימה שלי</button>
+    </div>
+    <div class="ctl-spacer"></div>
+    <div class="ctl-group">
+      <button class="ctl-btn ghost" onclick="openMethodology()" title="מתודולוגיה">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <span>מתודולוגיה</span>
+      </button>
+      <button class="ctl-btn" id="scan-btn" onclick="runScan(false)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        <span>סריקה</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ MAIN CONTENT ═══ -->
+
+  <!-- welcome screen -->
+  <div class="screen" id="screen-welcome">
+    <div class="hero-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="8" r="6"/><polyline points="8.21 13.89 7 22 12 19 17 22 15.79 13.88"/>
+      </svg>
+    </div>
+    <h3>מנוע המלצות כמותי</h3>
+    <p>
+      המערכת מדרגת כ-220 מניות large-cap אמריקאיות לפי 4 פקטורים כמותיים:
+      מומנטום, חוזק יחסי מול S&amp;P 500, איכות מגמה ומיקום יחסי.
+      <br><br>
+      זה לא חיזוי - זה דירוג שיטתי של מה שכבר עובד בשוק.
+    </p>
+    <button class="cta" onclick="runScan(false)">
+      התחל סריקה
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M5 12h14M13 6l6 6-6 6"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- loading screen -->
+  <div class="screen" id="adv-screen-loading" style="display:none">
+    <div class="spin"></div>
+    <h3>סורק את היקום</h3>
+    <p id="loading-msg">אוסף נתוני 52 שבועות לכל מניה...</p>
+    <div class="prog-wrap">
+      <div class="prog-txt" id="prog-txt">0 / 0</div>
+      <div class="prog-bar"><div class="prog-bar-fill" id="prog-fill" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <!-- error screen -->
+  <div class="screen" id="adv-screen-error" style="display:none">
+    <div class="hero-icon" style="background:var(--red-soft);border-color:var(--red-dim)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </div>
+    <h3>שגיאה בטעינה</h3>
+    <p id="adv-err-msg">לא הצלחתי לטעון נתונים. בדוק שה-proxy פעיל ונסה שוב.</p>
+    <button class="cta" onclick="runScan(false)">נסה שוב</button>
+  </div>
+
+  <!-- results table -->
+  <div id="tbl-container" style="display:none">
+    <div class="tbl-card">
+      <div class="tbl-wrap">
+        <table class="picks">
+          <thead>
+            <tr>
+              <th style="width:34px">#</th>
+              <th onclick="sortBy('sym')">מניה</th>
+              <th class="h-sec" onclick="sortBy('sector')">סקטור</th>
+              <th onclick="sortBy('score')" class="sorted num">ציון</th>
+              <th class="hide-m">פקטורים</th>
+              <th onclick="sortBy('price')" class="hide-m num">מחיר</th>
+              <th onclick="sortBy('y1')" class="num">1Y</th>
+              <th onclick="sortBy('m3')" class="hide-m num">3M</th>
+              <th onclick="sortBy('fromHi')" class="hide-m num">מ-52שי</th>
+              <th style="width:20px"></th>
+            </tr>
+          </thead>
+          <tbody id="picks-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="disclaimer">
+      המערכת לצורכי מידע ומחקר בלבד. אינה ייעוץ השקעות. דירוג כמותי מבוסס על תנועת מחירים היסטורית.
+      <br>
+      נתונים מ-Yahoo Finance בעיכוב 15 דק׳ · בנצ׳מרק: SPY · קאש: 4 שעות · <a onclick="openMethodology()">תיעוד מלא של המודל</a>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ DETAIL PANEL ═══ -->
+<div class="dt-overlay" id="dt-overlay" onclick="closeDetail(event)">
+  <div class="dt-panel" onclick="event.stopPropagation()">
+    <div class="dt-hdr">
+      <div class="dt-hdr-sym" id="dt-sym">—</div>
+      <div class="dt-hdr-name" id="dt-name">—</div>
+      <button class="dt-close" onclick="closeDetailDirect()">✕</button>
+    </div>
+    <div class="dt-body" id="dt-body"></div>
+  </div>
+</div>
+
+<!-- ═══ METHODOLOGY MODAL ═══ -->
+<div class="mth-overlay" id="mth-overlay" onclick="closeMethodology(event)">
+  <div class="mth-modal" onclick="event.stopPropagation()">
+    <div class="mth-hdr">
+      <div class="mth-title">איך הציון מחושב</div>
+      <button class="dt-close" onclick="closeMethodologyDirect()">✕</button>
+    </div>
+    <div class="mth-body">
+      <p>המודל מבוסס על מחקר אקדמי ב-factor investing (Jegadeesh &amp; Titman 1993, Asness et al 2013). כל מניה מקבלת ציון 0-100 שמשקלל ארבעה פקטורים:</p>
+
+      <h4>1. Momentum (מומנטום) · 35%</h4>
+      <p>תשואה היסטורית לאורך מספר טווחים. מניות שעלו חזק בעבר נוטות להמשיך (בטווח של 3-12 חודשים).</p>
+      <ul>
+        <li><b>12M-1M</b> · תשואה שנתית בדילוג על החודש האחרון (להימנע מ-reversal)</li>
+        <li><b>6M</b> · תשואה ל-6 חודשים</li>
+        <li><b>3M</b> · תשואה ל-3 חודשים</li>
+      </ul>
+
+      <h4>2. Relative Strength (חוזק יחסי) · 30%</h4>
+      <p>ביצועים מול <code>SPY</code> (S&amp;P 500). מניות שמתעלות על השוק לאורך זמן - הן המובילות.</p>
+      <ul>
+        <li><b>12M Excess</b> · תשואה שנתית מינוס תשואת SPY</li>
+        <li><b>3M Excess</b> · תשואה 3 חודשים מינוס SPY</li>
+      </ul>
+
+      <h4>3. Trend Quality (איכות מגמה) · 25%</h4>
+      <p>האם המגמה יציבה או תנודתית? מגמה נקייה =&gt; ציון גבוה.</p>
+      <ul>
+        <li><b>Price &gt; SMA50</b> · 5 נקודות</li>
+        <li><b>Price &gt; SMA200</b> · 5 נקודות</li>
+        <li><b>SMA50 &gt; SMA200 (Golden Cross)</b> · 5 נקודות</li>
+        <li><b>SMA50 Slope</b> · שיפוע עולה של הממוצע 50</li>
+        <li><b>Stickiness</b> · כמה שבועות המחיר מעל SMA50</li>
+      </ul>
+
+      <h4>4. Position (מיקום) · 10%</h4>
+      <p>מרחק משיא 52 שבועות (קרוב לשיא = חוזק) ומיקום בטווח השנתי.</p>
+
+      <h4>חישוב הציון הסופי</h4>
+      <p>כל פקטור מתורגם ל-<b>Percentile Rank</b> מול כל היקום (0-100). הציון הסופי הוא ממוצע משוקלל של הדירוגים היחסיים. זה יתרון חשוב - הציון מתאים למצב השוק (אם כולם יורדים, הטובים ביותר עדיין יקבלו ציון גבוה).</p>
+
+      <div class="mth-warning">
+        <b>חשוב להבין:</b> המודל הוא technical בלבד - הוא לא יודע אם החברה רווחית, כמה היא שווה, או אם יש קטליזטור קרב. מניה יכולה לקבל 95/100 ולקרוס אחרי earnings. הדירוג מזהה <b>חוזק יחסי וטכני</b>, לא ערך פונדמנטלי.
+      </div>
+
+      <h4>מתי המודל לא עובד?</h4>
+      <ul>
+        <li><b>שינויי מגמה חדים</b> · המודל איטי - הוא מזהה מומנטום, לא reversals</li>
+        <li><b>שווקים sideway</b> · פחות אלפא מפקטור מומנטום</li>
+        <li><b>Small caps / penny stocks</b> · המודל מכסה רק holdings של 11 ETF סקטוריאליים</li>
+        <li><b>אירועים חד-פעמיים</b> · מניות שזוחלות על חדשות (כמו EFOI +300%) לא ייתפסו</li>
+      </ul>
+
+      <h4>רקע אקדמי</h4>
+      <p>אסטרטגיות מומנטום ו-RS תועדו היטב בספרות: Jegadeesh-Titman (1993) הראו שמניות זוכות ממשיכות להוביל ל-3-12 חודשים. O'Neil (IBD) פיתח RS Rating על בסיס דומה. Minervini (SEPA) דורש מגמה נקייה כפי שהמודל הזה מודד.</p>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ─────────── POST-APP (anything dashboard put after #app) ─────────── -->
+<!-- /#app -->
+
+<!-- ═══════════ STOCK DETAIL PANEL (app.js) ═══════════ -->
+<div class="stock-overlay" id="stock-overlay" onclick="closeStockDetail(event)">
+  <div class="stock-panel" id="stock-panel">
+    <div class="sp-hdr">
+      <button class="sp-close-btn" onclick="closeStockDetail()">×</button>
+      <div class="sp-hdr-center">
+        <div class="sp-sym" id="sp-sym">–</div>
+        <div class="sp-name" id="sp-name">–</div>
+      </div>
+      <div class="sp-hdr-right">
+        <div class="sp-price" id="sp-price">–</div>
+        <div class="sp-chg" id="sp-chg">–</div>
+      </div>
+    </div>
+    <div class="sp-tabs" id="sp-tabs">
+      <button class="sp-tab active" onclick="switchStockTab('chart')" id="tab-chart">גרף</button>
+      <button class="sp-tab" onclick="switchStockTab('fundamentals')" id="tab-fundamentals">פונדמנטלס</button>
+      <button class="sp-tab" onclick="switchStockTab('news')" id="tab-news">חדשות</button>
+    </div>
+    <div class="sp-layout">
+      <div class="sp-sidebar" id="sp-sidebar"></div>
+      <div class="sp-body" id="sp-body">
+        <div class="modal-loading" style="padding:40px"><div class="mini-ring" style="margin:0 auto 10px"></div>טוען...</div>
+      </div>
+      <div class="sp-sidebar-right" id="sp-sidebar-right"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTOR HOLDINGS MODAL ═══════════ -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-hdr">
+      <div>
+        <div class="modal-title" id="modal-title">אחזקות סקטור</div>
+        <div class="modal-sub" id="modal-sub"></div>
+      </div>
+      <div class="modal-hdr-actions">
+        <div class="modal-search-wrap" id="modal-search-wrap">
+          <input class="modal-search-input" id="modal-search-input" type="text"
+            placeholder="סמל מניה (e.g. TSLA)"
+            onkeydown="if(event.key==='Enter')searchFromModal();if(event.key==='Escape')toggleModalSearch()"
+            autocomplete="off" autocapitalize="characters">
+          <button class="modal-search-go" onclick="searchFromModal()">→</button>
+        </div>
+        <button class="modal-search-btn" id="modal-search-btn" onclick="toggleModalSearch()" title="חיפוש מניה">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </button>
+        <button class="modal-close" onclick="closeModalDirect()">×</button>
+      </div>
+    </div>
+    <div class="modal-body" id="modal-body">
+      <div class="modal-loading"><div class="mini-ring"></div>טוען אחזקות...</div>
+    </div>
+    <div class="modal-footer" id="modal-footer">מקור: Yahoo Finance ETF Holdings</div>
+  </div>
+</div>
+
+<!-- ═══════════ SCRIPTS ═══════════ -->
+
+<!-- Consolidated script -->
+<script src="app.js"></script>
+
 </body>
 </html>
