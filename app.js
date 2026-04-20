@@ -5088,7 +5088,300 @@ function rebuildSymMaps() {
 }
 rebuildSymMaps();
 
-// Current state
+/* ════════════════════════════════════════════════════════════════════════════
+   WIKIPEDIA UNIVERSE FETCHER
+   Keeps the S&P 500 and S&P MidCap 400 constituent lists current without manual
+   edits. Hardcoded ETF_HOLDINGS / MID_CAP_HOLDINGS are the floor (always works
+   offline, always valid). Wikipedia is an *overlay* that replaces them in-memory
+   when a fresh fetch succeeds.
+
+   Flow:
+     1. Boot uses hardcoded immediately — user sees the app instantly.
+     2. advisorBoot fires refreshUniversesFromWikipedia() non-blocking.
+     3. If cache is fresh (<48h) → restore from cache, no network.
+     4. Else → fetch both lists in parallel, parse, validate, cache, apply.
+     5. On failure → keep whatever's in memory (hardcoded or stale cache).
+
+   The bundled data is the SAFETY NET. If Wikipedia breaks, the app still works.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+const UNIVERSE_CACHE_KEY = 'universe_wiki_cache_v1';
+const UNIVERSE_CACHE_TTL = 48 * 60 * 60 * 1000;    // 48 hours
+const UNIVERSE_FETCH_TIMEOUT = 12000;              // 12 seconds per page
+let lastUniverseUpdate = null;                     // timestamp; null = still on hardcoded
+let universeUpdateSource = 'hardcoded';            // 'hardcoded' | 'cache' | 'wikipedia'
+
+// Snapshot of the hardcoded SYM_SUBIND taken at boot — acts as the floor for
+// tickers Wikipedia might not classify (new sub-industries we don't recognize).
+const BASE_SYM_SUBIND = { ...SYM_SUBIND };
+
+// GICS sector → ETF bucket. Stable (11 sectors, changes ~once per decade).
+const GICS_TO_ETF = {
+  'Information Technology':'XLK', 'Financials':'XLF', 'Health Care':'XLV',
+  'Consumer Discretionary':'XLY', 'Consumer Staples':'XLP', 'Industrials':'XLI',
+  'Energy':'XLE', 'Materials':'XLB', 'Utilities':'XLU', 'Real Estate':'XLRE',
+  'Communication Services':'XLC',
+};
+
+// GICS sub-industry → our shortcode (matches SI_LABELS keys).
+// If Wikipedia returns a sub-industry not in this map, the ticker falls back to
+// BASE_SYM_SUBIND (our hardcoded floor) — meaning we just won't show the pill.
+const GICS_TO_SI = {
+  'Semiconductors':'semi','Semiconductor Materials & Equipment':'semi',
+  'Technology Hardware, Storage & Peripherals':'thw',
+  'Application Software':'sw','Systems Software':'sw',
+  'IT Consulting & Other Services':'itsvc','Data Processing & Outsourced Services':'itsvc',
+  'Communications Equipment':'commeq',
+  'Electronic Equipment & Instruments':'elec','Electronic Components':'elec','Electronic Manufacturing Services':'elec',
+  'Interactive Media & Services':'imds',
+  'Movies & Entertainment':'ent',
+  'Publishing':'media','Broadcasting':'media','Advertising':'media','Cable & Satellite':'media',
+  'Integrated Telecommunication Services':'dtel','Alternative Carriers':'dtel',
+  'Wireless Telecommunication Services':'wtel',
+  'Broadline Retail':'bret','Computer & Electronics Retail':'bret',
+  'Specialty Stores':'sret','Other Specialty Retail':'sret','Home Improvement Retail':'sret',
+  'Homefurnishing Retail':'sret','Apparel Retail':'sret','Automotive Retail':'sret',
+  'Food Retail':'csdr','Consumer Staples Merchandise Retail':'csdr','Food Distributors':'csdr',
+  'Restaurants':'hrl','Hotels, Resorts & Cruise Lines':'hrl','Casinos & Gaming':'hrl','Leisure Facilities':'hrl',
+  'Automotive Parts & Equipment':'autop','Tires & Rubber':'autop','Automobile Manufacturers':'auto',
+  'Apparel, Accessories & Luxury Goods':'appar','Footwear':'appar',
+  'Leisure Products':'leis','Motorcycle Manufacturers':'leis',
+  'Homebuilding':'hhd','Home Furnishings':'hhd','Household Appliances':'hhd',
+  'Household Products':'hhp',
+  'Personal Care Products':'pcp',
+  'Packaged Foods & Meats':'food','Agricultural Products & Services':'food',
+  'Soft Drinks & Non-alcoholic Beverages':'bev','Brewers':'bev','Distillers & Vintners':'bev',
+  'Tobacco':'tob',
+  'Distributors':'dist',
+  'Diversified Banks':'bank','Regional Banks':'bank',
+  'Consumer Finance':'cfin',
+  'Asset Management & Custody Banks':'capm','Investment Banking & Brokerage':'capm',
+  'Financial Exchanges & Data':'capm','Multi-Sector Holdings':'capm',
+  'Property & Casualty Insurance':'ins','Life & Health Insurance':'ins','Multi-line Insurance':'ins',
+  'Reinsurance':'ins','Insurance Brokers':'ins',
+  'Transaction & Payment Processing Services':'fin','Diversified Financial Services':'fin',
+  'Commercial & Residential Mortgage Finance':'fin',
+  'Pharmaceuticals':'pharm',
+  'Biotechnology':'biot',
+  'Health Care Services':'hcps','Health Care Facilities':'hcps','Managed Health Care':'hcps',
+  'Health Care Technology':'hcps','Health Care Distributors':'hcps',
+  'Health Care Equipment':'hces','Health Care Supplies':'hces',
+  'Life Sciences Tools & Services':'lsts',
+  'Oil & Gas Exploration & Production':'oil','Oil & Gas Refining & Marketing':'oil',
+  'Oil & Gas Storage & Transportation':'oil','Integrated Oil & Gas':'oil',
+  'Oil & Gas Equipment & Services':'oilsvc','Oil & Gas Drilling':'oilsvc',
+  'Aerospace & Defense':'aero',
+  'Agricultural & Farm Machinery':'mach','Industrial Machinery & Supplies & Components':'mach',
+  'Construction Machinery & Heavy Transportation Equipment':'cmach',
+  'Industrial Conglomerates':'icong',
+  'Environmental & Facilities Services':'css','Office Services & Supplies':'css',
+  'Security & Alarm Services':'css','Specialized Consumer Services':'css','Diversified Support Services':'css',
+  'Research & Consulting Services':'prof','Human Resource & Employment Services':'prof','Education Services':'prof',
+  'Cargo Ground Transportation':'gtrans','Passenger Ground Transportation':'gtrans',
+  'Marine Transportation':'gtrans','Rail Transportation':'gtrans','Trucking':'gtrans',
+  'Air Freight & Logistics':'airf',
+  'Passenger Airlines':'airline',
+  'Building Products':'bldg',
+  'Construction & Engineering':'ceng',
+  'Electrical Components & Equipment':'ee','Heavy Electrical Equipment':'ee',
+  'Trading Companies & Distributors':'td','Technology Distributors':'td',
+  'Diversified Chemicals':'chem','Specialty Chemicals':'chem','Commodity Chemicals':'chem',
+  'Fertilizers & Agricultural Chemicals':'chem','Industrial Gases':'chem',
+  'Steel':'metal','Aluminum':'metal','Silver':'metal','Gold':'metal','Copper':'metal',
+  'Diversified Metals & Mining':'metal','Precious Metals & Minerals':'metal',
+  'Construction Materials':'cmat',
+  'Metal, Glass & Plastic Containers':'cp','Paper & Plastic Packaging Products & Materials':'cp',
+  'Forest Products':'paper','Paper Products':'paper',
+  'Other Specialized REITs':'spreit','Self-Storage REITs':'spreit','Timber REITs':'spreit',
+  'Hotel & Resort REITs':'spreit','Data Center REITs':'spreit','Telecom Tower REITs':'spreit',
+  'Diversified REITs':'dreit','Retail REITs':'dreit','Office REITs':'dreit',
+  'Industrial REITs':'dreit','Health Care REITs':'dreit','Mortgage REITs':'dreit',
+  'Single-Family Residential REITs':'rreit','Multi-Family Residential REITs':'rreit',
+  'Real Estate Services':'remd','Real Estate Operating Companies':'remd',
+  'Electric Utilities':'elutil',
+  'Multi-Utilities':'multutil',
+  'Gas Utilities':'gasutil',
+  'Water Utilities':'watutil',
+  'Renewable Electricity':'ipwr','Independent Power Producers':'ipwr',
+  'Independent Power Producers & Energy Traders':'ipwr',
+};
+
+/**
+ * Fetch and parse one Wikipedia constituent list. Uses the MediaWiki parse API
+ * to get rendered HTML (more stable than raw wikitext), then DOMParser to walk
+ * the first matching wikitable. Column indices are looked up by header text,
+ * NOT by position — so the parser survives column reorders.
+ */
+async function fetchWikipediaUniverse(pageName) {
+  const url = `https://en.wikipedia.org/w/api.php?action=parse&page=${pageName}&prop=text&format=json&formatversion=2&origin=*`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), UNIVERSE_FETCH_TIMEOUT);
+
+  let html;
+  try {
+    const resp = await fetch(url, { signal: controller.signal });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+    html = json?.parse?.text;
+    if (!html) throw new Error('no .parse.text in response');
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  // Parse HTML and locate the constituent table by its header signature.
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const tables = doc.querySelectorAll('table.wikitable');
+  const rows = [];
+  for (const table of tables) {
+    const headerRow = [...table.querySelectorAll('tr')].find(tr =>
+      tr.querySelectorAll('th').length >= 4
+    );
+    if (!headerRow) continue;
+    const headers = [...headerRow.querySelectorAll('th')].map(th => th.textContent.trim());
+    const iSym     = headers.findIndex(h => /^Symbol$/i.test(h));
+    const iSec     = headers.findIndex(h => /^Security/i.test(h));
+    const iSector  = headers.findIndex(h => /GICS.*Sector/i.test(h));
+    const iSubInd  = headers.findIndex(h => /GICS.*Sub.?Industry/i.test(h));
+    if (iSym < 0 || iSector < 0) continue;   // not the constituent table
+
+    for (const tr of table.querySelectorAll('tr')) {
+      const tds = tr.querySelectorAll('td');
+      if (tds.length < 4) continue;
+      const sym = (tds[iSym]?.textContent || '').trim();
+      const name = iSec >= 0 ? (tds[iSec]?.textContent || '').trim() : sym;
+      const sector = (tds[iSector]?.textContent || '').trim();
+      const subind = iSubInd >= 0 ? (tds[iSubInd]?.textContent || '').trim() : '';
+      // Defensive: ticker must look like a real ticker (1-7 chars, A-Z . -)
+      if (!/^[A-Z][A-Z.\-]{0,6}$/.test(sym)) continue;
+      if (!sector) continue;
+      rows.push({ sym, name, sector, subind });
+    }
+    if (rows.length) break;  // found the right table, stop scanning
+  }
+  return rows;
+}
+
+/**
+ * Convert flat Wikipedia rows into the app's internal structure:
+ *   - holdings: grouped by ETF bucket (XLK/XLF/…), same shape as ETF_HOLDINGS
+ *   - symSubind: ticker → sub-industry code (only for known mappings)
+ */
+function buildUniverseFromWikiRows(rows) {
+  const holdings = {};
+  const symSubind = {};
+  let accepted = 0;
+  for (const r of rows) {
+    const etf = GICS_TO_ETF[r.sector];
+    if (!etf) continue;  // unknown sector → drop (shouldn't happen with 11 stable sectors)
+    holdings[etf] = holdings[etf] || [];
+    holdings[etf].push({ s: r.sym, n: r.name, w: 0.3 });
+    const si = GICS_TO_SI[r.subind];
+    if (si) symSubind[r.sym] = si;
+    accepted++;
+  }
+  return { holdings, symSubind, count: accepted };
+}
+
+/** Sanity check — reject the payload if counts look wrong. */
+function isValidUniverse(u, min, max) {
+  if (!u || !u.count || u.count < min || u.count > max) return false;
+  if (Object.keys(u.holdings).length < 8) return false;  // must span most sectors
+  return true;
+}
+
+/** Apply a Wikipedia-sourced payload to the live in-memory data. */
+function applyUniversePayload(payload) {
+  UNIVERSES.large.holdings = payload.sp500.holdings;
+  UNIVERSES.mid.holdings   = payload.sp400.holdings;
+  // SYM_SUBIND: start from the hardcoded floor, overlay wiki data on top.
+  Object.keys(SYM_SUBIND).forEach(k => delete SYM_SUBIND[k]);
+  Object.assign(SYM_SUBIND, BASE_SYM_SUBIND, payload.sp500.symSubind, payload.sp400.symSubind);
+  rebuildSymMaps();
+  lastUniverseUpdate = payload.fetchedAt;
+  universeUpdateSource = payload.source || 'wikipedia';
+  updateUniverseIndicator();
+}
+
+/**
+ * Entry point. Non-blocking: resolves quickly from cache, or fires a background
+ * fetch if cache is stale. Never throws — all failures fall back to whatever
+ * data is currently in memory.
+ */
+async function refreshUniversesFromWikipedia() {
+  // 1. Try valid cache first
+  try {
+    const cached = JSON.parse(localStorage.getItem(UNIVERSE_CACHE_KEY));
+    if (cached && Date.now() - cached.fetchedAt < UNIVERSE_CACHE_TTL) {
+      applyUniversePayload({ ...cached, source: 'cache' });
+      return { source: 'cache' };
+    }
+  } catch(e){}
+
+  // 2. Cache expired or missing → fetch fresh. Display stale cache while we wait.
+  try {
+    const staleCache = JSON.parse(localStorage.getItem(UNIVERSE_CACHE_KEY));
+    if (staleCache) applyUniversePayload({ ...staleCache, source: 'cache' });
+  } catch(e){}
+
+  try {
+    const [sp500rows, sp400rows] = await Promise.all([
+      fetchWikipediaUniverse('List_of_S%26P_500_companies'),
+      fetchWikipediaUniverse('List_of_S%26P_400_companies'),
+    ]);
+    const sp500 = buildUniverseFromWikiRows(sp500rows);
+    const sp400 = buildUniverseFromWikiRows(sp400rows);
+
+    if (!isValidUniverse(sp500, 450, 520)) {
+      throw new Error(`SP500 validation failed (got ${sp500.count})`);
+    }
+    if (!isValidUniverse(sp400, 380, 410)) {
+      throw new Error(`SP400 validation failed (got ${sp400.count})`);
+    }
+
+    // Remove any sp400 tickers that are also in sp500 (promoted stocks can
+    // appear in both lists briefly around index reshuffles).
+    const inSp500 = new Set();
+    Object.values(sp500.holdings).forEach(arr => arr.forEach(h => inSp500.add(h.s)));
+    for (const etf in sp400.holdings) {
+      sp400.holdings[etf] = sp400.holdings[etf].filter(h => !inSp500.has(h.s));
+    }
+    sp400.count = Object.values(sp400.holdings).reduce((a, arr) => a + arr.length, 0);
+
+    const payload = { sp500, sp400, fetchedAt: Date.now() };
+    try { localStorage.setItem(UNIVERSE_CACHE_KEY, JSON.stringify(payload)); } catch(e){}
+    applyUniversePayload({ ...payload, source: 'wikipedia' });
+    console.info(`universe refreshed from Wikipedia: ${sp500.count} large + ${sp400.count} mid`);
+    return { source: 'wikipedia', sp500: sp500.count, sp400: sp400.count };
+
+  } catch(e) {
+    console.warn('universe Wikipedia fetch failed, keeping current data:', e.message);
+    return { source: universeUpdateSource, error: e.message };
+  }
+}
+
+/** Refresh the small "updated X ago · source" label next to the universe chips. */
+function updateUniverseIndicator() {
+  const el = document.getElementById('universe-indicator');
+  if (!el) return;
+  if (!lastUniverseUpdate) {
+    el.textContent = 'מקומי';
+    el.title = 'רשימה מובנית באפליקציה';
+    el.className = 'univ-ind univ-ind-local';
+    return;
+  }
+  const ageMs = Date.now() - lastUniverseUpdate;
+  const hours = Math.floor(ageMs / 3600000);
+  const days = Math.floor(hours / 24);
+  const ago = days >= 1 ? `לפני ${days} ימים`
+            : hours >= 1 ? `לפני ${hours} שעות`
+            : 'לפני פחות משעה';
+  const srcLabel = universeUpdateSource === 'wikipedia' ? 'Wikipedia'
+                 : universeUpdateSource === 'cache'     ? 'Wikipedia (cache)'
+                 : 'מקומי';
+  el.textContent = `${srcLabel} · ${ago}`;
+  el.title = `מקור האחזקות: ${srcLabel}. עדכון הבא ברקע כעבור 48 שעות.`;
+  el.className = 'univ-ind univ-ind-wiki';
+}
 let scanData = null;
 let displayState = {
   minScore: 50,
@@ -5108,6 +5401,11 @@ function advisorBoot() {
     $('adv-screen-error').style.display = 'block';
     return;
   }
+  // Kick off a non-blocking Wikipedia refresh. If cache is fresh (<48h) this
+  // returns almost instantly; otherwise it fires an async fetch and updates
+  // holdings in memory when done. User's current view uses whatever data is
+  // available right now — next scan picks up the refresh.
+  refreshUniversesFromWikipedia().catch(() => {});
   // Validate saved methodology against the live METHODOLOGIES dictionary
   // (we couldn't do this at the `let currentMethodology = ...` site because of TDZ)
   if (!METHODOLOGIES[currentMethodology]) currentMethodology = 'momentum';
