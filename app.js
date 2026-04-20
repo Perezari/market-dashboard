@@ -5012,8 +5012,8 @@ const getSubIndHe = (sym) => {
    at the currently-active holdings object and keep caches separate per universe.
    ════════════════════════════════════════════════════════════════════════════ */
 const UNIVERSES = {
-  large: { label:'Large Caps', labelShort:'large-caps', holdings: ETF_HOLDINGS },
-  mid:   { label:'Mid Caps',   labelShort:'mid-caps',   holdings: MID_CAP_HOLDINGS }
+  large: { label:'S&P 500',         labelShort:'S&P 500',         holdings: ETF_HOLDINGS },
+  mid:   { label:'S&P MidCap 400',  labelShort:'S&P MidCap 400',  holdings: MID_CAP_HOLDINGS }
 };
 let currentUniverse = localStorage.getItem(UNIVERSE_KEY) || 'large';
 if (!UNIVERSES[currentUniverse]) currentUniverse = 'large';
@@ -5100,7 +5100,7 @@ function advisorBoot() {
   startMarketClock();
 } // advisorBoot end
 
-// Reflect currentUniverse in the universe chip group and the KPI "large-caps"/"mid-caps" subtitle
+// Reflect currentUniverse in the universe chip group and the KPI subtitle
 function syncUniverseUI() {
   document.querySelectorAll('.chip[data-universe]').forEach(b => {
     b.classList.toggle('active', b.dataset.universe === currentUniverse);
