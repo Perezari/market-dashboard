@@ -88,6 +88,9 @@ body::after{
   position:sticky;top:0;z-index:40;
   display:flex;align-items:center;
   height:46px;padding:0 14px;gap:14px;
+  /* iPhone PWA: מוסיף כרית מעל לסטטוס בר (Dynamic Island/notch) */
+  padding-top:env(safe-area-inset-top,0px);
+  box-sizing:content-box;
   background:rgba(10,17,15,.92);
   border-bottom:1px solid var(--border2);
   backdrop-filter:blur(16px);
@@ -368,8 +371,6 @@ section.compact{}
   display:grid !important;
   grid-template-columns:auto 1fr !important;
   align-items:center !important;
-  gap: 10px !important;
-  padding: 8px 2px !important;
   background:transparent !important;
   border:none !important;
   border-bottom:1px solid var(--border) !important;
@@ -851,18 +852,28 @@ section.compact{}
   width:10px;height:10px;border-radius:50%;background:#28c941;
   box-shadow:-16px 0 0 #febc2e,-32px 0 0 #ff5f57;z-index:3;
 }
-.col.main .sectors-card .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;position:relative}
+.col.main .sectors-card .tbl-wrap{
+  overflow-x:auto;-webkit-overflow-scrolling:touch;position:relative;
+  /* iOS Safari sticky fix — אותו pattern כמו .corr-wrap שעובד */
+  will-change:scroll-position;
+  transform:translateZ(0);-webkit-transform:translateZ(0);
+}
 .col.main .sectors-card .t{
   width:100%;border-collapse:separate;border-spacing:0;
   font-size:11px;direction:ltr;min-width:620px;
 }
 /* ── Sticky sector column (נצמד לקצה הימני, חלק מאותה <table>) ── */
 .col.main .sectors-card .t .stky{
+  position:-webkit-sticky !important;
   position:sticky !important;right:0 !important;z-index:2 !important;
   min-width:150px !important;max-width:150px !important;
   padding:0 14px 0 10px !important;
   border-left:1px solid var(--border) !important;
   text-align:right !important;direction:rtl !important;
+  /* iOS Safari sticky fix — זה מה שעושה את ההבדל ב-.corr-table */
+  will-change:transform;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
 }
 .col.main .sectors-card .t thead th.stky{
   background:rgba(0,0,0,.45) !important;z-index:3 !important;
@@ -872,15 +883,6 @@ section.compact{}
   background:#111816 !important;
   font-family:var(--sans) !important;font-size:11px !important;font-weight:500 !important;
   color:var(--text) !important;
-}
-/* iOS Safari sticky fix — trigger compositor layer */
-.col.main .sectors-card .t th.stky,
-.col.main .sectors-card .t td.stky{
-  position:-webkit-sticky !important;
-  position:sticky !important;
-  will-change:transform;
-  backface-visibility:hidden;
-  -webkit-backface-visibility:hidden;
 }
 .col.main .sectors-card .t tbody tr:hover td.stky{background:#16201d !important}
 .col.main .sectors-card .t tbody tr.avgrow td.stky{
@@ -1426,12 +1428,13 @@ section.compact{}
 }
 @media(max-width:820px){
   .tb-hide{display:none !important}
-  .term-bar{padding:0 10px}
+  .term-bar{padding-left:10px;padding-right:10px}
   .page{padding:10px}
   .hw-clock{display:none}
   .hw-body{flex-wrap:wrap;padding:12px 14px;gap:10px}
   .heat-grid{grid-template-columns:repeat(2,1fr)}
-  .ai-signals{grid-template-columns:repeat(2,1fr) !important}
+  /* ── AI signals: 2 עמודות במובייל כדי שהכותרות לא יגלשו ── */
+  .col.main .ai-signals{grid-template-columns:repeat(2,1fr) !important}
   .ai-micro-stats{padding:8px 10px !important;gap:6px !important;flex-wrap:wrap}
   .ai-mi-lbl{font-size:8px !important}
   .ai-mi-val{font-size:12px !important}
@@ -1446,7 +1449,16 @@ section.compact{}
     word-break:break-word;
   }
   .col.main .ai-s-desc{font-size:10px !important;line-height:1.35 !important}
-  .col.main .ai-s-label{font-size:8.5px !important}
+  /* ── Labels: חותך letter-spacing ומאפשר wrap כדי שלא יגלשו ── */
+  .col.main .ai-s-hdr{min-width:0 !important;flex-wrap:wrap}
+  .col.main .ai-s-label{
+    font-size:9px !important;
+    letter-spacing:.4px !important;
+    white-space:normal !important;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+    min-width:0;
+  }
 }
 </style>
 </head>
@@ -1661,6 +1673,38 @@ section.compact{}
     <!-- ══════ LEFT SIDEBAR ══════ -->
     <aside class="col">
 
+      <!-- Sector Heatmap (custom, synced from sector-tbody) -->
+      <section class="compact">
+        <div class="sec-label">
+          <div class="sec-meta">% · 1D</div>
+          <div class="sec-title">Sector Heatmap</div>
+        </div>
+        <div class="heat-grid" id="sb-heatmap">
+          <div class="heat-cell neu" data-sector-slot="XLK"><span class="heat-sym">TECH</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLC"><span class="heat-sym">COMM</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLP"><span class="heat-sym">CONS</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLV"><span class="heat-sym">HEAL</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLF"><span class="heat-sym">FIN</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLI"><span class="heat-sym">INDU</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLRE"><span class="heat-sym">REAL</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLE"><span class="heat-sym">ENER</span><span class="heat-pct">–</span></div>
+        </div>
+      </section>
+
+      <!-- Top Movers (app.js #movers-grid) -->
+      <section class="compact econ-section" id="movers-section">
+        <div class="sec-label">
+          <div class="sec-meta">S&amp;P 500</div>
+          <div class="sec-title">Top Movers</div>
+        </div>
+        <div class="movers-grid" id="movers-grid">
+          <div style="text-align:center;color:var(--dim);font-size:11px;padding:12px">
+            <div class="mini-ring" style="margin:0 auto 8px"></div>
+            סורק...
+          </div>
+        </div>
+      </section>
+
       <!-- Next Events (app.js #econ-wrap) -->
       <section class="compact econ-section">
         <div class="sec-label">
@@ -1774,38 +1818,6 @@ section.compact{}
     <!-- ══════ RIGHT SIDEBAR ══════ -->
     <aside class="col">
 
-      <!-- Sector Heatmap (custom, synced from sector-tbody) -->
-      <section class="compact">
-        <div class="sec-label">
-          <div class="sec-meta">% · 1D</div>
-          <div class="sec-title">Sector Heatmap</div>
-        </div>
-        <div class="heat-grid" id="sb-heatmap">
-          <div class="heat-cell neu" data-sector-slot="XLK"><span class="heat-sym">TECH</span><span class="heat-pct">–</span></div>
-          <div class="heat-cell neu" data-sector-slot="XLC"><span class="heat-sym">COMM</span><span class="heat-pct">–</span></div>
-          <div class="heat-cell neu" data-sector-slot="XLP"><span class="heat-sym">CONS</span><span class="heat-pct">–</span></div>
-          <div class="heat-cell neu" data-sector-slot="XLV"><span class="heat-sym">HEAL</span><span class="heat-pct">–</span></div>
-          <div class="heat-cell neu" data-sector-slot="XLF"><span class="heat-sym">FIN</span><span class="heat-pct">–</span></div>
-          <div class="heat-cell neu" data-sector-slot="XLI"><span class="heat-sym">INDU</span><span class="heat-pct">–</span></div>
-          <div class="heat-cell neu" data-sector-slot="XLRE"><span class="heat-sym">REAL</span><span class="heat-pct">–</span></div>
-          <div class="heat-cell neu" data-sector-slot="XLE"><span class="heat-sym">ENER</span><span class="heat-pct">–</span></div>
-        </div>
-      </section>
-	  
-	  <!-- Top Movers (app.js #movers-grid) -->
-      <section class="compact econ-section" id="movers-section">
-        <div class="sec-label">
-          <div class="sec-meta">S&amp;P 500</div>
-          <div class="sec-title">Top Movers</div>
-        </div>
-        <div class="movers-grid" id="movers-grid">
-          <div style="text-align:center;color:var(--dim);font-size:11px;padding:12px">
-            <div class="mini-ring" style="margin:0 auto 8px"></div>
-            סורק...
-          </div>
-        </div>
-      </section>
-
       <!-- US Indices (app.js #idx-main + #idx-other) -->
       <section class="compact">
         <div class="sec-label">
@@ -1891,7 +1903,7 @@ section.compact{}
       </section>
 
       <!-- Daily Chart -->
-      <section class="compact chart-box" style="display:none">
+      <section class="compact chart-box">
         <div class="card-hdr"><div class="section-label">Daily Chart</div></div>
         <canvas id="chart" width="266" height="200"></canvas>
       </section>
