@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html dir="rtl" lang="he">
 <head>
-<script>/* Redirect to login if not connected yet */try{if(!localStorage.getItem('app_proxy_url'))location.replace('index.html');}catch(e){}</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0b1311">
@@ -866,7 +865,7 @@ section.compact{}
 }
 .col.main .sectors-card .t{
   width:100%;border-collapse:separate;border-spacing:0;
-  font-size:11px;direction:ltr;min-width:620px;
+  font-size:11px;direction:rtl;min-width:620px;
 }
 /* ── Sticky sector column (נצמד לקצה הימני, חלק מאותה <table>) ── */
 .col.main .sectors-card .t .stky{
@@ -1466,9 +1465,255 @@ section.compact{}
     min-width:0;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   LOGIN OVERLAY — מופיע כשאין proxy url ב-localStorage
+   מחליף את index.html — נשאר ב-PWA mode בלי ניווט לדף אחר
+   ═══════════════════════════════════════════════════════════ */
+#login-overlay{
+  position:fixed;inset:0;z-index:1000;
+  display:none;
+  align-items:center;justify-content:center;
+  padding:20px;
+  /* כרית בטוחה ל-iPhone — safe-area insets עבור Dynamic Island ו-Home Indicator */
+  padding-top:max(20px, env(safe-area-inset-top));
+  padding-bottom:max(20px, env(safe-area-inset-bottom));
+  background:var(--bg);
+  overflow-y:auto;
+  direction:rtl;
+}
+#login-overlay.visible{display:flex}
+#login-overlay .lo-window{
+  width:100%;max-width:490px;
+  background:linear-gradient(180deg,#1a2320 0%,#121a18 100%);
+  border:1px solid var(--border2);
+  border-radius:14px;
+  overflow:hidden;
+  box-shadow:
+    0 0 0 1px rgba(79,199,138,.06),
+    0 24px 80px rgba(0,0,0,.7),
+    0 10px 30px rgba(0,0,0,.5),
+    inset 0 1px 0 rgba(255,255,255,.04);
+  animation:lo-in .4s cubic-bezier(.2,.9,.3,1.1);
+}
+@keyframes lo-in{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+#login-overlay .lo-titlebar{
+  display:flex;align-items:center;justify-content:space-between;
+  height:38px;padding:0 14px;
+  background:rgba(0,0,0,.3);
+  border-bottom:1px solid var(--border);
+  direction:ltr;
+}
+#login-overlay .lo-version{
+  font-family:var(--mono);font-size:9px;font-weight:800;color:var(--green);
+  letter-spacing:1.2px;text-transform:uppercase;
+  padding:3px 7px;border-radius:4px;
+  border:1px solid var(--green-dim);
+  background:var(--green-soft);
+}
+#login-overlay .lo-title-txt{
+  font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.3px;
+}
+#login-overlay .lo-title-txt .lo-scheme{color:var(--dimmer)}
+#login-overlay .lo-traffic{display:flex;gap:7px}
+#login-overlay .lo-traffic i{
+  width:11px;height:11px;border-radius:50%;display:block;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3), 0 0 0 .5px rgba(0,0,0,.3);
+}
+#login-overlay .lo-traffic i:nth-child(1){background:#ff5f57}
+#login-overlay .lo-traffic i:nth-child(2){background:#febc2e}
+#login-overlay .lo-traffic i:nth-child(3){background:#28c941}
+#login-overlay .lo-body{padding:30px 38px 26px}
+#login-overlay .lo-brand{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:4px}
+#login-overlay .lo-brand h1{
+  font-family:var(--sans);font-size:26px;font-weight:800;
+  color:var(--text);letter-spacing:-.7px;line-height:1;margin:0;
+}
+#login-overlay .lo-brand-icon{
+  display:flex;align-items:center;justify-content:center;
+  width:36px;height:36px;border-radius:8px;
+  background:var(--green-soft);
+  border:1px solid var(--green-dim);
+  color:var(--green);
+}
+#login-overlay .lo-brand-icon svg{width:20px;height:20px}
+#login-overlay .lo-tagline{
+  text-align:center;
+  font-family:var(--mono);font-size:9px;font-weight:600;
+  color:var(--dim);letter-spacing:1.8px;text-transform:uppercase;
+  margin-bottom:24px;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  direction:ltr;flex-wrap:wrap;
+}
+#login-overlay .lo-tagline span{display:inline-flex;align-items:center;gap:10px}
+#login-overlay .lo-tagline .lo-dot{width:3px;height:3px;border-radius:50%;background:var(--green);opacity:.6}
+#login-overlay .lo-h-title{
+  text-align:center;font-size:20px;font-weight:700;color:var(--text);
+  margin-bottom:7px;letter-spacing:-.3px;
+}
+#login-overlay .lo-h-sub{
+  text-align:center;font-size:12px;color:var(--dim);
+  line-height:1.6;margin-bottom:22px;
+}
+#login-overlay .lo-input-group{margin-bottom:13px}
+#login-overlay .lo-input-labels{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:6px;padding:0 2px;
+  font-family:var(--mono);font-size:8.5px;font-weight:700;
+  letter-spacing:1.4px;text-transform:uppercase;
+  direction:ltr;
+}
+#login-overlay .lo-il-left{color:var(--green)}
+#login-overlay .lo-il-right{color:var(--dim)}
+#login-overlay .lo-input-shell{
+  position:relative;
+  background:rgba(0,0,0,.35);
+  border:1px solid var(--border2);
+  border-radius:8px;
+  transition:all .2s;
+}
+#login-overlay .lo-input-shell:focus-within{
+  border-color:var(--green);
+  box-shadow:0 0 0 3px var(--green-soft), inset 0 0 0 1px rgba(79,199,138,.1);
+}
+#login-overlay .lo-input{
+  width:100%;background:transparent;border:none;outline:none;
+  padding:13px 38px 13px 14px;
+  font-family:var(--mono);font-size:12px;color:var(--text);
+  letter-spacing:.2px;direction:ltr;
+  -webkit-user-select:text;user-select:text;
+  box-sizing:border-box;
+}
+#login-overlay .lo-input::placeholder{color:var(--dimmer)}
+#login-overlay .lo-input-shell::after{
+  content:'';position:absolute;top:50%;left:14px;transform:translateY(-50%);
+  width:6px;height:6px;border-radius:50%;background:var(--dimmer);
+}
+#login-overlay .lo-input-shell:focus-within::after{background:var(--green);box-shadow:0 0 8px var(--green)}
+#login-overlay .lo-btn{
+  width:100%;margin-top:6px;
+  background:linear-gradient(180deg,#4fc78a 0%,#3fb179 100%);
+  color:#041612;
+  border:none;border-radius:8px;
+  padding:14px 16px;
+  font-family:var(--sans);font-size:14px;font-weight:800;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  letter-spacing:-.1px;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.2) inset,
+    0 -1px 0 rgba(0,0,0,.15) inset,
+    0 4px 14px rgba(79,199,138,.2),
+    0 1px 3px rgba(0,0,0,.3);
+  transition:all .15s;
+}
+#login-overlay .lo-btn:hover:not(.loading){transform:translateY(-1px)}
+#login-overlay .lo-btn:active{transform:translateY(0)}
+#login-overlay .lo-btn.loading{opacity:.7;pointer-events:none}
+#login-overlay .lo-btn svg{width:14px;height:14px}
+#login-overlay .lo-err{
+  display:none;margin-top:10px;
+  font-family:var(--mono);font-size:10px;color:var(--red);text-align:center;
+  letter-spacing:.4px;
+}
+#login-overlay .lo-err.show{display:block;animation:lo-shake .4s}
+@keyframes lo-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+#login-overlay .lo-pills{
+  display:flex;flex-wrap:wrap;justify-content:center;gap:6px;
+  margin-top:22px;padding-top:20px;
+  border-top:1px solid var(--border);
+  direction:ltr;
+}
+#login-overlay .lo-pill{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:4px 10px;
+  border:1px solid var(--border2);
+  border-radius:14px;
+  font-family:var(--mono);font-size:8.5px;font-weight:700;
+  color:var(--dim);letter-spacing:1.2px;text-transform:uppercase;
+}
+#login-overlay .lo-pill-dot{width:4px;height:4px;border-radius:50%;background:var(--green);opacity:.7}
+@media(max-width:760px){
+  #login-overlay .lo-body{padding:24px 22px 22px}
+  #login-overlay .lo-brand h1{font-size:22px}
+}
 </style>
 </head>
 <body>
+
+<!-- ═══════════ LOGIN OVERLAY (מחליף את index.html בתוך הדשבורד) ═══════════ -->
+<div id="login-overlay">
+  <div class="lo-window">
+    <div class="lo-titlebar">
+      <div class="lo-version">V2.4.1</div>
+      <div class="lo-title-txt"><span class="lo-scheme">stockpulse://</span>terminal/auth</div>
+      <div class="lo-traffic"><i></i><i></i><i></i></div>
+    </div>
+    <div class="lo-body">
+      <div class="lo-brand">
+        <h1>StockPulse</h1>
+        <div class="lo-brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+            <polyline points="16 7 22 7 22 13"/>
+          </svg>
+        </div>
+      </div>
+      <div class="lo-tagline">
+        <span>Real-Time</span><span class="lo-dot"></span>
+        <span>Institutional Grade</span><span class="lo-dot"></span>
+        <span>Since 2026</span>
+      </div>
+      <div class="lo-h-title">כניסה לטרמינל</div>
+      <div class="lo-h-sub">חבר את פרוקסי ה-Worker שלך וגש לנתוני שוק בזמן אמת.</div>
+      <div class="lo-input-group">
+        <div class="lo-input-labels">
+          <span class="lo-il-left">Cloudflare</span>
+          <span class="lo-il-right">Worker Endpoint</span>
+        </div>
+        <div class="lo-input-shell">
+          <input class="lo-input" id="lo-key-input" type="text"
+            placeholder="https://your-worker.workers.dev"
+            autocomplete="off" spellcheck="false"
+            onkeydown="if(event.key==='Enter')loStartWithKey()">
+        </div>
+        <div class="lo-err" id="lo-key-err">המפתח לא תקין, נסה שוב.</div>
+      </div>
+      <button class="lo-btn" id="lo-login-btn" onclick="loStartWithKey()">
+        <span class="lo-btn-text">התחבר לטרמינל</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+      </button>
+      <div class="lo-pills">
+        <span class="lo-pill"><span class="lo-pill-dot"></span>Portfolio</span>
+        <span class="lo-pill"><span class="lo-pill-dot"></span>Alerts</span>
+        <span class="lo-pill"><span class="lo-pill-dot"></span>AI Brief</span>
+        <span class="lo-pill"><span class="lo-pill-dot"></span>Sector Heatmap</span>
+        <span class="lo-pill"><span class="lo-pill-dot"></span>Live Quotes</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- סקריפט מוקדם: מציג את ה-overlay לפני ש-app.js רץ, מונע פלאש של דשבורד ריק -->
+<script>
+(function(){
+  try{
+    if(!localStorage.getItem('app_proxy_url')){
+      var ov = document.getElementById('login-overlay');
+      if(ov) ov.classList.add('visible');
+      // שומר את ה-URL האחרון כדי למלא מראש אחרי retry
+      var saved = localStorage.getItem('app_proxy_url_last');
+      if(saved){
+        var inp = document.getElementById('lo-key-input');
+        if(inp) inp.value = saved;
+      }
+    }
+  }catch(e){}
+})();
+</script>
 
 <!-- ═══════════ BOOT SCREENS ═══════════ -->
 <div id="screen-key">
@@ -1575,7 +1820,7 @@ section.compact{}
     <button class="sp-nav-item" data-tooltip="ערכה בהירה/כהה" onclick="if(window.toggleTheme)toggleTheme()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
     </button>
-    <button class="sp-nav-item" data-tooltip="יציאה" onclick="if(confirm('לצאת?')){localStorage.removeItem('app_proxy_url');location.href='index.html'}">
+    <button class="sp-nav-item" data-tooltip="יציאה" onclick="if(confirm('לצאת?')){logout()}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
     </button>
   </div>
@@ -1796,7 +2041,7 @@ section.compact{}
         <div class="tbl-wrap">
           <table class="t">
             <thead>
-              <tr><th>1D</th><th>1W</th><th>1M</th><th>3M</th><th>6M</th><th>1Y</th><th>52W HIGH</th><th>52W LOW</th><th>VOL</th><th>MACRO</th><th>AVG</th><th class="stky">Sector</th></tr>
+              <tr><th class="stky">Sector</th><th>1D</th><th>1W</th><th>1M</th><th>3M</th><th>6M</th><th>1Y</th><th>52W HIGH</th><th>52W LOW</th><th>VOL</th><th>MACRO</th><th>AVG</th></tr>
             </thead>
             <tbody id="sector-tbody"></tbody>
           </table>
@@ -2002,10 +2247,75 @@ section.compact{}
 <script src="etf-holdings.js"></script>
 <script src="app.js"></script>
 <script>
-/* showKey override: redirect to login instead of showing inline */
+/* ═══════════ LOGIN OVERLAY — מחבר את ה-Worker בלי לצאת מהדשבורד ═══════════ */
+async function loStartWithKey(){
+  const input   = document.getElementById('lo-key-input');
+  const err     = document.getElementById('lo-key-err');
+  const btn     = document.getElementById('lo-login-btn');
+  const btnText = btn.querySelector('.lo-btn-text');
+  const val     = (input.value || '').trim();
+
+  if (!val) {
+    err.textContent = 'אנא הזן את כתובת ה-Worker.';
+    err.classList.add('show');
+    input.focus();
+    return;
+  }
+  if (!val.startsWith('http')) {
+    err.textContent = 'הכתובת חייבת להתחיל ב-https://';
+    err.classList.add('show');
+    return;
+  }
+
+  const cleanUrl = val.endsWith('/') ? val.slice(0, -1) : val;
+  const originalText = btnText.textContent;
+
+  err.classList.remove('show');
+  btn.classList.add('loading');
+  btnText.textContent = 'מוודא הרשאות...';
+
+  try {
+    const testUrl = 'https://query1.finance.yahoo.com/v7/finance/spark?symbols=SPY&range=1d&interval=1d';
+    const r = await fetch(`${cleanUrl}/?url=${encodeURIComponent(testUrl)}`);
+    const d = await r.json();
+    if (d.spark && d.spark.result) {
+      // Success — שומר ומטעין מחדש את הדשבורד (נשאר ב-PWA mode — אין ניווט ליעד חדש)
+      localStorage.setItem('app_proxy_url', cleanUrl);
+      localStorage.setItem('app_proxy_url_last', cleanUrl);
+      btnText.textContent = 'מתחבר...';
+      setTimeout(() => { location.reload(); }, 300);
+    } else {
+      throw new Error('Invalid response');
+    }
+  } catch (e) {
+    err.textContent = 'מפתח המערכת שגוי או שהשרת אינו מגיב.';
+    err.classList.add('show');
+    btn.classList.remove('loading');
+    btnText.textContent = originalText;
+  }
+}
+
+/* showKey override: מציג את ה-overlay עם שגיאה במקום לצאת ל-index.html */
 window.showKey = function(){
-  try { localStorage.removeItem('app_proxy_url'); } catch(e) {}
-  location.replace('index.html?login=1&err=bad');
+  try {
+    const last = localStorage.getItem('app_proxy_url') || '';
+    localStorage.removeItem('app_proxy_url');
+    if (last) localStorage.setItem('app_proxy_url_last', last);
+  } catch(e) {}
+  const ov = document.getElementById('login-overlay');
+  if (ov) {
+    ov.classList.add('visible');
+    const inp = document.getElementById('lo-key-input');
+    if (inp) {
+      inp.value = localStorage.getItem('app_proxy_url_last') || '';
+      setTimeout(() => inp.focus(), 100);
+    }
+    const err = document.getElementById('lo-key-err');
+    if (err) {
+      err.textContent = 'החיבור ל-Worker נכשל. בדוק את הכתובת ונסה שוב.';
+      err.classList.add('show');
+    }
+  }
 };
 
 /* Terminal clocks + latency */
