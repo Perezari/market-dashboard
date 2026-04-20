@@ -861,13 +861,18 @@ section.compact{}
    (identical pattern to .corr-table — eliminates row-height mismatch and
    avgrow layout issues that came from the old two-element split) ═══════════ */
 
-/* Scrolling container */
+/* Scrolling container.
+   NOTE: do NOT add `transform:translateZ(0)` / `-webkit-transform:translateZ(0)` /
+   `-webkit-overflow-scrolling:touch` here. Those create a compositing layer that,
+   combined with horizontally-scrollable content + position:sticky children,
+   triggers a documented iOS Safari bug where the sticky cells vanish after the
+   page is vertically scrolled. `will-change:scroll-position` is safe. */
 .col.main .sectors-card .tbl-wrap{
-  overflow-x:auto;-webkit-overflow-scrolling:touch;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:auto;  /* explicit override of the cascaded 'touch' from generic .tbl-wrap rule */
   min-width:0;width:100%;
   border-top:1px solid var(--border);
   will-change:scroll-position;
-  -webkit-transform:translateZ(0);transform:translateZ(0);
 }
 
 /* The table itself. No direction override — inherits RTL from <html>,
@@ -901,7 +906,10 @@ section.compact{}
   box-sizing:border-box;
 }
 
-/* Sticky Sector column — FIRST cell, pinned to right edge (RTL) */
+/* Sticky Sector column — FIRST cell, pinned to right edge (RTL).
+   NOTE: do NOT add will-change:transform or backface-visibility:hidden here.
+   Combined with a composited parent they cause iOS Safari to drop the sticky cells
+   after the page is vertically scrolled. */
 .col.main .sectors-card .t thead th.sec-col,
 .col.main .sectors-card .t thead th:first-child{
   position:sticky;right:0;z-index:3;
@@ -910,7 +918,6 @@ section.compact{}
   text-align:right !important;
   background:rgba(0,0,0,.55) !important;  /* slightly darker so scrolled content doesn't bleed through */
   box-shadow:-1px 0 0 0 var(--border);
-  will-change:transform;backface-visibility:hidden;-webkit-backface-visibility:hidden;
 }
 .col.main .sectors-card .t tbody td.sec-cell{
   position:sticky;right:0;z-index:1;
@@ -922,7 +929,6 @@ section.compact{}
   background:#111816 !important;
   box-shadow:-1px 0 0 0 var(--border);
   white-space:nowrap !important;
-  will-change:transform;backface-visibility:hidden;-webkit-backface-visibility:hidden;
 }
 /* Symbol tag inside the sector cell — small mono chip, pushed to the left */
 .col.main .sectors-card .t tbody td.sec-cell .sym{
