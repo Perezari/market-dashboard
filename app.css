@@ -2569,7 +2569,10 @@ section.compact{}
   background:linear-gradient(180deg,#1a2320 0%,#121a18 100%) !important;
   border:1px solid var(--border2) !important;
   border-radius:12px !important;
-  overflow:hidden;
+  /* overflow:clip במקום hidden — hidden יוצר containing block ל-sticky children,
+     מה שגורם ל-iOS Safari "לאבד" את עמודת הסקטור בגלילה אנכית. clip חותך ויזואלית
+     ללא יצירת formatting context, ומשמר את התנהגות ה-sticky. (iOS 16+) */
+  overflow:clip;
   box-shadow:0 0 0 1px rgba(79,199,138,.04),0 6px 24px rgba(0,0,0,.4) !important;
   padding:0 !important;
 }
@@ -2630,6 +2633,9 @@ section.compact{}
   -webkit-overflow-scrolling:auto;  /* explicit override of the cascaded 'touch' from generic .tbl-wrap rule */
   min-width:0;width:100%;
   border-top:1px solid var(--border);
+  /* גיבוי ויזואלי לפינות התחתונות אם overflow:clip באב לא נתמך */
+  border-bottom-left-radius:11px;
+  border-bottom-right-radius:11px;
   will-change:scroll-position;
 }
 
