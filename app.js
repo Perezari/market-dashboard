@@ -5002,7 +5002,7 @@ function setMinScore(v, btn) {
 }
 function setView(v, btn) {
   displayState.view = v;
-  document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b === btn));
+  document.querySelectorAll('.chip[data-view]').forEach(b => b.classList.toggle('active', b === btn));
   renderTable();
 }
 function sortBy(key) {
