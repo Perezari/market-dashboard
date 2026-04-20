@@ -2569,12 +2569,18 @@ section.compact{}
   background:linear-gradient(180deg,#1a2320 0%,#121a18 100%) !important;
   border:1px solid var(--border2) !important;
   border-radius:12px !important;
-  /* overflow:clip במקום hidden — hidden יוצר containing block ל-sticky children,
-     מה שגורם ל-iOS Safari "לאבד" את עמודת הסקטור בגלילה אנכית. clip חותך ויזואלית
-     ללא יצירת formatting context, ומשמר את התנהגות ה-sticky. (iOS 16+) */
-  overflow:clip;
+  /* ⚠️ חשוב: אין overflow כאן. overflow:hidden/clip על אב של sticky יוצר
+     containing block שמגרום ל-iOS Safari לאבד את עמודת הסקטור בגלילה אנכית.
+     במקום זה — סומכים על border-radius של הרכיבים הפנימיים (card-hdr למעלה,
+     tbl-wrap עם overflow-x:auto למטה) כדי לחתוך ויזואלית. */
   box-shadow:0 0 0 1px rgba(79,199,138,.04),0 6px 24px rgba(0,0,0,.4) !important;
   padding:0 !important;
+}
+/* פינות עגולות עליונות ל-card-hdr ופינות עגולות תחתונות ל-tbl-wrap
+   מחליפות את ה-overflow:hidden שהסרנו מהאב */
+.col.main .sectors-card .card-hdr{
+  border-top-left-radius:11px;
+  border-top-right-radius:11px;
 }
 .col.main .sectors-card .card-hdr{
   display:flex;align-items:center;justify-content:space-between;
@@ -2647,6 +2653,10 @@ section.compact{}
   width:100%;border-collapse:separate;border-spacing:0;
   font-size:11px;
   min-width:670px;  /* 11 data columns + sector column */
+  /* isolation:isolate יוצר stacking context מקומי ברמת הטבלה.
+     זה "מקבע" את תאי ה-sticky לטבלה עצמה, כך ש-iOS לא מאבד אותם
+     כש-compositing layers של אבות זזים בגלילה אנכית. */
+  isolation:isolate;
 }
 
 /* Header cells */
