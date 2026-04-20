@@ -6096,6 +6096,13 @@ function toggleCdd(id) {
   if (!wasOpen) {
     el.classList.add('open');
     positionCddPanel(el);
+    // On mobile, auto-close on scroll. Two reasons:
+    //   (1) The panel uses position:fixed with JS-computed top, so scrolling
+    //       the page leaves it "floating" detached from its trigger field.
+    //   (2) iOS Safari captures touch on scrollable fixed panels — if the user
+    //       scrolls while the dropdown is open, scroll can get stuck on the
+    //       hidden panel after close. Closing on first scroll frees the capture.
+    if (window.innerWidth <= 600) attachScrollToCloseCdd();
   }
 }
 function positionCddPanel(cdd) {
@@ -6123,6 +6130,22 @@ function positionCddPanel(cdd) {
 }
 function closeAllCdd() {
   document.querySelectorAll('.cdd.open').forEach(e => e.classList.remove('open'));
+  detachScrollToCloseCdd();
+}
+
+// Scroll-to-close handlers (bound only while a dropdown is open on mobile)
+let _cddScrollHandler = null;
+function attachScrollToCloseCdd() {
+  if (_cddScrollHandler) return;
+  _cddScrollHandler = () => { closeAllCdd(); };
+  // Capture phase + passive so we catch scrolls on any nested scroll container
+  // (body, #view-advisor, table wrappers) without blocking the scroll itself.
+  document.addEventListener('scroll', _cddScrollHandler, { passive: true, capture: true });
+}
+function detachScrollToCloseCdd() {
+  if (!_cddScrollHandler) return;
+  document.removeEventListener('scroll', _cddScrollHandler, { capture: true });
+  _cddScrollHandler = null;
 }
 // Outside-click + ESC close (attached once; guarded against re-attach)
 if (!window.__cddGlobalBound) {
