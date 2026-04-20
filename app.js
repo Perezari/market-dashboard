@@ -802,11 +802,11 @@ async function runScreener() {
 
 function renderSectorsWithSkeleton(){
   const sk='<td class="lc">&nbsp;</td>';
-  // 11 תאי skeleton למספרים + תא sec-cell עם שם הסקטור (ב-HTML SECTOR הוא הטור האחרון; sticky right:0 ב-LTR מצמיד אותו לימין המסך)
+  // תא sec-cell ראשון (sticky right, צמוד לצד ימין), אחריו 11 תאי skeleton למספרים
   const mainRows = SECTORS.map(s =>
-    `<tr data-sym="${s.sym}" onclick="openSectorModal('${s.sym}','${s.name}')" style="cursor:pointer">${sk.repeat(11)}<td class="sec-cell">${s.name} <span class="sym">${s.sym}</span></td></tr>`
+    `<tr data-sym="${s.sym}" onclick="openSectorModal('${s.sym}','${s.name}')" style="cursor:pointer"><td class="sec-cell">${s.name} <span class="sym">${s.sym}</span></td>${sk.repeat(11)}</tr>`
   );
-  mainRows.push(`<tr class="avgrow">${sk.repeat(11)}<td class="sec-cell">ממוצע סקטורים</td></tr>`);
+  mainRows.push(`<tr class="avgrow"><td class="sec-cell">ממוצע סקטורים</td>${sk.repeat(11)}</tr>`);
   $('sector-tbody').innerHTML = mainRows.join('');
 }
 
@@ -816,10 +816,8 @@ function _doSyncFrozenRows() {}
 function initSyncObserver() {}
 
 function renderSectors(){
-  // direction:ltr על הטבלה ב-CSS. כדי שויזואלית (LTR = משמאל לימין) נראה:
-  //   AVG | MACRO | VOL | 52W LOW | 52W HIGH | 1Y | 6M | 3M | 1M | 1W | 1D | SECTOR(sticky)
-  // סדר התאים ב-HTML חייב להיות הפוך מהסדר הלוגי של המקור: AVG ראשון, ואז MACRO, VOL, 52W, ..., 1D, sec-cell אחרון.
-  // לתא ה-1D מוספת class="c-d1" כדי שקוד ה-sync של ה-heatmap יוכל לאתר אותו ללא תלות במיקום.
+  // מבנה טבלה יחיד: כל השורות בתוך <tr> אחד — לא עוד div חיצוני נפרד לעמודת סקטור.
+  // תא ה-sec-cell הוא התא הראשון (position:sticky;right:0 ב-CSS) ולכן נצמד לצד ימין תמיד, מיושר עם שאר התאים באותה שורה.
   const mainRows = SECTORS.map(s=>{
     const d=qmap[s.sym]||{};
     const h=histMap[s.sym]||{};
@@ -837,11 +835,10 @@ function renderSectors(){
       volTd = `<td class="${vc}" title="${(vr*100).toFixed(0)}% מהממוצע">${vi} ${(vr*100).toFixed(0)}%</td>`;
     }
     return`<tr data-sym="${s.sym}" onclick="openSectorModal('${s.sym}','${s.name}')" title="לחץ לראות אחזקות" style="cursor:pointer">
-      <td class="${cellCls(a)}">${pct(a)}</td>
-      ${getSectorMacroTd(s.sym)}
-      ${volTd}${loTd}${hiTd}
-      ${td(h.y1)}${td(h.m6)}${td(h.m3)}${td(h.m1)}${td(h.w1)}${td(d.d1,'c-d1')}
       <td class="sec-cell">${s.name} <span class="sym">${s.sym}</span></td>
+      ${td(d.d1)}${td(h.w1)}${td(h.m1)}${td(h.m3)}${td(h.m6)}${td(h.y1)}${hiTd}${loTd}${volTd}
+      ${getSectorMacroTd(s.sym)}
+      <td class="${cellCls(a)}">${pct(a)}</td>
     </tr>`;
   });
   const periodAvgs=[0,1,2,3,4,5].map(pi=>avg(SECTORS.map(s=>{
@@ -849,12 +846,10 @@ function renderSectors(){
     return[d.d1,h.w1,h.m1,h.m3,h.m6,h.y1][pi];
   })));
   const ov=avg(periodAvgs);
-  // avgrow באותו סדר: AVG הכולל → 4 תאים ריקים (MACRO/VOL/52W LOW/52W HIGH) → ממוצעי 1Y/6M/3M/1M/1W/1D → sec-cell
   mainRows.push(`<tr class="avgrow">
-    <td class="${cellCls(ov)}"><b>${pct(ov)}</b></td>
-    <td></td><td></td><td></td><td></td>
-    ${[periodAvgs[5],periodAvgs[4],periodAvgs[3],periodAvgs[2],periodAvgs[1],periodAvgs[0]].map(v=>`<td class="${cellCls(v)}">${pct(v)}</td>`).join('')}
     <td class="sec-cell">ממוצע סקטורים</td>
+    ${periodAvgs.map((v)=>`<td class="${cellCls(v)}">${pct(v)}</td>`).join('')}<td></td><td></td><td></td><td></td>
+    <td class="${cellCls(ov)}"><b>${pct(ov)}</b></td>
   </tr>`);
   $('sector-tbody').innerHTML=mainRows.join('');
 }
