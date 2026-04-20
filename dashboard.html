@@ -873,6 +873,15 @@ section.compact{}
   font-family:var(--sans) !important;font-size:11px !important;font-weight:500 !important;
   color:var(--text) !important;
 }
+/* iOS Safari sticky fix — trigger compositor layer */
+.col.main .sectors-card .t th.stky,
+.col.main .sectors-card .t td.stky{
+  position:-webkit-sticky !important;
+  position:sticky !important;
+  will-change:transform;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+}
 .col.main .sectors-card .t tbody tr:hover td.stky{background:#16201d !important}
 .col.main .sectors-card .t tbody tr.avgrow td.stky{
   background:#0f2520 !important;
@@ -1652,38 +1661,6 @@ section.compact{}
     <!-- ══════ LEFT SIDEBAR ══════ -->
     <aside class="col">
 
-      <!-- Sector Heatmap (custom, synced from sector-tbody) -->
-      <section class="compact">
-        <div class="sec-label">
-          <div class="sec-meta">% · 1D</div>
-          <div class="sec-title">Sector Heatmap</div>
-        </div>
-        <div class="heat-grid" id="sb-heatmap">
-          <div class="heat-cell neu" data-sector-slot="XLK"><span class="heat-sym">TECH</span><span class="heat-pct">–</span></div>
-          <div class="heat-cell neu" data-sector-slot="XLC"><span class="heat-sym">COMM</span><span class="heat-pct">–</span></div>
-          <div class="heat-cell neu" data-sector-slot="XLP"><span class="heat-sym">CONS</span><span class="heat-pct">–</span></div>
-          <div class="heat-cell neu" data-sector-slot="XLV"><span class="heat-sym">HEAL</span><span class="heat-pct">–</span></div>
-          <div class="heat-cell neu" data-sector-slot="XLF"><span class="heat-sym">FIN</span><span class="heat-pct">–</span></div>
-          <div class="heat-cell neu" data-sector-slot="XLI"><span class="heat-sym">INDU</span><span class="heat-pct">–</span></div>
-          <div class="heat-cell neu" data-sector-slot="XLRE"><span class="heat-sym">REAL</span><span class="heat-pct">–</span></div>
-          <div class="heat-cell neu" data-sector-slot="XLE"><span class="heat-sym">ENER</span><span class="heat-pct">–</span></div>
-        </div>
-      </section>
-
-      <!-- Top Movers (app.js #movers-grid) -->
-      <section class="compact econ-section" id="movers-section">
-        <div class="sec-label">
-          <div class="sec-meta">S&amp;P 500</div>
-          <div class="sec-title">Top Movers</div>
-        </div>
-        <div class="movers-grid" id="movers-grid">
-          <div style="text-align:center;color:var(--dim);font-size:11px;padding:12px">
-            <div class="mini-ring" style="margin:0 auto 8px"></div>
-            סורק...
-          </div>
-        </div>
-      </section>
-
       <!-- Next Events (app.js #econ-wrap) -->
       <section class="compact econ-section">
         <div class="sec-label">
@@ -1797,6 +1774,38 @@ section.compact{}
     <!-- ══════ RIGHT SIDEBAR ══════ -->
     <aside class="col">
 
+      <!-- Sector Heatmap (custom, synced from sector-tbody) -->
+      <section class="compact">
+        <div class="sec-label">
+          <div class="sec-meta">% · 1D</div>
+          <div class="sec-title">Sector Heatmap</div>
+        </div>
+        <div class="heat-grid" id="sb-heatmap">
+          <div class="heat-cell neu" data-sector-slot="XLK"><span class="heat-sym">TECH</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLC"><span class="heat-sym">COMM</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLP"><span class="heat-sym">CONS</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLV"><span class="heat-sym">HEAL</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLF"><span class="heat-sym">FIN</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLI"><span class="heat-sym">INDU</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLRE"><span class="heat-sym">REAL</span><span class="heat-pct">–</span></div>
+          <div class="heat-cell neu" data-sector-slot="XLE"><span class="heat-sym">ENER</span><span class="heat-pct">–</span></div>
+        </div>
+      </section>
+	  
+	  <!-- Top Movers (app.js #movers-grid) -->
+      <section class="compact econ-section" id="movers-section">
+        <div class="sec-label">
+          <div class="sec-meta">S&amp;P 500</div>
+          <div class="sec-title">Top Movers</div>
+        </div>
+        <div class="movers-grid" id="movers-grid">
+          <div style="text-align:center;color:var(--dim);font-size:11px;padding:12px">
+            <div class="mini-ring" style="margin:0 auto 8px"></div>
+            סורק...
+          </div>
+        </div>
+      </section>
+
       <!-- US Indices (app.js #idx-main + #idx-other) -->
       <section class="compact">
         <div class="sec-label">
@@ -1882,7 +1891,7 @@ section.compact{}
       </section>
 
       <!-- Daily Chart -->
-      <section class="compact chart-box">
+      <section class="compact chart-box" style="display:none">
         <div class="card-hdr"><div class="section-label">Daily Chart</div></div>
         <canvas id="chart" width="266" height="200"></canvas>
       </section>
