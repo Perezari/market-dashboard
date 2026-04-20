@@ -3926,7 +3926,7 @@ td.pct.flat{color:var(--dim)}
   display:inline-block;padding:1px 5px;border-radius:3px;
   font-family:var(--mono);font-size:9px;font-weight:800;
   text-transform:uppercase;letter-spacing:.8px;
-  margin-left:4px;vertical-align:middle;
+  margin-inline-start:4px;vertical-align:middle;
 }
 .bdg-star{background:var(--green-soft);color:var(--green);border:1px solid var(--green-dim)}
 .bdg-wl{background:var(--amber-soft);color:var(--amber);border:1px solid rgba(240,181,106,.3)}
@@ -4927,3 +4927,35 @@ body.light #view-macro table td {
   color: var(--text);
   border-color: var(--border) !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ADVISOR · PICKS TABLE — stable column widths + header/cell alignment
+   Fixes:
+     1. column-widths jumping when filter buttons (הכל / Top 20 / WL) change
+     2. headers not sitting directly above their data (ציון, פקטורים)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Fixed layout locks column widths regardless of row content.
+   Inline widths on th:nth-child(1) = 34px and th:nth-child(10) = 20px still apply. */
+table.picks{table-layout:fixed}
+
+/* Explicit widths for the remaining columns.
+   th:nth-child(2) (מניה) stays auto → flexes to fill leftover space. */
+table.picks th:nth-child(3){width:110px}   /* סקטור    */
+table.picks th:nth-child(4){width:72px}    /* ציון     */
+table.picks th:nth-child(5){width:72px}    /* פקטורים  */
+table.picks th:nth-child(6){width:88px}    /* מחיר     */
+table.picks th:nth-child(7){width:76px}    /* 1Y       */
+table.picks th:nth-child(8){width:76px}    /* 3M       */
+table.picks th:nth-child(9){width:82px}    /* מ-52שי   */
+
+/* Center the ציון (badge) and פקטורים (mini-bars) columns so the
+   header caption lines up directly above the visual element. */
+table.picks thead th:nth-child(4),
+table.picks tbody td:nth-child(4),
+table.picks thead th:nth-child(5),
+table.picks tbody td:nth-child(5){text-align:center}
+
+/* Ellipsis for name/sector when the content is long and the column is now fixed. */
+table.picks tbody td.sym,
+table.picks tbody td.sec{overflow:hidden;text-overflow:ellipsis}
