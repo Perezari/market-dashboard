@@ -857,49 +857,29 @@ section.compact{}
   width:10px;height:10px;border-radius:50%;background:#28c941;
   box-shadow:-16px 0 0 #febc2e,-32px 0 0 #ff5f57;z-index:3;
 }
+/* ═══════════ SECTOR PERFORMANCE: single <table> with sticky Sector column
+   (identical pattern to .corr-table — eliminates row-height mismatch and
+   avgrow layout issues that came from the old two-element split) ═══════════ */
+
+/* Scrolling container */
 .col.main .sectors-card .tbl-wrap{
-  overflow-x:auto;-webkit-overflow-scrolling:touch;position:relative;
-  /* iOS Safari sticky fix — אותו pattern כמו .corr-wrap שעובד */
+  overflow-x:auto;-webkit-overflow-scrolling:touch;
+  min-width:0;width:100%;
+  border-top:1px solid var(--border);
   will-change:scroll-position;
-  transform:translateZ(0);-webkit-transform:translateZ(0);
+  -webkit-transform:translateZ(0);transform:translateZ(0);
 }
+
+/* The table itself. direction:ltr keeps period order 1D→AVG left→right
+   as in the original design; SECTOR is the LAST <th>/<td> so sticky right:0
+   pins it to the visual right edge (the Hebrew reading anchor). */
 .col.main .sectors-card .t{
   width:100%;border-collapse:separate;border-spacing:0;
-  font-size:11px;direction:rtl;min-width:620px;
+  font-size:11px;direction:ltr;
+  min-width:670px;  /* 11 data columns + sector column */
 }
-/* ── Sticky sector column (נצמד לקצה הימני, חלק מאותה <table>) ── */
-.col.main .sectors-card .t .stky{
-  position:-webkit-sticky !important;
-  position:sticky !important;right:0 !important;z-index:2 !important;
-  min-width:150px !important;max-width:150px !important;
-  padding:0 14px 0 10px !important;
-  border-left:1px solid var(--border) !important;
-  text-align:right !important;direction:rtl !important;
-  /* iOS Safari sticky fix — זה מה שעושה את ההבדל ב-.corr-table */
-  will-change:transform;
-  backface-visibility:hidden;
-  -webkit-backface-visibility:hidden;
-}
-.col.main .sectors-card .t thead th.stky{
-  background:rgba(0,0,0,.45) !important;z-index:3 !important;
-  color:var(--dim) !important;
-}
-.col.main .sectors-card .t tbody td.stky{
-  background:#111816 !important;
-  font-family:var(--sans) !important;font-size:11px !important;font-weight:500 !important;
-  color:var(--text) !important;
-}
-.col.main .sectors-card .t tbody tr:hover td.stky{background:#16201d !important}
-.col.main .sectors-card .t tbody tr.avgrow td.stky{
-  background:#0f2520 !important;
-  border-top:1px solid var(--green-dim) !important;
-  font-weight:800 !important;
-}
-.col.main .sectors-card .t tbody td.stky .sym{
-  font-family:var(--mono) !important;font-size:9px !important;
-  color:var(--dim) !important;letter-spacing:1px !important;
-  float:left;
-}
+
+/* Header cells */
 .col.main .sectors-card .t thead th{
   height:36px !important;padding:0 8px !important;
   background:rgba(0,0,0,.35) !important;
@@ -907,20 +887,68 @@ section.compact{}
   color:var(--dim) !important;letter-spacing:1.2px !important;text-transform:uppercase !important;
   text-align:center !important;white-space:nowrap;
   border-bottom:1px solid var(--border) !important;
+  box-sizing:border-box;
 }
+
+/* Body cells */
 .col.main .sectors-card .t tbody td{
   padding:0 8px !important;height:34px !important;line-height:34px !important;
   font-family:var(--mono) !important;font-size:11px !important;font-weight:700 !important;
   text-align:center !important;white-space:nowrap !important;
   border-bottom:1px solid var(--border) !important;color:var(--text) !important;
   transition:background .12s !important;
+  box-sizing:border-box;
 }
+
+/* Sticky Sector column — LAST cell, pinned to right edge */
+.col.main .sectors-card .t thead th.sec-col,
+.col.main .sectors-card .t thead th:last-child{
+  position:sticky;right:0;z-index:3;
+  width:150px;min-width:150px;
+  padding:0 12px !important;
+  text-align:right !important;
+  background:rgba(0,0,0,.55) !important;  /* slightly darker so scrolled content doesn't bleed through */
+  box-shadow:-1px 0 0 0 var(--border);
+  will-change:transform;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+}
+.col.main .sectors-card .t tbody td.sec-cell{
+  position:sticky;right:0;z-index:1;
+  width:150px;min-width:150px;
+  padding:0 12px !important;
+  text-align:right !important;
+  font-family:var(--sans) !important;font-size:11px !important;font-weight:500 !important;
+  color:var(--text) !important;
+  background:#111816 !important;
+  box-shadow:-1px 0 0 0 var(--border);
+  white-space:nowrap !important;
+  will-change:transform;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+}
+/* Symbol tag inside the sector cell — small mono chip, pushed to the left */
+.col.main .sectors-card .t tbody td.sec-cell .sym{
+  font-family:var(--mono);font-size:9px;
+  color:var(--dim);letter-spacing:1px;
+  margin-left:6px;  /* gap between name (right) and symbol (left) in RTL cell */
+}
+
+/* Row hover */
 .col.main .sectors-card .t tbody tr{cursor:pointer}
 .col.main .sectors-card .t tbody tr:hover td{background:rgba(79,199,138,.05) !important}
+.col.main .sectors-card .t tbody tr:hover td.sec-cell{background:#192520 !important}
+
+/* Average row (last row) */
 .col.main .sectors-card .t tbody tr.avgrow td{
   background:rgba(79,199,138,.06) !important;
   border-top:1px solid var(--green-dim) !important;font-weight:800 !important;
 }
+.col.main .sectors-card .t tbody tr.avgrow td.sec-cell{
+  background:rgba(79,199,138,.08) !important;
+  cursor:default;
+  font-weight:800 !important;
+}
+.col.main .sectors-card .t tbody tr.avgrow{cursor:default}
+.col.main .sectors-card .t tbody tr:hover.avgrow td{background:rgba(79,199,138,.06) !important}
+.col.main .sectors-card .t tbody tr:hover.avgrow td.sec-cell{background:rgba(79,199,138,.08) !important}
+
 /* Cell color classes (app.js .p1/.p2/.p3/.n1/.n2/.n3) */
 .col.main .sectors-card .t tbody td.p3{background:rgba(79,199,138,.22) !important;color:#7dd9a9 !important}
 .col.main .sectors-card .t tbody td.p2{background:rgba(79,199,138,.14) !important;color:#6fd0a0 !important}
@@ -930,6 +958,17 @@ section.compact{}
 .col.main .sectors-card .t tbody td.n3{background:rgba(231,115,133,.22) !important;color:#f0a0ad !important}
 .col.main .sectors-card .t tbody td.hi52{background:rgba(79,199,138,.05) !important;color:#61c796 !important}
 .col.main .sectors-card .t tbody td.lo52{background:rgba(231,115,133,.05) !important;color:#eb8798 !important}
+
+/* Light-mode overrides for the new sticky Sector column */
+body.light .col.main .sectors-card .t thead th.sec-col,
+body.light .col.main .sectors-card .t thead th:last-child{
+  background:var(--bg) !important;
+}
+body.light .col.main .sectors-card .t tbody td.sec-cell{
+  background:#fff !important;color:var(--text) !important;
+}
+body.light .col.main .sectors-card .t tbody tr:hover td.sec-cell{background:var(--bg3) !important}
+body.light .col.main .sectors-card .t tbody tr.avgrow td.sec-cell{background:var(--bg3) !important}
 
 /* ═══════════ AI BRIEF ═══════════ */
 .col.main .ai-brief-section{margin:0 !important;padding:0 !important}
@@ -2033,7 +2072,7 @@ section.compact{}
         </div>
       </div>
 
-      <!-- Sector Performance Table -->
+      <!-- Sector Performance Table — single <table> with sticky Sector column (same pattern as Sector Correlation) -->
       <div class="sectors-card">
         <div class="card-hdr">
           <div class="section-label">Sector Performance</div>
@@ -2041,7 +2080,7 @@ section.compact{}
         <div class="tbl-wrap">
           <table class="t">
             <thead>
-              <tr><th class="stky">Sector</th><th>1D</th><th>1W</th><th>1M</th><th>3M</th><th>6M</th><th>1Y</th><th>52W HIGH</th><th>52W LOW</th><th>VOL</th><th>MACRO</th><th>AVG</th></tr>
+              <tr><th>1D</th><th>1W</th><th>1M</th><th>3M</th><th>6M</th><th>1Y</th><th>52W HIGH</th><th>52W LOW</th><th>VOL</th><th>MACRO</th><th>AVG</th><th class="sec-col">SECTOR</th></tr>
             </thead>
             <tbody id="sector-tbody"></tbody>
           </table>
@@ -2352,11 +2391,9 @@ window.showKey = function(){
     const rows = document.querySelectorAll('#sector-tbody tr:not(.avgrow)');
     if(!rows.length) return;
     rows.forEach(row => {
-      const stkyCell = row.querySelector('td.stky');
-      const symEl = stkyCell ? stkyCell.querySelector('.sym') : null;
-      if(!symEl) return;
-      const sym = symEl.textContent.trim();
-      if(!SECTOR_MAP[sym]) return;
+      // הסימבול קריא מ-data-sym attribute (עמודת הסקטור כבר לא חלק מה-tr הזה)
+      const sym = row.getAttribute('data-sym');
+      if(!sym || !SECTOR_MAP[sym]) return;
       const dayCell = row.querySelector('td');
       const pct = parsePct(dayCell ? dayCell.textContent : '');
       const cell = document.querySelector(`.heat-cell[data-sector-slot="${sym}"]`);
@@ -2370,7 +2407,9 @@ window.showKey = function(){
       if(pct > 0.05) cell.className = 'heat-cell up' + (strong?' strong':'');
       else if(pct < -0.05) cell.className = 'heat-cell down' + (strong?' strong':'');
       else cell.className = 'heat-cell neu';
-      const nameTxt = stkyCell.textContent.replace(sym, '').trim();
+      // שם הסקטור — קריא מתא ה-.sec-cell בתוך אותה שורה
+      const sectorCell = row.querySelector('td.sec-cell');
+      const nameTxt = sectorCell ? sectorCell.textContent.replace(sym,'').trim() : sym;
       cell.onclick = () => { if(window.openSectorModal) window.openSectorModal(sym, nameTxt); };
       cell.style.cursor = 'pointer';
     });
@@ -2394,11 +2433,8 @@ window.showKey = function(){
     const rows = document.querySelectorAll('#sector-tbody tr:not(.avgrow)');
     const out = [];
     rows.forEach(row => {
-      const stkyCell = row.querySelector('td.stky');
-      const symEl = stkyCell ? stkyCell.querySelector('.sym') : null;
-      if (!symEl) return;
-      const sym = symEl.textContent.trim();
-      if (!SECTOR_NAMES[sym]) return;
+      const sym = row.getAttribute('data-sym');
+      if (!sym || !SECTOR_NAMES[sym]) return;
       const td = row.querySelector('td');
       const m = td ? td.textContent.match(/-?\d+\.?\d*/) : null;
       if (!m) return;

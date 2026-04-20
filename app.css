@@ -321,15 +321,9 @@ body.light .z{background:#eef2f8;color:#8090a8}
 
 /* ── Sectors card wrapper ── */
 .sectors-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;overflow:hidden}
-.tbl-container{display:flex;border-radius:0;border:none;border-top:1px solid var(--border);overflow:hidden;width:100%;min-width:0;box-sizing:border-box}
-.tbl-frozen{flex-shrink:0;background:var(--bg2);border-left:1px solid var(--border2);z-index:2}
-.tbl-frozen-hdr{padding:6px 10px;font-size:9px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;background:var(--bg);border-bottom:1px solid var(--border);white-space:nowrap;height:31px;display:flex;align-items:center}
-.tbl-frozen-row{padding:4px 10px 4px 8px;font-family:var(--sans);font-size:12px;font-weight:600;white-space:nowrap;display:flex;align-items:center;border-bottom:1px solid var(--border);height:29px}
-.tbl-frozen-row .sym{font-family:var(--mono);font-size:10px;color:var(--dim);margin-left:6px}
-.tbl-frozen-avg{background:var(--bg4)!important;border-top:2px solid var(--border2)!important;font-weight:700!important}
-body.light .tbl-frozen{background:#fff}
-body.light .tbl-frozen-row{background:#fff}
-body.light .tbl-frozen-avg{background:var(--bg3)!important}
+/* NOTE: .tbl-container / .tbl-frozen / .tbl-frozen-hdr / .tbl-frozen-row / .tbl-frozen-avg
+   rules removed — replaced by the single-<table> sticky-last-column pattern in dashboard.html
+   (identical to .corr-table pattern). */
 .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;flex:1;min-width:0;will-change:scroll-position}
 table.t{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;min-width:520px}
 .t th{background:var(--bg);color:var(--dim);font-weight:600;padding:0 6px;height:22px;max-height:22px;line-height:22px;overflow:hidden;white-space:nowrap;border-bottom:1px solid var(--border);border-right:1px solid var(--border);font-size:9px;text-align:center;text-transform:uppercase;letter-spacing:.8px}

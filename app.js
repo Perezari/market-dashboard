@@ -802,13 +802,12 @@ async function runScreener() {
 
 function renderSectorsWithSkeleton(){
   const sk='<td class="lc">&nbsp;</td>';
-  const stky = s => `<td class="stky"><span class="sym">${s.sym}</span>${s.name}</td>`;
-  // 11 תאי data skeleton + עמודת סקטור דביקה בסוף כל שורה (סה"כ 12)
-  const rows = SECTORS.map(s =>
-    `<tr onclick="openSectorModal('${s.sym}','${s.name}')" style="cursor:pointer">${sk.repeat(11)}${stky(s)}</tr>`
+  // 11 תאי skeleton למספרים + תא sec-cell עם שם הסקטור שמופיע מיד (לפני שנתונים נטענים)
+  const mainRows = SECTORS.map(s =>
+    `<tr data-sym="${s.sym}" onclick="openSectorModal('${s.sym}','${s.name}')" style="cursor:pointer">${sk.repeat(11)}<td class="sec-cell">${s.name} <span class="sym">${s.sym}</span></td></tr>`
   );
-  rows.push(`<tr class="avgrow">${sk.repeat(11)}<td class="stky">ממוצע סקטורים</td></tr>`);
-  $('sector-tbody').innerHTML = rows.join('');
+  mainRows.push(`<tr class="avgrow">${sk.repeat(11)}<td class="sec-cell">ממוצע סקטורים</td></tr>`);
+  $('sector-tbody').innerHTML = mainRows.join('');
 }
 
 // ── פונקציות הסנכרון הישנות — מיותרות אחרי איחוד לטבלה יחידה, נשארות כ-no-op ──
@@ -817,8 +816,9 @@ function _doSyncFrozenRows() {}
 function initSyncObserver() {}
 
 function renderSectors(){
-  // טבלה יחידה — עמודת סקטור דביקה בסוף כל שורה (sticky right)
-  const rows=SECTORS.map(s=>{
+  // מבנה טבלה יחיד: כל השורות בתוך <tr> אחד — לא עוד div חיצוני נפרד לעמודת סקטור.
+  // תא ה-sec-cell הוא התא האחרון (position:sticky;right:0 ב-CSS) ולכן תמיד מיושר עם שאר התאים באותה שורה.
+  const mainRows = SECTORS.map(s=>{
     const d=qmap[s.sym]||{};
     const h=histMap[s.sym]||{};
     const vals=[d.d1,h.w1,h.m1,h.m3,h.m6,h.y1];
@@ -834,11 +834,11 @@ function renderSectors(){
       const vc = vr > 1.5 ? 'vol-high' : vr < 0.7 ? 'vol-low' : 'vol-norm';
       volTd = `<td class="${vc}" title="${(vr*100).toFixed(0)}% מהממוצע">${vi} ${(vr*100).toFixed(0)}%</td>`;
     }
-    return`<tr onclick="openSectorModal('${s.sym}','${s.name}')" title="לחץ לראות אחזקות" style="cursor:pointer">
+    return`<tr data-sym="${s.sym}" onclick="openSectorModal('${s.sym}','${s.name}')" title="לחץ לראות אחזקות" style="cursor:pointer">
       ${td(d.d1)}${td(h.w1)}${td(h.m1)}${td(h.m3)}${td(h.m6)}${td(h.y1)}${hiTd}${loTd}${volTd}
       ${getSectorMacroTd(s.sym)}
       <td class="${cellCls(a)}">${pct(a)}</td>
-      <td class="stky"><span class="sym">${s.sym}</span>${s.name}</td>
+      <td class="sec-cell">${s.name} <span class="sym">${s.sym}</span></td>
     </tr>`;
   });
   const periodAvgs=[0,1,2,3,4,5].map(pi=>avg(SECTORS.map(s=>{
@@ -846,12 +846,12 @@ function renderSectors(){
     return[d.d1,h.w1,h.m1,h.m3,h.m6,h.y1][pi];
   })));
   const ov=avg(periodAvgs);
-  rows.push(`<tr class="avgrow">
+  mainRows.push(`<tr class="avgrow">
     ${periodAvgs.map((v)=>`<td class="${cellCls(v)}">${pct(v)}</td>`).join('')}<td></td><td></td><td></td><td></td>
     <td class="${cellCls(ov)}"><b>${pct(ov)}</b></td>
-    <td class="stky">ממוצע סקטורים</td>
+    <td class="sec-cell">ממוצע סקטורים</td>
   </tr>`);
-  $('sector-tbody').innerHTML=rows.join('');
+  $('sector-tbody').innerHTML=mainRows.join('');
 }
 
 function renderSummary(){
