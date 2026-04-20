@@ -248,6 +248,15 @@ const MID_CAP_HOLDINGS = {
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 
+// Restore theme preference as early as possible so the rest of the script
+// (and the initial paint) sees the correct body.light class without a FOUC.
+(function restoreTheme(){
+  try {
+    if (localStorage.getItem('app_theme') === 'light') {
+      document.body.classList.add('light');
+    }
+  } catch(e){}
+})();
 
 let _proxyUrl = localStorage.getItem('app_proxy_url') || '';
 
@@ -1186,9 +1195,28 @@ function drawChart(){
 let isDark = !document.body.classList.contains('light');
 const moonSVG=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
 const sunSVG=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+
+// If theme was restored to light by the early IIFE, swap the hardcoded
+// sun-icons in the HTML to moon-icons so they match the current state.
+if (!isDark) {
+  const _tb = $('theme-btn');
+  if (_tb) _tb.innerHTML = moonSVG;
+  const _mb = $('mob-theme-icon');
+  if (_mb) {
+    const tmpl = document.createElement('template');
+    tmpl.innerHTML = moonSVG.trim();
+    const fresh = tmpl.content.firstChild;
+    if (fresh && fresh.tagName && fresh.tagName.toLowerCase() === 'svg') {
+      fresh.id = 'mob-theme-icon';
+      _mb.parentNode.replaceChild(fresh, _mb);
+    }
+  }
+}
+
 function toggleTheme(){
   isDark=!isDark;
   document.body.classList.toggle('light',!isDark);
+  try { localStorage.setItem('app_theme', isDark ? 'dark' : 'light'); } catch(e){}
   {
     const _tb = $('theme-btn');
     if (_tb) _tb.innerHTML = isDark ? sunSVG : moonSVG;
