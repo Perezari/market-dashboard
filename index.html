@@ -20,7 +20,7 @@
 
 <!-- Consolidated stylesheet -->
 <!-- Consolidated stylesheet (cache-bust via ?v= to force fresh load after rebuilds) -->
-<link rel="stylesheet" href="app.css?v=2026-04-20-dropdown-instant-close">
+<link rel="stylesheet" href="app.css?v=2026-04-20-pill-first-desktop">
 </head>
 <body>
 
@@ -655,10 +655,15 @@
   <!-- CONTROLS -->
   <div class="controls-bar">
     <div class="ctl-group">
-      <span class="ctl-label">קטגוריה</span>
-      <button class="chip" data-universe="large" onclick="setUniverse('large', this)">S&amp;P 500</button>
-      <button class="chip" data-universe="mid" onclick="setUniverse('mid', this)">S&amp;P MidCap 400</button>
       <span class="univ-ind univ-ind-local" id="universe-indicator" title="רשימה מובנית באפליקציה">מקומי</span>
+      <span class="ctl-label">קטגוריה</span>
+      <div class="cdd cdd-simple" id="cdd-universe">
+        <button class="cdd-trigger" type="button" onclick="toggleCdd('universe')">
+          <span class="cdd-current" id="cdd-universe-current">S&amp;P 500</span>
+          <svg class="cdd-chevron" viewBox="0 0 12 8" fill="none"><path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="cdd-panel" id="cdd-universe-panel"></div>
+      </div>
     </div>
     <div class="ctl-group">
       <span class="ctl-label">מודל</span>
@@ -876,7 +881,7 @@
 
 <!-- Consolidated script -->
 <!-- Consolidated script (cache-bust via ?v=) -->
-<script src="app.js?v=2026-04-20-dropdown-instant-close"></script>
+<script src="app.js?v=2026-04-20-pill-first-desktop"></script>
 
 </body>
 </html>

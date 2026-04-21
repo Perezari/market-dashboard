@@ -429,6 +429,71 @@ const MID_CAP_HOLDINGS = {
   ],
 };
 
+/* ──────────── NASDAQ-100 (QQQ) hardcoded floor ──────────────────────────────
+   Same shape as ETF_HOLDINGS — grouped by the 11 GICS sectors (XL* ETF codes)
+   so the scan + filter code works unchanged. NDX has ~100-101 constituents
+   (101 when counting GOOG+GOOGL dual-class), heavily weighted to tech and
+   comm services. Wikipedia overlay keeps this current at runtime. */
+const NASDAQ_100_HOLDINGS = {
+  XLK: [
+    {s:'AAPL',n:"Apple",w:0.3},{s:'MSFT',n:"Microsoft",w:0.3},{s:'NVDA',n:"Nvidia",w:0.3},
+    {s:'AVGO',n:"Broadcom",w:0.3},{s:'ADBE',n:"Adobe",w:0.3},{s:'CSCO',n:"Cisco",w:0.3},
+    {s:'AMD',n:"AMD",w:0.3},{s:'TXN',n:"Texas Instruments",w:0.3},{s:'QCOM',n:"Qualcomm",w:0.3},
+    {s:'INTU',n:"Intuit",w:0.3},{s:'AMAT',n:"Applied Materials",w:0.3},{s:'MU',n:"Micron",w:0.3},
+    {s:'PANW',n:"Palo Alto Networks",w:0.3},{s:'ADP',n:"ADP",w:0.3},{s:'ADI',n:"Analog Devices",w:0.3},
+    {s:'LRCX',n:"Lam Research",w:0.3},{s:'INTC',n:"Intel",w:0.3},{s:'KLAC',n:"KLA",w:0.3},
+    {s:'SNPS',n:"Synopsys",w:0.3},{s:'CDNS',n:"Cadence Design",w:0.3},
+    {s:'CRWD',n:"CrowdStrike",w:0.3},{s:'ASML',n:"ASML",w:0.3},{s:'NXPI',n:"NXP Semiconductors",w:0.3},
+    {s:'FTNT',n:"Fortinet",w:0.3},{s:'WDAY',n:"Workday",w:0.3},{s:'ROP',n:"Roper",w:0.3},
+    {s:'ADSK',n:"Autodesk",w:0.3},{s:'MRVL',n:"Marvell",w:0.3},{s:'PAYX',n:"Paychex",w:0.3},
+    {s:'CTSH',n:"Cognizant",w:0.3},{s:'TEAM',n:"Atlassian",w:0.3},{s:'ON',n:"ON Semiconductor",w:0.3},
+    {s:'CDW',n:"CDW",w:0.3},{s:'GFS',n:"GlobalFoundries",w:0.3},{s:'ANSS',n:"Ansys",w:0.3},
+    {s:'MCHP',n:"Microchip Technology",w:0.3},{s:'TTD',n:"Trade Desk",w:0.3},
+    {s:'MDB',n:"MongoDB",w:0.3},{s:'DDOG',n:"Datadog",w:0.3},{s:'ZS',n:"Zscaler",w:0.3},
+    {s:'ARM',n:"Arm Holdings",w:0.3},{s:'APP',n:"AppLovin",w:0.3},{s:'PLTR',n:"Palantir",w:0.3},
+    {s:'MSTR',n:"MicroStrategy",w:0.3},
+  ],
+  XLC: [
+    {s:'GOOGL',n:"Alphabet Class A",w:0.3},{s:'GOOG',n:"Alphabet Class C",w:0.3},
+    {s:'META',n:"Meta Platforms",w:0.3},{s:'NFLX',n:"Netflix",w:0.3},
+    {s:'TMUS',n:"T-Mobile US",w:0.3},{s:'CMCSA',n:"Comcast",w:0.3},
+    {s:'WBD',n:"Warner Bros. Discovery",w:0.3},{s:'EA',n:"Electronic Arts",w:0.3},
+  ],
+  XLY: [
+    {s:'AMZN',n:"Amazon",w:0.3},{s:'TSLA',n:"Tesla",w:0.3},{s:'BKNG',n:"Booking Holdings",w:0.3},
+    {s:'SBUX',n:"Starbucks",w:0.3},{s:'MELI',n:"MercadoLibre",w:0.3},{s:'ORLY',n:"O'Reilly Automotive",w:0.3},
+    {s:'ABNB',n:"Airbnb",w:0.3},{s:'MAR',n:"Marriott",w:0.3},{s:'ROST',n:"Ross Stores",w:0.3},
+    {s:'DLTR',n:"Dollar Tree",w:0.3},{s:'LULU',n:"Lululemon",w:0.3},{s:'PDD',n:"PDD Holdings",w:0.3},
+  ],
+  XLP: [
+    {s:'COST',n:"Costco",w:0.3},{s:'PEP',n:"PepsiCo",w:0.3},{s:'MDLZ',n:"Mondelez",w:0.3},
+    {s:'MNST',n:"Monster Beverage",w:0.3},{s:'KDP',n:"Keurig Dr Pepper",w:0.3},
+    {s:'KHC',n:"Kraft Heinz",w:0.3},
+  ],
+  XLV: [
+    {s:'ISRG',n:"Intuitive Surgical",w:0.3},{s:'AMGN',n:"Amgen",w:0.3},{s:'VRTX',n:"Vertex",w:0.3},
+    {s:'GILD',n:"Gilead Sciences",w:0.3},{s:'REGN',n:"Regeneron",w:0.3},{s:'AZN',n:"AstraZeneca",w:0.3},
+    {s:'BIIB',n:"Biogen",w:0.3},{s:'DXCM',n:"Dexcom",w:0.3},{s:'IDXX',n:"IDEXX Laboratories",w:0.3},
+    {s:'GEHC',n:"GE HealthCare",w:0.3},
+  ],
+  XLI: [
+    {s:'HON',n:"Honeywell",w:0.3},{s:'CTAS',n:"Cintas",w:0.3},{s:'CSX',n:"CSX",w:0.3},
+    {s:'PCAR',n:"PACCAR",w:0.3},{s:'FAST',n:"Fastenal",w:0.3},{s:'VRSK',n:"Verisk Analytics",w:0.3},
+    {s:'ODFL',n:"Old Dominion Freight Line",w:0.3},{s:'CPRT',n:"Copart",w:0.3},
+    {s:'AXON',n:"Axon Enterprise",w:0.3},
+  ],
+  XLU: [
+    {s:'AEP',n:"American Electric Power",w:0.3},{s:'CEG',n:"Constellation Energy",w:0.3},
+    {s:'EXC',n:"Exelon",w:0.3},{s:'XEL',n:"Xcel Energy",w:0.3},
+  ],
+  XLE: [
+    {s:'FANG',n:"Diamondback Energy",w:0.3},{s:'BKR',n:"Baker Hughes",w:0.3},
+  ],
+  XLB: [
+    {s:'LIN',n:"Linde",w:0.3},
+  ],
+};
+
 
 
 /* ──────────── [2] CORE app.js ──────────── */
@@ -5035,8 +5100,9 @@ const getSubIndHe = (sym) => {
    at the currently-active holdings object and keep caches separate per universe.
    ════════════════════════════════════════════════════════════════════════════ */
 const UNIVERSES = {
-  large: { label:'S&P 500',         labelShort:'S&P 500',         holdings: ETF_HOLDINGS },
-  mid:   { label:'S&P MidCap 400',  labelShort:'S&P MidCap 400',  holdings: MID_CAP_HOLDINGS }
+  large: { label:'S&P 500',         labelShort:'S&P 500',         holdings: ETF_HOLDINGS        },
+  mid:   { label:'S&P MidCap 400',  labelShort:'S&P MidCap 400',  holdings: MID_CAP_HOLDINGS    },
+  ndx:   { label:'NASDAQ 100',      labelShort:'NASDAQ 100',      holdings: NASDAQ_100_HOLDINGS },
 };
 let currentUniverse = localStorage.getItem(UNIVERSE_KEY) || 'large';
 if (!UNIVERSES[currentUniverse]) currentUniverse = 'large';
@@ -5105,22 +5171,36 @@ rebuildSymMaps();
    The bundled data is the SAFETY NET. If Wikipedia breaks, the app still works.
    ════════════════════════════════════════════════════════════════════════════ */
 
-const UNIVERSE_CACHE_KEY = 'universe_wiki_cache_v1';
+const UNIVERSE_CACHE_KEY = 'universe_wiki_cache_v2';  // v2 = includes ndx
 const UNIVERSE_CACHE_TTL = 48 * 60 * 60 * 1000;    // 48 hours
 const UNIVERSE_FETCH_TIMEOUT = 12000;              // 12 seconds per page
 let lastUniverseUpdate = null;                     // timestamp; null = still on hardcoded
 let universeUpdateSource = 'hardcoded';            // 'hardcoded' | 'cache' | 'wikipedia'
+
+// NDX-only tickers — ADRs/foreign listings that aren't in SP500 or SP400 but
+// are in NASDAQ-100. Without these, clicking into these stocks wouldn't show
+// a sub-industry pill. These enter SYM_SUBIND BEFORE the BASE snapshot.
+Object.assign(SYM_SUBIND, {
+  ASML:'semi', AZN:'pharm', ARM:'semi', MELI:'bret',
+  PDD:'bret', GFS:'semi', MSTR:'itsvc',
+});
 
 // Snapshot of the hardcoded SYM_SUBIND taken at boot — acts as the floor for
 // tickers Wikipedia might not classify (new sub-industries we don't recognize).
 const BASE_SYM_SUBIND = { ...SYM_SUBIND };
 
 // GICS sector → ETF bucket. Stable (11 sectors, changes ~once per decade).
+// Includes ICB synonyms for the three sectors Nasdaq-100 names differently:
+// Technology / Telecommunications / Basic Materials. All other ICB industry
+// names (Consumer Discretionary, Health Care, etc.) happen to match GICS.
 const GICS_TO_ETF = {
+  // GICS names (S&P 500 and S&P 400 pages)
   'Information Technology':'XLK', 'Financials':'XLF', 'Health Care':'XLV',
   'Consumer Discretionary':'XLY', 'Consumer Staples':'XLP', 'Industrials':'XLI',
   'Energy':'XLE', 'Materials':'XLB', 'Utilities':'XLU', 'Real Estate':'XLRE',
   'Communication Services':'XLC',
+  // ICB names (Nasdaq-100 page only uses the three divergent ones)
+  'Technology':'XLK', 'Telecommunications':'XLC', 'Basic Materials':'XLB',
 };
 
 // GICS sub-industry → our shortcode (matches SI_LABELS keys).
@@ -5238,10 +5318,14 @@ async function fetchWikipediaUniverse(pageName) {
     );
     if (!headerRow) continue;
     const headers = [...headerRow.querySelectorAll('th')].map(th => th.textContent.trim());
-    const iSym     = headers.findIndex(h => /^Symbol$/i.test(h));
-    const iSec     = headers.findIndex(h => /^Security/i.test(h));
-    const iSector  = headers.findIndex(h => /GICS.*Sector/i.test(h));
-    const iSubInd  = headers.findIndex(h => /GICS.*Sub.?Industry/i.test(h));
+    // Header regex is UNION of S&P and Nasdaq conventions:
+    //   - S&P pages use: Symbol, Security, GICS Sector, GICS Sub-Industry
+    //   - Nasdaq-100 page uses: Ticker, Company, ICB Industry, ICB Subsector
+    // Matching on either keeps the parser useful for both — no branching by URL.
+    const iSym     = headers.findIndex(h => /^(?:Symbol|Ticker)$/i.test(h));
+    const iSec     = headers.findIndex(h => /^(?:Security|Company)/i.test(h));
+    const iSector  = headers.findIndex(h => /(?:GICS|ICB).*(?:Sector|Industry)/i.test(h));
+    const iSubInd  = headers.findIndex(h => /(?:GICS|ICB).*(?:Sub.?Industry|Subsector)/i.test(h));
     if (iSym < 0 || iSector < 0) continue;   // not the constituent table
 
     for (const tr of table.querySelectorAll('tr')) {
@@ -5293,9 +5377,14 @@ function isValidUniverse(u, min, max) {
 function applyUniversePayload(payload) {
   UNIVERSES.large.holdings = payload.sp500.holdings;
   UNIVERSES.mid.holdings   = payload.sp400.holdings;
+  // NDX is optional — if the parser fails for Nasdaq-100 specifically, we
+  // keep the hardcoded floor rather than blocking the whole refresh.
+  if (payload.ndx) UNIVERSES.ndx.holdings = payload.ndx.holdings;
   // SYM_SUBIND: start from the hardcoded floor, overlay wiki data on top.
   Object.keys(SYM_SUBIND).forEach(k => delete SYM_SUBIND[k]);
-  Object.assign(SYM_SUBIND, BASE_SYM_SUBIND, payload.sp500.symSubind, payload.sp400.symSubind);
+  Object.assign(SYM_SUBIND, BASE_SYM_SUBIND,
+    payload.sp500.symSubind, payload.sp400.symSubind,
+    payload.ndx?.symSubind || {});
   rebuildSymMaps();
   lastUniverseUpdate = payload.fetchedAt;
   universeUpdateSource = payload.source || 'wikipedia';
@@ -5308,10 +5397,16 @@ function applyUniversePayload(payload) {
  * data is currently in memory.
  */
 async function refreshUniversesFromWikipedia() {
-  // 1. Try valid cache first
+  // 1. Try valid cache first. Cache is "valid" only if it's fresh AND complete
+  // (all three universes present). An incomplete cache — e.g., saved when the
+  // NDX parser was broken and ndx was missing — is treated as stale so a fresh
+  // fetch gets a chance to fill it in. Self-heals without needing a cache-key
+  // bump whenever we add a universe.
   try {
     const cached = JSON.parse(localStorage.getItem(UNIVERSE_CACHE_KEY));
-    if (cached && Date.now() - cached.fetchedAt < UNIVERSE_CACHE_TTL) {
+    const fresh = cached && Date.now() - cached.fetchedAt < UNIVERSE_CACHE_TTL;
+    const complete = cached && cached.sp500 && cached.sp400 && cached.ndx;
+    if (fresh && complete) {
       applyUniversePayload({ ...cached, source: 'cache' });
       return { source: 'cache' };
     }
@@ -5324,12 +5419,14 @@ async function refreshUniversesFromWikipedia() {
   } catch(e){}
 
   try {
-    const [sp500rows, sp400rows] = await Promise.all([
+    const [sp500rows, sp400rows, ndxrows] = await Promise.all([
       fetchWikipediaUniverse('List_of_S%26P_500_companies'),
       fetchWikipediaUniverse('List_of_S%26P_400_companies'),
+      fetchWikipediaUniverse('Nasdaq-100').catch(() => []),
     ]);
     const sp500 = buildUniverseFromWikiRows(sp500rows);
     const sp400 = buildUniverseFromWikiRows(sp400rows);
+    const ndx   = buildUniverseFromWikiRows(ndxrows);
 
     if (!isValidUniverse(sp500, 450, 520)) {
       throw new Error(`SP500 validation failed (got ${sp500.count})`);
@@ -5347,11 +5444,20 @@ async function refreshUniversesFromWikipedia() {
     }
     sp400.count = Object.values(sp400.holdings).reduce((a, arr) => a + arr.length, 0);
 
+    // NDX: validate if parsed. If it looks reasonable (90-110 names, spans
+    // at least 4 GICS sectors since NDX is tech-heavy) include it, otherwise
+    // leave out and log a warning — hardcoded floor stays in force for NDX only.
+    const ndxValid = ndx.count >= 90 && ndx.count <= 110 && Object.keys(ndx.holdings).length >= 4;
+    if (!ndxValid) {
+      console.warn(`NDX validation failed (got ${ndx.count}), keeping hardcoded floor for NDX`);
+    }
+
     const payload = { sp500, sp400, fetchedAt: Date.now() };
+    if (ndxValid) payload.ndx = ndx;
     try { localStorage.setItem(UNIVERSE_CACHE_KEY, JSON.stringify(payload)); } catch(e){}
     applyUniversePayload({ ...payload, source: 'wikipedia' });
-    console.info(`universe refreshed from Wikipedia: ${sp500.count} large + ${sp400.count} mid`);
-    return { source: 'wikipedia', sp500: sp500.count, sp400: sp400.count };
+    console.info(`universe refreshed: ${sp500.count} large + ${sp400.count} mid${ndxValid ? ` + ${ndx.count} ndx` : ''}`);
+    return { source: 'wikipedia', sp500: sp500.count, sp400: sp400.count, ndx: ndxValid ? ndx.count : null };
 
   } catch(e) {
     console.warn('universe Wikipedia fetch failed, keeping current data:', e.message);
@@ -5409,7 +5515,8 @@ function advisorBoot() {
   // Validate saved methodology against the live METHODOLOGIES dictionary
   // (we couldn't do this at the `let currentMethodology = ...` site because of TDZ)
   if (!METHODOLOGIES[currentMethodology]) currentMethodology = 'momentum';
-  // Build custom dropdowns (sector + methodology) and reflect current state
+  // Build custom dropdowns (universe + sector + methodology) and reflect current state
+  populateUniverseDropdown();
   populateSectorDropdown();
   populateMethodologyDropdown();
   syncUniverseUI();
@@ -5422,10 +5529,35 @@ function advisorBoot() {
 } // advisorBoot end
 
 // Reflect currentUniverse in the universe chip group and the KPI subtitle
-function syncUniverseUI() {
-  document.querySelectorAll('.chip[data-universe]').forEach(b => {
-    b.classList.toggle('active', b.dataset.universe === currentUniverse);
+/**
+ * Build the universe dropdown options from the UNIVERSES dict. Called once on
+ * boot. Adding a new universe anywhere (e.g., Russell 2000 later) just needs an
+ * entry in UNIVERSES — this function auto-discovers it.
+ */
+function populateUniverseDropdown() {
+  const panel = $('cdd-universe-panel');
+  if (!panel) return;
+  panel.innerHTML = '';
+  Object.entries(UNIVERSES).forEach(([key, u]) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cdd-option';
+    if (key === currentUniverse) btn.classList.add('active');
+    btn.dataset.value = key;
+    btn.innerHTML = `<div class="cdd-option-title">${u.label}</div>`;
+    btn.onclick = (e) => { e.stopPropagation(); setUniverse(key); };
+    panel.appendChild(btn);
   });
+}
+
+function syncUniverseUI() {
+  // Dropdown: update both the trigger label and the active option
+  const cur = $('cdd-universe-current');
+  if (cur) cur.textContent = UNIVERSES[currentUniverse].labelShort;
+  document.querySelectorAll('#cdd-universe-panel .cdd-option').forEach(b =>
+    b.classList.toggle('active', b.dataset.value === currentUniverse)
+  );
+  // KPI subtitle
   const lbl = $('kpi-universe-label');
   if (lbl) lbl.textContent = UNIVERSES[currentUniverse].labelShort;
 }
@@ -6303,8 +6435,8 @@ function syncMethodologyUI() {
  * Each universe has its own cache entry, so switching is instant if already scanned;
  * otherwise the user sees the welcome screen with a "Start scan" prompt.
  */
-function setUniverse(u, btn) {
-  if (!UNIVERSES[u] || u === currentUniverse) return;
+function setUniverse(u, _btn) {
+  if (!UNIVERSES[u] || u === currentUniverse) { closeAllCdd(); return; }
   currentUniverse = u;
   localStorage.setItem(UNIVERSE_KEY, u);
 
@@ -6314,8 +6446,9 @@ function setUniverse(u, btn) {
   // Reset table state (scan data is universe-specific)
   scanData = null;
 
-  // Update UI: active chip + KPI subtitle
+  // Update UI: dropdown label + active option + KPI subtitle
   syncUniverseUI();
+  closeAllCdd();
 
   // Try to load cached scan for THIS universe
   scanData = loadCachedScan();
@@ -6398,7 +6531,16 @@ function renderTable() {
   tbody.innerHTML = list.map(s => {
     const rkCls = s.rank <= 3 ? 'top3' : '';
     const badges = [];
-    if (watchlist.includes(s.sym)) badges.push('<span class="bdg bdg-wl">WL</span>');
+    // In watchlist view, replace the generic WL pill with an informative
+    // Exit-Signal verdict (חזק / חלש / יציאה). Other views get the plain WL
+    // pill so starred stocks are visible at a glance during normal browsing.
+    if (watchlist.includes(s.sym)) {
+      if (displayState.view === 'watchlist') {
+        badges.push(renderExitBadge(s.sym));
+      } else {
+        badges.push('<span class="bdg bdg-wl">WL</span>');
+      }
+    }
     if (s.rank <= 10 && s.score >= 80) badges.push('<span class="bdg bdg-star">★</span>');
 
     return `
@@ -6440,6 +6582,128 @@ function pctCls(n) {
   if (n > 0) return 'up';
   if (n < 0) return 'down';
   return 'flat';
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   EXIT SIGNALS
+   For a stock in the user's watchlist, compute three independent signals that
+   answer "should I still hold?" — based on classic momentum exit rules:
+
+     1. TOP — still in the top N of the latest scan (we use 50)
+             → if it dropped out, momentum rank has decayed (Jegadeesh & Titman)
+
+     2. MA  — price still above its 40-day moving average
+             → weekly MA break = Weinstein stage-4 begins
+
+     3. Y1  — 12-month return still positive
+             → Antonacci Dual Momentum hard exit rule
+
+   The combined verdict maps 0-3 passing signals to a HOLD / WATCH / EXIT
+   recommendation. This is informational, not instruction — the user still
+   decides. Unknown states (stock missing from scan) return `null`.
+   ════════════════════════════════════════════════════════════════════════════ */
+const EXIT_TOP_N = 50;
+
+function computeExitSignal(sym) {
+  if (!scanData || !scanData.stocks) return null;
+  const stock = scanData.stocks.find(s => s.sym === sym);
+  if (!stock) return { state: 'unknown', pass: 0, signals: { top: null, ma: null, y1: null } };
+
+  const price = stock.metrics?.price;
+  const sma40 = stock.metrics?.sma40;
+  const y1    = stock.y1;
+  const rank  = stock.rank;
+
+  const sig = {
+    top: rank != null ? rank <= EXIT_TOP_N : null,
+    ma:  (price != null && sma40 != null) ? price > sma40 : null,
+    y1:  y1 != null ? y1 > 0 : null,
+  };
+
+  // Count passes, counting nulls as failures for the overall verdict (conservative:
+  // missing data shouldn't inflate confidence).
+  const pass = (sig.top === true ? 1 : 0) + (sig.ma === true ? 1 : 0) + (sig.y1 === true ? 1 : 0);
+  let state;
+  if      (pass === 3) state = 'strong';   // 3/3 — hold
+  else if (pass === 2) state = 'caution';  // 2/3 — watch
+  else                 state = 'exit';     // 0-1/3 — consider selling
+  return { state, pass, signals: sig, rank, price, sma40, y1 };
+}
+
+/** Compact colored pill next to ticker in watchlist rows. */
+function renderExitBadge(sym) {
+  const r = computeExitSignal(sym);
+  if (!r || r.state === 'unknown') return '';  // hide when no scan data
+  const labels = { strong: 'חזק', caution: 'חלש', exit: 'יציאה' };
+  return `<span class="bdg bdg-exit bdg-exit-${r.state}" title="${r.pass}/3 סיגנלי החזקה">${labels[r.state]}</span>`;
+}
+
+/** Full Exit Signals breakdown for the Detail Panel — only called when the
+    user has starred this stock. Shows each signal as a row with pass/fail + a
+    plain-language explanation so the user understands WHY the verdict says what
+    it says (not just a mystery badge). */
+function renderExitSection(s) {
+  const r = computeExitSignal(s.sym);
+  if (!r) return '';
+
+  const verdictCls   = `exit-verdict exit-verdict-${r.state}`;
+  const verdictText  = { strong:  'החזק — שלושת הסיגנלים תקינים',
+                         caution: 'שים לב — סיגנל אחד שבור',
+                         exit:    'שקול למכור — שני סיגנלים שבורים',
+                         unknown: 'אין נתונים עדכניים' }[r.state];
+
+  const row = (ok, label, detail) => {
+    const cls = ok === true ? 'ok' : ok === false ? 'bad' : 'na';
+    const sym = ok === true ? '✓' : ok === false ? '✗' : '—';
+    return `
+      <div class="exit-row exit-row-${cls}">
+        <div class="exit-dot">${sym}</div>
+        <div class="exit-text">
+          <div class="exit-label">${label}</div>
+          <div class="exit-detail">${detail}</div>
+        </div>
+      </div>`;
+  };
+
+  const topDetail = r.signals.top === null
+    ? 'המניה לא נסרקה'
+    : r.signals.top
+      ? `דירוג ${r.rank} בסריקה — בתוך הטופ ${EXIT_TOP_N}`
+      : `דירוג ${r.rank} בסריקה — מחוץ לטופ ${EXIT_TOP_N}, המומנטום נחלש`;
+
+  const maDetail = r.signals.ma === null
+    ? 'חסרים נתוני ממוצע נע'
+    : r.signals.ma
+      ? `$${fmt(r.price)} מעל MA40 ($${fmt(r.sma40)}) — המגמה שלמה`
+      : `$${fmt(r.price)} מתחת ל-MA40 ($${fmt(r.sma40)}) — שבירת מגמה`;
+
+  const y1Detail = r.signals.y1 === null
+    ? 'חסרים נתוני תשואה שנתית'
+    : r.signals.y1
+      ? `תשואת 12 חודשים ${fmtPct(r.y1)} — מומנטום מוחלט חיובי`
+      : `תשואת 12 חודשים ${fmtPct(r.y1)} — חוק Antonacci מחייב יציאה`;
+
+  return `
+    <div class="dt-section">
+      <div class="dt-section-title">אותות יציאה · לפי חוקי המומנטום</div>
+      <div class="${verdictCls}">${verdictText}</div>
+      <div class="exit-signals">
+        ${row(r.signals.top, 'עדיין בטופ הסריקה',   topDetail)}
+        ${row(r.signals.ma,  'מעל הממוצע הנע 40 יום', maDetail)}
+        ${row(r.signals.y1,  'תשואת 12 חודשים חיובית', y1Detail)}
+      </div>
+      <div class="exit-footer">סריקה אחרונה: ${formatMinutesAgo(scanData.timestamp)} · עדכון אותות בסריקה הבאה</div>
+    </div>`;
+}
+
+/** Short "לפני X דקות/שעות" formatter — reused across the app. */
+function formatMinutesAgo(ts) {
+  if (!ts) return '—';
+  const mins = Math.floor((Date.now() - ts) / 60000);
+  if (mins < 60) return `לפני ${mins} דק׳`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `לפני ${hours} שעות`;
+  return `לפני ${Math.floor(hours / 24)} ימים`;
 }
 
 // ═══ DETAIL PANEL ═══
@@ -6533,6 +6797,8 @@ function openDetail(sym) {
         </div>
       </div>
     </div>
+
+    ${inWL ? renderExitSection(s) : ''}
 
     <div class="dt-section">
       <div class="dt-section-title">תזה אוטומטית</div>
