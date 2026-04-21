@@ -5131,6 +5131,9 @@ function loadCachedScan() {
       cached.stocks.forEach(s => {
         if (s.subInd === undefined) s.subInd = SYM_SUBIND[s.sym] || null;
         if (s.subIndName === undefined) s.subIndName = getSubIndHe(s.sym);
+        // Backfill per-stock freshness stamp for caches saved before this field
+        // existed — all stocks share the scan timestamp in that case.
+        if (s.refreshedAt === undefined) s.refreshedAt = cached.timestamp;
       });
     }
     return cached;
@@ -6075,9 +6078,11 @@ async function runScan() {
   const symbols = Array.from(symbolsSet);
 
   showScreen('adv-screen-loading');
-  // Estimate scan time: ~1.5s per ticker through the proxy (rough empirical)
-  const estMinutes = Math.ceil(symbols.length * 1.5 / 60);
-  $('loading-msg').textContent = `אוסף נתוני 52 שבועות עבור ${symbols.length} מניות (בנצ׳מרק: SPY) · משוער: ~${estMinutes} דק׳`;
+  // Actual rate with the parallel Cloudflare Worker is ~30-40 tickers/sec,
+  // so 500 tickers ≈ 15 seconds. Old estimate (1.5s/ticker) was off by ~50x.
+  const estSeconds = Math.max(5, Math.round(symbols.length / 30));
+  const timeText = estSeconds < 60 ? `~${estSeconds} שניות` : `~${Math.ceil(estSeconds / 60)} דק׳`;
+  $('loading-msg').textContent = `אוסף נתוני 52 שבועות עבור ${symbols.length} מניות (בנצ׳מרק: SPY) · משוער: ${timeText}`;
   $('prog-txt').textContent = `0 / ${symbols.length}`;
   $('prog-fill').style.width = '0%';
 
@@ -6108,7 +6113,11 @@ async function runScan() {
   }
 
   scanData = {
-    stocks, timestamp: Date.now(),
+    // Per-stock `refreshedAt` = initial scan timestamp. Partial watchlist
+    // refreshes update this field for the affected stocks only, so the stale
+    // check in computeExitSignal stays accurate per-stock rather than per-scan.
+    stocks: stocks.map(s => ({ ...s, refreshedAt: Date.now() })),
+    timestamp: Date.now(),
     universeSize: stocks.length,
     methodology: currentMethodology,
     universe: currentUniverse,
@@ -6127,6 +6136,7 @@ async function runScan() {
         subInd: s.subInd, subIndName: s.subIndName,
         score: s.score, scores: s.scores, rank: s.rank,
         price: s.price, y1: s.y1, m3: s.m3, m1: s.m1, fromHi: s.fromHi,
+        refreshedAt: s.refreshedAt,    // per-stock freshness stamp
         // Only the metrics actually used by the detail panel logic.
         // No `closes` → mini-chart shows a "re-scan for chart" placeholder on cache-load.
         metrics: {
@@ -6501,6 +6511,9 @@ function scoreClass(s) {
 function renderTable() {
   const list = getFilteredStocks();
   const tbody = $('picks-body');
+  // Watchlist-view-only banner with freshness + refresh button — rendered
+  // before the tbody so it appears above the rows.
+  renderWatchlistBanner();
   // Update sort indicators
   document.querySelectorAll('table.picks th').forEach(th => {
     th.classList.remove('sorted');
@@ -6598,16 +6611,18 @@ function pctCls(n) {
      3. Y1  — 12-month return still positive
              → Antonacci Dual Momentum hard exit rule
 
-   The combined verdict maps 0-3 passing signals to a HOLD / WATCH / EXIT
-   recommendation. This is informational, not instruction — the user still
-   decides. Unknown states (stock missing from scan) return `null`.
+   Scan age matters too — stale data can give false confidence. We track three
+   freshness tiers: fresh (<1h), warm (1-4h), cold (>4h). The UI dims stale
+   signals and nudges the user to re-scan before acting on them.
    ════════════════════════════════════════════════════════════════════════════ */
 const EXIT_TOP_N = 50;
+const STALE_FRESH_MS = 60 * 60 * 1000;          // 1 hour — signals fully trusted
+const STALE_WARM_MS  = 4 * 60 * 60 * 1000;      // 4 hours — show warning
 
 function computeExitSignal(sym) {
   if (!scanData || !scanData.stocks) return null;
   const stock = scanData.stocks.find(s => s.sym === sym);
-  if (!stock) return { state: 'unknown', pass: 0, signals: { top: null, ma: null, y1: null } };
+  if (!stock) return { state: 'unknown', pass: 0, signals: { top: null, ma: null, y1: null }, freshness: 'cold' };
 
   const price = stock.metrics?.price;
   const sma40 = stock.metrics?.sma40;
@@ -6627,15 +6642,31 @@ function computeExitSignal(sym) {
   if      (pass === 3) state = 'strong';   // 3/3 — hold
   else if (pass === 2) state = 'caution';  // 2/3 — watch
   else                 state = 'exit';     // 0-1/3 — consider selling
-  return { state, pass, signals: sig, rank, price, sma40, y1 };
+
+  // Freshness tier from per-stock refreshedAt (not scan timestamp). Partial
+  // watchlist refresh updates refreshedAt for just the refreshed subset, so
+  // this correctly reflects which stocks have fresh data vs which are stale.
+  // Fall back to scanData.timestamp for caches saved before refreshedAt existed.
+  const age = Date.now() - (stock.refreshedAt || scanData.timestamp || 0);
+  const freshness = age < STALE_FRESH_MS ? 'fresh'
+                  : age < STALE_WARM_MS  ? 'warm'
+                                         : 'cold';
+
+  return { state, pass, signals: sig, rank, price, sma40, y1, freshness, ageMs: age };
 }
 
-/** Compact colored pill next to ticker in watchlist rows. */
+/** Compact colored pill next to ticker in watchlist rows. When scan is stale,
+    the badge dims to signal uncertainty — keeps the verdict visible but tells
+    the user to treat it as provisional. */
 function renderExitBadge(sym) {
   const r = computeExitSignal(sym);
-  if (!r || r.state === 'unknown') return '';  // hide when no scan data
+  if (!r || r.state === 'unknown') return '';
   const labels = { strong: 'חזק', caution: 'חלש', exit: 'יציאה' };
-  return `<span class="bdg bdg-exit bdg-exit-${r.state}" title="${r.pass}/3 סיגנלי החזקה">${labels[r.state]}</span>`;
+  const freshClass = r.freshness === 'fresh' ? '' : ` bdg-exit-${r.freshness}`;
+  const title = r.freshness === 'fresh'
+    ? `${r.pass}/3 סיגנלי החזקה`
+    : `${r.pass}/3 סיגנלי החזקה · הסריקה ישנה, סרוק מחדש`;
+  return `<span class="bdg bdg-exit bdg-exit-${r.state}${freshClass}" title="${title}">${labels[r.state]}</span>`;
 }
 
 /** Full Exit Signals breakdown for the Detail Panel — only called when the
@@ -6683,16 +6714,36 @@ function renderExitSection(s) {
       ? `תשואת 12 חודשים ${fmtPct(r.y1)} — מומנטום מוחלט חיובי`
       : `תשואת 12 חודשים ${fmtPct(r.y1)} — חוק Antonacci מחייב יציאה`;
 
+  // Warning banner when the stock's data is stale enough to mistrust the verdict.
+  // 'warm' = soft warning, 'cold' = prominent red warning — both nudge the user
+  // to refresh before acting on the signal.
+  const staleWarning = r.freshness === 'fresh' ? '' : `
+    <div class="exit-stale-warn exit-stale-${r.freshness}">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>
+        ${r.freshness === 'warm'
+          ? `הנתונים לסיגנל הזה מלפני ${formatMinutesAgo(Date.now() - r.ageMs).replace('לפני ', '')}. סרוק מחדש לפני פעולה.`
+          : `הנתונים ישנים מאוד (${formatMinutesAgo(Date.now() - r.ageMs).replace('לפני ', '')}). הסיגנל לא אמין עד סריקה חדשה.`
+        }
+      </span>
+    </div>`;
+
+  // Per-stock refresh time — reflects partial-refresh updates, not just the
+  // full scan timestamp. Look up the actual stock to get refreshedAt.
+  const stockData = scanData.stocks.find(x => x.sym === s.sym);
+  const refreshedAt = stockData?.refreshedAt || scanData.timestamp;
+
   return `
     <div class="dt-section">
       <div class="dt-section-title">אותות יציאה · לפי חוקי המומנטום</div>
+      ${staleWarning}
       <div class="${verdictCls}">${verdictText}</div>
       <div class="exit-signals">
         ${row(r.signals.top, 'עדיין בטופ הסריקה',   topDetail)}
         ${row(r.signals.ma,  'מעל הממוצע הנע 40 יום', maDetail)}
         ${row(r.signals.y1,  'תשואת 12 חודשים חיובית', y1Detail)}
       </div>
-      <div class="exit-footer">סריקה אחרונה: ${formatMinutesAgo(scanData.timestamp)} · עדכון אותות בסריקה הבאה</div>
+      <div class="exit-footer">עדכון אחרון לסיגנל זה: ${formatMinutesAgo(refreshedAt)}</div>
     </div>`;
 }
 
@@ -6704,6 +6755,145 @@ function formatMinutesAgo(ts) {
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `לפני ${hours} שעות`;
   return `לפני ${Math.floor(hours / 24)} ימים`;
+}
+
+/**
+ * Partial refresh: fetches fresh chart data for just the watchlist stocks and
+ * updates their price/MA40/y1 in-place, without disturbing the full scan's
+ * rank/score (which depend on the entire universe's percentile distribution).
+ *
+ * Design note: we can't meaningfully re-rank with just 10-15 stocks — the
+ * percentile math only makes sense against the full universe. So the TOP
+ * signal (rank ≤ 50) continues to reference the full-scan rank, which is
+ * exactly what "still in top of scan" should mean. The MA40 and Y1 signals,
+ * which depend only on the stock's own price history, become fully fresh.
+ *
+ * Runtime: ~0.3s for 10-15 stocks (vs. ~10s for full scan), small enough
+ * to feel instant while still being honest about what it actually refreshed.
+ */
+async function refreshWatchlist() {
+  if (!scanData || !scanData.stocks) return;
+  const btn = $('wl-refresh-btn');
+  if (btn?.disabled) return;  // prevent double-clicks
+
+  // Find watchlist stocks that exist in the current scan (others we can't
+  // refresh — they belong to a different universe or aren't loaded).
+  const wlInScan = scanData.stocks.filter(s => watchlist.includes(s.sym));
+  if (wlInScan.length === 0) return;
+
+  if (btn) { btn.disabled = true; btn.classList.add('refreshing'); }
+  const bannerText = $('wl-refresh-status');
+  if (bannerText) bannerText.textContent = `מרענן ${wlInScan.length} מניות...`;
+
+  try {
+    const symbols = wlInScan.map(s => s.sym);
+    // Parallel: SPY (needed for rs12m in computeMetrics) + all watchlist charts
+    const [spyData, stocksData] = await Promise.all([
+      fetchChartWeekly('SPY'),
+      fetchUniverseInChunks(symbols, () => {}),  // no progress UI for partial
+    ]);
+
+    if (!spyData) throw new Error('SPY fetch failed');
+
+    // Recompute metrics per stock and patch into scanData.stocks in-place.
+    // Keep score/rank/scores/scoreBreakdown from the full scan — they require
+    // universe-wide percentile data we don't have here.
+    const now = Date.now();
+    let refreshedCount = 0;
+    for (const stock of wlInScan) {
+      const chartData = stocksData[stock.sym];
+      if (!chartData) continue;   // fetch failed for this symbol
+      const m = computeMetrics(chartData, spyData.closes);
+      if (!m) continue;
+
+      // Update the stock object in scanData.stocks (same reference as wlInScan entries)
+      stock.price  = m.price;
+      stock.y1     = m.ret12m != null ? m.ret12m * 100 : null;
+      stock.m3     = m.ret3m  != null ? m.ret3m  * 100 : null;
+      stock.m1     = m.ret1m  != null ? m.ret1m  * 100 : null;
+      stock.fromHi = m.fromHi * 100;
+      stock.metrics = {
+        price:      m.price,
+        fromHi:     m.fromHi,
+        ret1m:      m.ret1m,
+        sma10:      m.sma10,
+        sma40:      m.sma40,
+        sma10Slope: m.sma10Slope,
+      };
+      stock.refreshedAt = now;
+      refreshedCount++;
+    }
+
+    // Persist the update — next cache load will see the per-stock freshness.
+    try { localStorage.setItem(getCacheKey(), JSON.stringify({
+      timestamp: scanData.timestamp,
+      universeSize: scanData.universeSize,
+      methodology: scanData.methodology,
+      universe: scanData.universe,
+      stocks: scanData.stocks.map(s => ({
+        sym: s.sym, name: s.name, sector: s.sector, sectorName: s.sectorName,
+        subInd: s.subInd, subIndName: s.subIndName,
+        score: s.score, scores: s.scores, rank: s.rank,
+        price: s.price, y1: s.y1, m3: s.m3, m1: s.m1, fromHi: s.fromHi,
+        refreshedAt: s.refreshedAt,
+        metrics: s.metrics,
+      })),
+    })); } catch(e){}
+
+    if (bannerText) bannerText.textContent = `עודכן · ${refreshedCount}/${wlInScan.length}`;
+    // Clear the status text after 2 seconds so it doesn't linger
+    setTimeout(() => { if (bannerText) bannerText.textContent = ''; }, 2000);
+
+    renderTable();
+  } catch(e) {
+    console.warn('watchlist refresh failed:', e);
+    if (bannerText) bannerText.textContent = 'שגיאה · נסה שוב';
+    setTimeout(() => { if (bannerText) bannerText.textContent = ''; }, 3000);
+  } finally {
+    if (btn) { btn.disabled = false; btn.classList.remove('refreshing'); }
+  }
+}
+
+/** Render the small status-bar banner that appears ABOVE the table when the
+    user is in "רשימה שלי" view. Shows oldest-stock freshness across the list
+    and a compact refresh button. Called from renderTable() before the tbody
+    is written. */
+function renderWatchlistBanner() {
+  const container = $('wl-banner');
+  if (!container) return;
+
+  if (displayState.view !== 'watchlist' || !scanData || !scanData.stocks) {
+    container.style.display = 'none';
+    return;
+  }
+
+  const wlInScan = scanData.stocks.filter(s => watchlist.includes(s.sym));
+  if (wlInScan.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+
+  // Find the OLDEST refresh time in the list — the banner reflects the worst
+  // case. If even one stock is stale, show the warning; a refresh brings them
+  // all up to fresh at once.
+  const oldestRefresh = Math.min(...wlInScan.map(s => s.refreshedAt || scanData.timestamp || 0));
+  const age = Date.now() - oldestRefresh;
+  const tier = age < STALE_FRESH_MS ? 'fresh'
+             : age < STALE_WARM_MS  ? 'warm'
+                                    : 'cold';
+
+  const ageText = formatMinutesAgo(oldestRefresh);
+  container.className = `wl-banner wl-banner-${tier}`;
+  container.style.display = 'flex';
+  container.innerHTML = `
+    <div class="wl-banner-info">
+      <span class="wl-banner-label">אותות יציאה · נתונים מ-${ageText}</span>
+      <span class="wl-refresh-status" id="wl-refresh-status"></span>
+    </div>
+    <button class="wl-refresh-btn" id="wl-refresh-btn" onclick="refreshWatchlist()" title="רענון מהיר של הרשימה בלבד">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      <span>רענן רשימה</span>
+    </button>`;
 }
 
 // ═══ DETAIL PANEL ═══
@@ -7042,7 +7232,7 @@ document.addEventListener('keydown', e => {
     toggleCdd, selectSector, sortBy, applyFilters,
     openMethodology, closeMethodology, closeMethodologyDirect,
     openDetail, closeDetail, closeDetailDirect,
-    toggleWatchlist
+    toggleWatchlist, refreshWatchlist
   });
 
   window.initAdvisor = function(){

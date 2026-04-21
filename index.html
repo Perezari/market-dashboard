@@ -20,7 +20,7 @@
 
 <!-- Consolidated stylesheet -->
 <!-- Consolidated stylesheet (cache-bust via ?v= to force fresh load after rebuilds) -->
-<link rel="stylesheet" href="app.css?v=2026-04-20-pill-first-desktop">
+<link rel="stylesheet" href="app.css?v=2026-04-20-watchlist-refresh">
 </head>
 <body>
 
@@ -759,6 +759,9 @@
   <!-- results table -->
   <div id="tbl-container" style="display:none">
     <div class="tbl-card">
+      <!-- Watchlist-view banner: freshness indicator + partial refresh button.
+           JS toggles visibility via display:none/flex; hidden for other views. -->
+      <div id="wl-banner" class="wl-banner" style="display:none"></div>
       <div class="tbl-wrap">
         <table class="picks">
           <thead>
@@ -881,7 +884,7 @@
 
 <!-- Consolidated script -->
 <!-- Consolidated script (cache-bust via ?v=) -->
-<script src="app.js?v=2026-04-20-pill-first-desktop"></script>
+<script src="app.js?v=2026-04-20-watchlist-refresh"></script>
 
 </body>
 </html>
