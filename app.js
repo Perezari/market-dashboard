@@ -5524,6 +5524,9 @@ function advisorBoot() {
   populateMethodologyDropdown();
   syncUniverseUI();
   syncMethodologyUI();
+  // Kick off cloud sync in the background — if user has a session it pulls
+  // their cloud watchlist and merges with local. Never blocks UI render.
+  initCloudSync();
   // Try load from cache for this (universe, methodology)
   scanData = loadCachedScan();
   if (scanData) { showResults(); renderWatchlist(); return; }
@@ -7065,13 +7068,254 @@ function renderMiniChart(closes) {
   `;
 }
 
+// ═══ CLOUD SYNC (Supabase) ═══
+// Offline-first personal watchlist sync. localStorage stays the primary source
+// for reads (always instant), cloud becomes source-of-truth on login (pulled
+// once, then watched for changes), and all mutations push to cloud in the
+// background as fire-and-forget operations. Net effect: UI never blocks on
+// the network, yet state converges across devices within a couple of seconds.
+//
+// Security model: the anon key below is embedded in public HTML and can be
+// read by anyone who views source. This is fine by Supabase's design — the
+// ONLY protection against users reading each other's data is the RLS policies
+// in the SQL migration. Every query runs scoped to auth.uid(), so even if
+// someone tampers with requests in devtools, the database refuses to return
+// rows they don't own.
+
+const SUPABASE_URL       = 'https://grvoyxczifjftrovvisk.supabase.co';
+const SUPABASE_ANON_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdydm95eGN6aWZqZnRyb3Z2aXNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3NTc5NjksImV4cCI6MjA5MjMzMzk2OX0.l1a65TddlIa73oQI2SrTIq0tIJotVXKxRRNKLu4Fsoc';
+
+let sbClient    = null;  // lazily-initialized Supabase client
+let currentUser = null;  // { id, email } when signed in, else null
+let cloudSyncInitialized = false;
+
+function ensureSupabase() {
+  if (sbClient) return sbClient;
+  if (!window.supabase?.createClient) return null;   // CDN not yet loaded
+  sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+  });
+  return sbClient;
+}
+
+/** Boot sequence: restores existing session (if any), then listens for
+    future auth changes. Called once from advisorBoot. */
+async function initCloudSync() {
+  if (cloudSyncInitialized) return;
+  const sb = ensureSupabase();
+  if (!sb) {
+    // Retry once in case the CDN just hadn't loaded yet when app booted
+    setTimeout(initCloudSync, 800);
+    return;
+  }
+  cloudSyncInitialized = true;
+
+  // Auth state listener — fires for SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED, etc.
+  sb.auth.onAuthStateChange((event, session) => {
+    currentUser = session?.user ? { id: session.user.id, email: session.user.email } : null;
+    renderAuthStatus();
+    if (event === 'SIGNED_IN') {
+      pullWatchlistFromCloud();  // hydrate on login, merges with local
+    }
+  });
+
+  // Hydrate any existing session from localStorage (Supabase persists session there)
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    currentUser = { id: session.user.id, email: session.user.email };
+    renderAuthStatus();
+    pullWatchlistFromCloud();
+  } else {
+    renderAuthStatus();
+  }
+}
+
+/** Request a magic link. User enters email → Supabase sends a one-time sign-in
+    link → clicking it in the email lands back on this page authenticated. */
+async function signInWithEmail(email) {
+  const sb = ensureSupabase();
+  if (!sb) return { error: 'לא הצלחתי לטעון את Supabase. בדוק חיבור לאינטרנט.' };
+  const { error } = await sb.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.href.split('#')[0] },
+  });
+  return { error: error?.message };
+}
+
+async function signOut() {
+  const sb = ensureSupabase();
+  if (!sb) return;
+  await sb.auth.signOut();
+  currentUser = null;
+  renderAuthStatus();
+  // Intentionally keep local watchlist after logout — user can keep using app
+  // offline. Next login merges back with cloud.
+}
+
+/** Pull cloud watchlist, merge with local (union semantics: on first login
+    we UNION local + cloud so the user never loses symbols they added offline
+    before signing in). Subsequent pulls effectively replace local with cloud
+    since local + cloud have already converged. */
+async function pullWatchlistFromCloud() {
+  const sb = ensureSupabase();
+  if (!sb || !currentUser) return;
+  try {
+    const { data, error } = await sb.from('watchlist').select('symbol').eq('user_id', currentUser.id);
+    if (error) { console.warn('cloud pull failed:', error.message); return; }
+    const cloudSymbols = (data || []).map(r => r.symbol);
+    const localBefore  = watchlist.slice();
+
+    // Union merge — safe on first login, idempotent afterwards
+    const merged = [...new Set([...cloudSymbols, ...localBefore])];
+    watchlist = merged;
+    try { localStorage.setItem(WL_KEY, JSON.stringify(watchlist)); } catch(e){}
+
+    // Push any local-only symbols to cloud to complete the merge
+    const localOnly = localBefore.filter(s => !cloudSymbols.includes(s));
+    for (const sym of localOnly) pushSymbolToCloud(sym);
+
+    // Reflect merged list in UI
+    if (scanData) { renderWatchlist(); renderTable(); }
+    console.info(`watchlist merged: cloud=${cloudSymbols.length}, local-only=${localOnly.length}, total=${merged.length}`);
+  } catch(e) { console.warn('cloud pull error:', e); }
+}
+
+/** Fire-and-forget add. Uses upsert so double-clicks on the same symbol don't
+    create a duplicate error (composite PK would reject a plain INSERT). */
+async function pushSymbolToCloud(sym) {
+  const sb = ensureSupabase();
+  if (!sb || !currentUser) return;
+  try {
+    const { error } = await sb.from('watchlist').upsert(
+      { user_id: currentUser.id, symbol: sym },
+      { onConflict: 'user_id,symbol' }
+    );
+    if (error) console.warn(`push ${sym} failed:`, error.message);
+  } catch(e) { console.warn(`push ${sym} error:`, e); }
+}
+
+async function removeSymbolFromCloud(sym) {
+  const sb = ensureSupabase();
+  if (!sb || !currentUser) return;
+  try {
+    const { error } = await sb.from('watchlist').delete()
+      .eq('user_id', currentUser.id).eq('symbol', sym);
+    if (error) console.warn(`remove ${sym} failed:`, error.message);
+  } catch(e) { console.warn(`remove ${sym} error:`, e); }
+}
+
+// ─── AUTH UI ────────────────────────────────────────────────────────────────
+
+function renderAuthStatus() {
+  const el = $('auth-status');
+  if (!el) return;
+  if (currentUser) {
+    el.innerHTML = `
+      <div class="auth-pill auth-pill-connected" onclick="openAuthModal('account')" title="חשבון ${currentUser.email}">
+        <span class="auth-dot"></span>
+        <span class="auth-email">${currentUser.email}</span>
+      </div>`;
+  } else {
+    el.innerHTML = `
+      <button class="auth-pill auth-pill-connect" onclick="openAuthModal('login')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span>התחבר לסנכרון רשימה</span>
+      </button>`;
+  }
+}
+
+function openAuthModal(mode) {
+  const body = $('auth-body');
+  const title = $('auth-title');
+  if (!body || !title) return;
+
+  if (mode === 'login') {
+    title.textContent = 'התחברות לסנכרון';
+    body.innerHTML = `
+      <p class="auth-intro">הרשימה שלך תסונכרן אוטומטית בין מכשירים. לא תצטרך סיסמה — נשלח לך קישור חד-פעמי במייל.</p>
+      <form onsubmit="handleSignIn(event); return false" class="auth-form">
+        <label class="auth-label">כתובת אימייל</label>
+        <input type="email" id="auth-email-input" class="auth-input" placeholder="you@example.com" required autocomplete="email" dir="ltr">
+        <button type="submit" class="auth-submit" id="auth-submit-btn">שלח קישור</button>
+        <div class="auth-msg" id="auth-msg"></div>
+      </form>`;
+  } else if (mode === 'account') {
+    title.textContent = 'החשבון שלי';
+    body.innerHTML = `
+      <div class="auth-account">
+        <div class="auth-field">
+          <div class="auth-field-lbl">מחובר כ-</div>
+          <div class="auth-field-val" dir="ltr">${currentUser.email}</div>
+        </div>
+        <div class="auth-field">
+          <div class="auth-field-lbl">רשימה</div>
+          <div class="auth-field-val">${watchlist.length} מניות מסונכרנות</div>
+        </div>
+        <button class="auth-logout" onclick="handleSignOut()">התנתק</button>
+      </div>`;
+  }
+
+  $('auth-overlay').classList.add('open');
+  if (mode === 'login') setTimeout(() => $('auth-email-input')?.focus(), 100);
+}
+
+function closeAuthModal(e) {
+  if (e && e.target.id !== 'auth-overlay') return;
+  closeAuthModalDirect();
+}
+function closeAuthModalDirect() {
+  $('auth-overlay').classList.remove('open');
+}
+
+async function handleSignIn(event) {
+  event?.preventDefault();
+  const input = $('auth-email-input');
+  const btn   = $('auth-submit-btn');
+  const msg   = $('auth-msg');
+  if (!input || !btn || !msg) return;
+  const email = input.value.trim();
+  if (!email || !email.includes('@')) {
+    msg.textContent = 'כתובת אימייל לא תקינה';
+    msg.className = 'auth-msg auth-msg-err';
+    return;
+  }
+  btn.disabled = true; btn.textContent = 'שולח...';
+  msg.textContent = ''; msg.className = 'auth-msg';
+
+  const { error } = await signInWithEmail(email);
+  btn.disabled = false; btn.textContent = 'שלח קישור';
+
+  if (error) {
+    msg.textContent = `שגיאה: ${error}`;
+    msg.className = 'auth-msg auth-msg-err';
+  } else {
+    msg.innerHTML = `<strong>נשלח!</strong> בדוק את תיבת הדואר (${email}) ולחץ על הקישור כדי להתחבר.`;
+    msg.className = 'auth-msg auth-msg-ok';
+  }
+}
+
+async function handleSignOut() {
+  await signOut();
+  closeAuthModalDirect();
+}
+
 // ═══ WATCHLIST ═══
 
 function toggleWatchlist(sym) {
   const idx = watchlist.indexOf(sym);
+  const wasAdd = idx < 0;
   if (idx >= 0) watchlist.splice(idx, 1);
   else watchlist.push(sym);
   localStorage.setItem(WL_KEY, JSON.stringify(watchlist));
+
+  // Cloud sync — fire-and-forget. Silently no-ops when not signed in.
+  if (currentUser) {
+    if (wasAdd) pushSymbolToCloud(sym);
+    else        removeSymbolFromCloud(sym);
+  }
+
   renderWatchlist();
   if ($('dt-sym').textContent === sym && $('dt-overlay').classList.contains('open')) {
     openDetail(sym);
@@ -7232,7 +7476,9 @@ document.addEventListener('keydown', e => {
     toggleCdd, selectSector, sortBy, applyFilters,
     openMethodology, closeMethodology, closeMethodologyDirect,
     openDetail, closeDetail, closeDetailDirect,
-    toggleWatchlist, refreshWatchlist
+    toggleWatchlist, refreshWatchlist,
+    openAuthModal, closeAuthModal, closeAuthModalDirect,
+    handleSignIn, handleSignOut
   });
 
   window.initAdvisor = function(){

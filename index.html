@@ -713,6 +713,10 @@
 
   <!-- ═══ MAIN CONTENT ═══ -->
 
+  <!-- Cloud sync status bar — visible across all advisor sub-screens.
+       Compact when signed in (email + logout), prominent when not (CTA button). -->
+  <div id="auth-status" class="auth-status"></div>
+
   <!-- welcome screen -->
   <div class="screen" id="screen-welcome">
     <div class="hero-icon">
@@ -805,6 +809,17 @@
   </div>
 </div>
 
+<!-- ═══ AUTH MODAL (login / logout) ═══ -->
+<div class="auth-overlay" id="auth-overlay" onclick="closeAuthModal(event)">
+  <div class="auth-panel" onclick="event.stopPropagation()">
+    <div class="auth-hdr">
+      <div class="auth-title" id="auth-title">התחברות</div>
+      <button class="auth-close" onclick="closeAuthModalDirect()">✕</button>
+    </div>
+    <div class="auth-body" id="auth-body"></div>
+  </div>
+</div>
+
 <!-- ═══ METHODOLOGY MODAL ═══ -->
 <div class="mth-overlay" id="mth-overlay" onclick="closeMethodology(event)">
   <div class="mth-modal" onclick="event.stopPropagation()">
@@ -882,9 +897,13 @@
 
 <!-- ═══════════ SCRIPTS ═══════════ -->
 
+<!-- Supabase JS client — loaded BEFORE app.js so window.supabase is available
+     when app boots. UMD build assigns window.supabase.createClient. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
 <!-- Consolidated script -->
 <!-- Consolidated script (cache-bust via ?v=) -->
-<script src="app.js?v=2026-04-20-watchlist-refresh"></script>
+<script src="app.js?v=2026-04-20-cloud-sync"></script>
 
 </body>
 </html>
