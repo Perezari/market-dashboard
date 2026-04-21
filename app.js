@@ -7089,6 +7089,13 @@ let sbClient    = null;  // lazily-initialized Supabase client
 let currentUser = null;  // { id, email } when signed in, else null
 let cloudSyncInitialized = false;
 
+// Capture OAuth redirect status BEFORE Supabase client is created — the client
+// strips the hash automatically once it parses it. If we see access_token in
+// the URL, the user just came back from Google sign-in and we should navigate
+// them to the advisor tab after the session is established.
+const CAME_FROM_OAUTH = typeof window !== 'undefined'
+  && window.location.hash.includes('access_token=');
+
 function ensureSupabase() {
   if (sbClient) return sbClient;
   if (!window.supabase?.createClient) return null;   // CDN not yet loaded
@@ -7116,6 +7123,12 @@ async function initCloudSync() {
     renderAuthStatus();
     if (event === 'SIGNED_IN') {
       pullWatchlistFromCloud();  // hydrate on login, merges with local
+      // If this SIGNED_IN came from an OAuth redirect, the user landed on
+      // whatever the OAuth provider redirected to — usually the root/dashboard
+      // tab. Send them back to the advisor tab where the sync matters.
+      if (CAME_FROM_OAUTH) {
+        window.location.hash = '#/advisor';
+      }
     }
   });
 
@@ -7515,7 +7528,8 @@ document.addEventListener('keydown', e => {
     openDetail, closeDetail, closeDetailDirect,
     toggleWatchlist, refreshWatchlist,
     openAuthModal, closeAuthModal, closeAuthModalDirect,
-    handleSignIn, handleSignOut, handleGoogleSignIn
+    handleSignIn, handleSignOut, handleGoogleSignIn,
+    initCloudSync
   });
 
   window.initAdvisor = function(){
@@ -7875,6 +7889,14 @@ document.addEventListener('keydown', e => {
       a.classList.toggle('active', a.dataset.route === r);
     });
     document.body.dataset.route = r;
+
+    // Cloud sync boots on ANY route — needed because OAuth redirects return to
+    // the root URL regardless of which tab the user started from. Without this,
+    // signing in from the advisor tab and landing back on the dashboard tab
+    // would never hydrate the session. The function is idempotent.
+    if (typeof window.initCloudSync === 'function') {
+      try { window.initCloudSync(); } catch(e){ console.error('initCloudSync:', e); }
+    }
 
     // Lazy init for sub-modules
     if (r === 'macro' && typeof window.initMacro === 'function') {
