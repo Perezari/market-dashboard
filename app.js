@@ -7152,6 +7152,22 @@ async function signOut() {
   // offline. Next login merges back with cloud.
 }
 
+/** Google OAuth sign-in — much better UX than Magic Link: one click, no
+    email, no rate limits. Supabase handles the full OAuth dance via redirect
+    to accounts.google.com. User returns authenticated. Requires Google
+    provider to be enabled in Supabase Dashboard → Authentication → Providers. */
+async function signInWithGoogle() {
+  const sb = ensureSupabase();
+  if (!sb) return { error: 'לא הצלחתי לטעון את Supabase' };
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.href.split('#')[0],
+    },
+  });
+  return { error: error?.message };
+}
+
 /** Pull cloud watchlist, merge with local (union semantics: on first login
     we UNION local + cloud so the user never loses symbols they added offline
     before signing in). Subsequent pulls effectively replace local with cloud
@@ -7234,11 +7250,20 @@ function openAuthModal(mode) {
   if (mode === 'login') {
     title.textContent = 'התחברות לסנכרון';
     body.innerHTML = `
-      <p class="auth-intro">הרשימה שלך תסונכרן אוטומטית בין מכשירים. לא תצטרך סיסמה — נשלח לך קישור חד-פעמי במייל.</p>
+      <p class="auth-intro">הרשימה שלך תסונכרן אוטומטית בין מכשירים.</p>
+
+      <button class="auth-google-btn" onclick="handleGoogleSignIn()">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C12.955 4 4 12.955 4 24s8.955 20 20 20s20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
+        <span>המשך עם Google</span>
+      </button>
+
+      <div class="auth-divider"><span>או</span></div>
+
       <form onsubmit="handleSignIn(event); return false" class="auth-form">
-        <label class="auth-label">כתובת אימייל</label>
+        <label class="auth-label">התחבר עם קישור במייל</label>
         <input type="email" id="auth-email-input" class="auth-input" placeholder="you@example.com" required autocomplete="email" dir="ltr">
-        <button type="submit" class="auth-submit" id="auth-submit-btn">שלח קישור</button>
+        <button type="submit" class="auth-submit-secondary" id="auth-submit-btn">שלח קישור במייל</button>
+        <div class="auth-note">⚠ Supabase מגביל ל-3 מיילים בשעה. Google מומלץ.</div>
         <div class="auth-msg" id="auth-msg"></div>
       </form>`;
   } else if (mode === 'account') {
@@ -7299,6 +7324,18 @@ async function handleSignIn(event) {
 async function handleSignOut() {
   await signOut();
   closeAuthModalDirect();
+}
+
+async function handleGoogleSignIn() {
+  const { error } = await signInWithGoogle();
+  if (error) {
+    const msg = $('auth-msg');
+    if (msg) {
+      msg.className = 'auth-msg auth-msg-err';
+      msg.textContent = `שגיאה: ${error}. ודא ש-Google provider מופעל ב-Supabase.`;
+    }
+  }
+  // On success, the browser redirects away to Google — no further UI work needed.
 }
 
 // ═══ WATCHLIST ═══
@@ -7478,7 +7515,7 @@ document.addEventListener('keydown', e => {
     openDetail, closeDetail, closeDetailDirect,
     toggleWatchlist, refreshWatchlist,
     openAuthModal, closeAuthModal, closeAuthModalDirect,
-    handleSignIn, handleSignOut
+    handleSignIn, handleSignOut, handleGoogleSignIn
   });
 
   window.initAdvisor = function(){
