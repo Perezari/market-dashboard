@@ -4056,11 +4056,13 @@ td.pct.flat{color:var(--dim)}
 /* ═══ CLOUD SYNC — AUTH STATUS BAR & MODAL ═══ */
 
 /* Status bar sits above the welcome screen — subtle when logged in,
-   prominent CTA when not. Visible across all advisor sub-screens. */
+   prominent CTA when not. Visible across all advisor sub-screens.
+   Bottom padding separates it from whatever follows (welcome hero, loading
+   screen, or results table) so the pill doesn't feel crammed against them. */
 .auth-status{
   display:flex;
   justify-content:center;
-  padding:10px 16px 0;
+  padding:10px 16px 14px;
 }
 .auth-status:empty{display:none}
 

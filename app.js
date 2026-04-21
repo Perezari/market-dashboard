@@ -5529,7 +5529,14 @@ function advisorBoot() {
   initCloudSync();
   // Try load from cache for this (universe, methodology)
   scanData = loadCachedScan();
-  if (scanData) { showResults(); renderWatchlist(); return; }
+  if (scanData) {
+    showResults();
+    renderWatchlist();
+    // Auto-refresh watchlist signals in the background so every app load
+    // gives the user fresh MA40/price/y1 data without a manual click.
+    scheduleAutoRefresh(500);
+    return;
+  }
   renderWatchlist();
   startMarketClock();
 } // advisorBoot end
@@ -7122,7 +7129,10 @@ async function initCloudSync() {
     currentUser = session?.user ? { id: session.user.id, email: session.user.email } : null;
     renderAuthStatus();
     if (event === 'SIGNED_IN') {
-      pullWatchlistFromCloud();  // hydrate on login, merges with local
+      // Chain: pull watchlist from cloud first, THEN auto-refresh signals.
+      // Order matters — a symbol added on another device needs to be in the
+      // watchlist array before refreshWatchlist() can fetch its fresh data.
+      pullWatchlistFromCloud().then(() => scheduleAutoRefresh(0));
       // If this SIGNED_IN came from an OAuth redirect, the user landed on
       // whatever the OAuth provider redirected to — usually the root/dashboard
       // tab. Send them back to the advisor tab where the sync matters.
@@ -7231,6 +7241,29 @@ async function removeSymbolFromCloud(sym) {
       .eq('user_id', currentUser.id).eq('symbol', sym);
     if (error) console.warn(`remove ${sym} failed:`, error.message);
   } catch(e) { console.warn(`remove ${sym} error:`, e); }
+}
+
+// ─── AUTO-REFRESH ON BOOT ──────────────────────────────────────────────────
+// On every app load we refresh the watchlist automatically so signals reflect
+// the current moment rather than whenever the last scan ran. Cost is low
+// (~0.3s for ~15 stocks) and value is high (no manual step before checking
+// exit decisions). Cooldown prevents double-firing when advisorBoot and the
+// SIGNED_IN event (cloud sync pull) both trigger a refresh within seconds
+// of each other — second call is a no-op.
+
+const AUTO_REFRESH_COOLDOWN_MS = 60 * 1000;
+let lastAutoRefreshAt = 0;
+
+function scheduleAutoRefresh(delay = 300) {
+  if (Date.now() - lastAutoRefreshAt < AUTO_REFRESH_COOLDOWN_MS) return;
+  if (!scanData || watchlist.length === 0) return;
+  setTimeout(() => {
+    // Re-check at fire time; state may have changed during the delay
+    if (!scanData || watchlist.length === 0) return;
+    if (Date.now() - lastAutoRefreshAt < AUTO_REFRESH_COOLDOWN_MS) return;
+    lastAutoRefreshAt = Date.now();
+    refreshWatchlist();
+  }, delay);
 }
 
 // ─── AUTH UI ────────────────────────────────────────────────────────────────
