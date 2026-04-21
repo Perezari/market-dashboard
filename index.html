@@ -131,6 +131,11 @@
     </div>
   </div>
 
+  <!-- Cloud sync / user account pill — rendered by renderAuthStatus().
+       Lives in the top bar (standard UX location for account UI) so it's
+       accessible from any tab and doesn't clutter the advisor's filter row. -->
+  <div id="auth-status" class="auth-status"></div>
+
   <!-- RIGHT: brand -->
   <div class="tb-brand">
     <span class="tb-version">V2.4.1</span>
@@ -713,10 +718,6 @@
 
   <!-- ═══ MAIN CONTENT ═══ -->
 
-  <!-- Cloud sync status bar — visible across all advisor sub-screens.
-       Compact when signed in (email + logout), prominent when not (CTA button). -->
-  <div id="auth-status" class="auth-status"></div>
-
   <!-- welcome screen -->
   <div class="screen" id="screen-welcome">
     <div class="hero-icon">
@@ -903,7 +904,7 @@
 
 <!-- Consolidated script -->
 <!-- Consolidated script (cache-bust via ?v=) -->
-<script src="app.js?v=2026-04-20-auto-refresh"></script>
+<script src="app.js?v=2026-04-20-pill-in-topbar"></script>
 
 </body>
 </html>

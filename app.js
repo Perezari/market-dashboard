@@ -7112,6 +7112,21 @@ function ensureSupabase() {
   return sbClient;
 }
 
+/** Build a normalized user object from a Supabase session. Extracted so the
+    auth state listener and the initial session hydration stay in sync. */
+function userFromSession(session) {
+  if (!session?.user) return null;
+  const m = session.user.user_metadata || {};
+  return {
+    id:     session.user.id,
+    email:  session.user.email,
+    // Google OAuth returns avatar_url + picture (same URL); Magic Link has
+    // neither and we gracefully fall back to the green dot indicator.
+    avatar: m.avatar_url || m.picture || null,
+    name:   m.full_name || m.name || null,
+  };
+}
+
 /** Boot sequence: restores existing session (if any), then listens for
     future auth changes. Called once from advisorBoot. */
 async function initCloudSync() {
@@ -7126,7 +7141,7 @@ async function initCloudSync() {
 
   // Auth state listener — fires for SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED, etc.
   sb.auth.onAuthStateChange((event, session) => {
-    currentUser = session?.user ? { id: session.user.id, email: session.user.email } : null;
+    currentUser = userFromSession(session);
     renderAuthStatus();
     if (event === 'SIGNED_IN') {
       // Chain: pull watchlist from cloud first, THEN auto-refresh signals.
@@ -7145,7 +7160,7 @@ async function initCloudSync() {
   // Hydrate any existing session from localStorage (Supabase persists session there)
   const { data: { session } } = await sb.auth.getSession();
   if (session) {
-    currentUser = { id: session.user.id, email: session.user.email };
+    currentUser = userFromSession(session);
     renderAuthStatus();
     pullWatchlistFromCloud();
   } else {
@@ -7191,6 +7206,11 @@ async function signInWithGoogle() {
   return { error: error?.message };
 }
 
+// Metadata per symbol — currently just addedAt. Populated from cloud on pull,
+// and from local push timestamps when the user stars a symbol while online.
+// Keyed by symbol → { addedAt: ISO string }.
+const watchlistMeta = {};
+
 /** Pull cloud watchlist, merge with local (union semantics: on first login
     we UNION local + cloud so the user never loses symbols they added offline
     before signing in). Subsequent pulls effectively replace local with cloud
@@ -7199,9 +7219,13 @@ async function pullWatchlistFromCloud() {
   const sb = ensureSupabase();
   if (!sb || !currentUser) return;
   try {
-    const { data, error } = await sb.from('watchlist').select('symbol').eq('user_id', currentUser.id);
+    const { data, error } = await sb.from('watchlist').select('symbol, added_at').eq('user_id', currentUser.id);
     if (error) { console.warn('cloud pull failed:', error.message); return; }
-    const cloudSymbols = (data || []).map(r => r.symbol);
+    const cloudRows = data || [];
+    const cloudSymbols = cloudRows.map(r => r.symbol);
+    // Store addedAt timestamps for the account modal to display
+    cloudRows.forEach(r => { watchlistMeta[r.symbol] = { addedAt: r.added_at }; });
+
     const localBefore  = watchlist.slice();
 
     // Union merge — safe on first login, idempotent afterwards
@@ -7213,7 +7237,8 @@ async function pullWatchlistFromCloud() {
     const localOnly = localBefore.filter(s => !cloudSymbols.includes(s));
     for (const sym of localOnly) pushSymbolToCloud(sym);
 
-    // Reflect merged list in UI
+    // Reflect merged list in UI + refresh pill (count changed)
+    renderAuthStatus();
     if (scanData) { renderWatchlist(); renderTable(); }
     console.info(`watchlist merged: cloud=${cloudSymbols.length}, local-only=${localOnly.length}, total=${merged.length}`);
   } catch(e) { console.warn('cloud pull error:', e); }
@@ -7222,6 +7247,11 @@ async function pullWatchlistFromCloud() {
 /** Fire-and-forget add. Uses upsert so double-clicks on the same symbol don't
     create a duplicate error (composite PK would reject a plain INSERT). */
 async function pushSymbolToCloud(sym) {
+  // Record local addedAt immediately so the account modal reflects "נוסף היום"
+  // without waiting for the cloud roundtrip. Cloud's added_at (from the DB
+  // default) will overwrite on the next pull — they should be within seconds.
+  watchlistMeta[sym] = { addedAt: new Date().toISOString() };
+
   const sb = ensureSupabase();
   if (!sb || !currentUser) return;
   try {
@@ -7272,10 +7302,18 @@ function renderAuthStatus() {
   const el = $('auth-status');
   if (!el) return;
   if (currentUser) {
+    const count = watchlist.length;
+    // Avatar from Google OAuth (Magic Link has no avatar → fallback to dot).
+    // referrerpolicy is needed — without it Google's CDN returns 403 when the
+    // request comes from a non-google.com origin.
+    const avatar = currentUser.avatar
+      ? `<img src="${currentUser.avatar}" class="auth-avatar" alt="" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'auth-dot'}))">`
+      : `<span class="auth-dot"></span>`;
     el.innerHTML = `
       <div class="auth-pill auth-pill-connected" onclick="openAuthModal('account')" title="חשבון ${currentUser.email}">
-        <span class="auth-dot"></span>
+        ${avatar}
         <span class="auth-email">${currentUser.email}</span>
+        <span class="auth-count" title="${count} מניות ברשימה">${count}</span>
       </div>`;
   } else {
     el.innerHTML = `
@@ -7283,7 +7321,7 @@ function renderAuthStatus() {
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
-        <span>התחבר לסנכרון רשימה</span>
+        <span>התחבר לסנכרון</span>
       </button>`;
   }
 }
@@ -7314,18 +7352,7 @@ function openAuthModal(mode) {
       </form>`;
   } else if (mode === 'account') {
     title.textContent = 'החשבון שלי';
-    body.innerHTML = `
-      <div class="auth-account">
-        <div class="auth-field">
-          <div class="auth-field-lbl">מחובר כ-</div>
-          <div class="auth-field-val" dir="ltr">${currentUser.email}</div>
-        </div>
-        <div class="auth-field">
-          <div class="auth-field-lbl">רשימה</div>
-          <div class="auth-field-val">${watchlist.length} מניות מסונכרנות</div>
-        </div>
-        <button class="auth-logout" onclick="handleSignOut()">התנתק</button>
-      </div>`;
+    body.innerHTML = renderAccountView();
   }
 
   $('auth-overlay').classList.add('open');
@@ -7367,6 +7394,211 @@ async function handleSignIn(event) {
   }
 }
 
+/** Build the HTML for the "החשבון שלי" modal body. Pulls together: user
+    header (avatar/name/email), quick stats (count + avg score + signal
+    distribution), smart alerts (actionable warnings), and the watchlist
+    stock list with exit state + date added. All values come from in-memory
+    state — no network calls. */
+function renderAccountView() {
+  // Assemble per-stock view objects with everything we need for display
+  const items = watchlist.map(sym => {
+    const stock = scanData?.stocks.find(x => x.sym === sym) || null;
+    const exit  = stock ? computeExitSignal(sym) : null;
+    const meta  = watchlistMeta[sym] || null;
+    return { sym, stock, exit, meta };
+  });
+
+  const withSignal = items.filter(i => i.exit);
+  const avgScore   = withSignal.length
+    ? Math.round(withSignal.reduce((a,i) => a + (i.stock?.score || 0), 0) / withSignal.length)
+    : null;
+  const strongCount  = withSignal.filter(i => i.exit.state === 'strong').length;
+  const cautionCount = withSignal.filter(i => i.exit.state === 'caution').length;
+  const exitCount    = withSignal.filter(i => i.exit.state === 'exit').length;
+
+  const alerts = generateSmartAlerts(items);
+
+  // USER HEADER
+  const avatarHtml = currentUser.avatar
+    ? `<img src="${currentUser.avatar}" class="auth-user-avatar" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'">`
+    : `<div class="auth-user-avatar-fallback">${(currentUser.email || '?')[0].toUpperCase()}</div>`;
+
+  const header = `
+    <div class="auth-user-hdr">
+      ${avatarHtml}
+      <div class="auth-user-info">
+        ${currentUser.name ? `<div class="auth-user-name">${currentUser.name}</div>` : ''}
+        <div class="auth-user-email" dir="ltr">${currentUser.email}</div>
+      </div>
+    </div>`;
+
+  // QUICK STATS
+  const stats = items.length === 0 ? '' : `
+    <div class="auth-stats">
+      <div class="auth-stat">
+        <div class="auth-stat-val">${items.length}</div>
+        <div class="auth-stat-lbl">מניות</div>
+      </div>
+      <div class="auth-stat">
+        <div class="auth-stat-val">${avgScore ?? '—'}</div>
+        <div class="auth-stat-lbl">ציון ממוצע</div>
+      </div>
+      <div class="auth-stat auth-stat-strong">
+        <div class="auth-stat-val">${strongCount}</div>
+        <div class="auth-stat-lbl">חזקות</div>
+      </div>
+      <div class="auth-stat auth-stat-exit">
+        <div class="auth-stat-val">${exitCount || cautionCount}</div>
+        <div class="auth-stat-lbl">${exitCount ? 'ליציאה' : 'שים לב'}</div>
+      </div>
+    </div>`;
+
+  // SMART ALERTS
+  const alertsHtml = alerts.length === 0 ? '' : `
+    <div class="auth-section">
+      <div class="auth-section-title">התראות חכמות</div>
+      <div class="auth-alerts">
+        ${alerts.map(a => `
+          <div class="auth-alert auth-alert-${a.severity}">
+            <div class="auth-alert-icon">${a.icon}</div>
+            <div class="auth-alert-text">
+              ${a.sym ? `<strong>${a.sym}</strong> ` : ''}${a.message}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+
+  // STOCK LIST
+  const stocksHtml = items.length === 0 ? `
+    <div class="auth-empty">עדיין לא הוספת מניות. סמן מניות ברשימה מפאנל הפירוט.</div>
+  ` : `
+    <div class="auth-section">
+      <div class="auth-section-title">הרשימה שלי (${items.length})</div>
+      <div class="auth-stocks">
+        ${items.map(i => {
+          const sigLabel = i.exit ? { strong:'חזק', caution:'חלש', exit:'יציאה' }[i.exit.state] : '—';
+          const sigClass = i.exit ? `auth-stock-sig-${i.exit.state}` : 'auth-stock-sig-unknown';
+          const addedStr = i.meta?.addedAt ? relativeTimeHebrew(i.meta.addedAt) : '';
+          const scoreStr = i.stock?.score != null ? `${i.stock.score}` : '—';
+          return `
+            <div class="auth-stock">
+              <div class="auth-stock-main">
+                <div class="auth-stock-sym">${i.sym}</div>
+                <div class="auth-stock-name">${i.stock?.name || 'לא נסרק'}</div>
+              </div>
+              <div class="auth-stock-meta">
+                ${addedStr ? `<span class="auth-stock-added">${addedStr}</span>` : ''}
+                <span class="auth-stock-score">${scoreStr}</span>
+                <span class="auth-stock-sig ${sigClass}">${sigLabel}</span>
+              </div>
+            </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+  return `
+    ${header}
+    ${stats}
+    ${alertsHtml}
+    ${stocksHtml}
+    <button class="auth-logout" onclick="handleSignOut()">התנתק</button>
+  `;
+}
+
+/** Generate actionable alerts based on exit signals + score thresholds.
+    Rules are intentionally conservative — alerts should be rare enough
+    that the user pays attention when they appear, not numb to them. */
+function generateSmartAlerts(items) {
+  const alerts = [];
+  const valid = items.filter(i => i.stock && i.exit);
+  if (valid.length === 0) return alerts;
+
+  // ─── WARNING ALERTS (per stock) ────────────────────────────────────────
+  // Only the most important issue per stock to avoid duplication. Priority:
+  // Y1 negative > MA40 broken > dropped from top.
+  for (const i of valid) {
+    if (i.stock.y1 != null && i.stock.y1 < 0) {
+      alerts.push({
+        sym: i.sym, severity: 'bad', icon: '⚠',
+        message: `תשואה 12ח' שלילית (${fmtPct(i.stock.y1)}) — חוק Antonacci מחייב יציאה`
+      });
+    } else if (i.exit.signals.ma === false) {
+      alerts.push({
+        sym: i.sym, severity: 'bad', icon: '↓',
+        message: `ירד מתחת ל-MA40 ($${fmt(i.exit.sma40)}) — שבירת מגמה לפי Weinstein`
+      });
+    } else if (i.stock.rank > EXIT_TOP_N) {
+      alerts.push({
+        sym: i.sym, severity: 'warn', icon: '▽',
+        message: `דירוג #${i.stock.rank} — מחוץ לטופ ${EXIT_TOP_N}, המומנטום נחלש`
+      });
+    }
+  }
+
+  // ─── POSITIVE ALERTS ───────────────────────────────────────────────────
+  // Only the leader (biggest 3M gainer), and only if it's meaningfully ahead
+  const withM3 = valid.filter(i => i.stock.m3 != null);
+  if (withM3.length >= 3) {
+    const leader = withM3.slice().sort((a,b) => b.stock.m3 - a.stock.m3)[0];
+    if (leader.stock.m3 > 30) {
+      alerts.push({
+        sym: leader.sym, severity: 'good', icon: '▲',
+        message: `+${leader.stock.m3.toFixed(0)}% ב-3 חודשים — מוביל ברשימה שלך`
+      });
+    }
+  }
+
+  // Top-tier performer (rank ≤ 5 in the full universe, all signals OK)
+  for (const i of valid) {
+    if (i.exit.state === 'strong' && i.stock.rank <= 5) {
+      alerts.push({
+        sym: i.sym, severity: 'good', icon: '★',
+        message: `דירוג #${i.stock.rank} מתוך ${scanData.universeSize} — מניה מובילה במדד`
+      });
+    }
+  }
+
+  // ─── META ALERTS (about the list as a whole) ───────────────────────────
+  // Sector concentration: 60%+ in one sector and ≥3 stocks total
+  const sectorCounts = {};
+  valid.forEach(i => {
+    const sec = i.stock.sectorName;
+    if (sec) sectorCounts[sec] = (sectorCounts[sec] || 0) + 1;
+  });
+  const dominant = Object.entries(sectorCounts).sort((a,b) => b[1]-a[1])[0];
+  if (dominant && valid.length >= 3 && dominant[1] / valid.length >= 0.6) {
+    alerts.push({
+      sym: null, severity: 'info', icon: '◈',
+      message: `${dominant[1]} מתוך ${valid.length} מניותיך בסקטור ${dominant[0]} — ריכוז גבוה, שקול פיזור`
+    });
+  }
+
+  return alerts;
+}
+
+/** Hebrew relative time formatter. "היום" / "אתמול" / "לפני 3 ימים" /
+    "לפני 2 שבועות" / "לפני 5 חודשים" / "לפני שנה". Used in the account
+    modal to show when each watchlist stock was added. */
+function relativeTimeHebrew(iso) {
+  const ts = new Date(iso).getTime();
+  if (!ts || isNaN(ts)) return '';
+  const mins = Math.floor((Date.now() - ts) / 60000);
+  if (mins < 5)    return 'עכשיו';
+  if (mins < 60)   return `לפני ${mins} דק׳`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24)  return hours === 1 ? 'לפני שעה' : `לפני ${hours} שעות`;
+  const days = Math.floor(hours / 24);
+  if (days === 1)  return 'אתמול';
+  if (days < 7)    return `לפני ${days} ימים`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 4)   return weeks === 1 ? 'לפני שבוע' : `לפני ${weeks} שבועות`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return months === 1 ? 'לפני חודש' : `לפני ${months} חודשים`;
+  const years = Math.floor(days / 365);
+  return years === 1 ? 'לפני שנה' : `לפני ${years} שנים`;
+}
+
 async function handleSignOut() {
   await signOut();
   closeAuthModalDirect();
@@ -7389,8 +7621,14 @@ async function handleGoogleSignIn() {
 function toggleWatchlist(sym) {
   const idx = watchlist.indexOf(sym);
   const wasAdd = idx < 0;
-  if (idx >= 0) watchlist.splice(idx, 1);
-  else watchlist.push(sym);
+  if (idx >= 0) {
+    watchlist.splice(idx, 1);
+    delete watchlistMeta[sym];   // clean up meta so account modal stays in sync
+  } else {
+    watchlist.push(sym);
+    // pushSymbolToCloud will stamp addedAt; for logged-out users, stamp now
+    if (!currentUser) watchlistMeta[sym] = { addedAt: new Date().toISOString() };
+  }
   localStorage.setItem(WL_KEY, JSON.stringify(watchlist));
 
   // Cloud sync — fire-and-forget. Silently no-ops when not signed in.
@@ -7399,6 +7637,7 @@ function toggleWatchlist(sym) {
     else        removeSymbolFromCloud(sym);
   }
 
+  renderAuthStatus();              // count in pill changed
   renderWatchlist();
   if ($('dt-sym').textContent === sym && $('dt-overlay').classList.contains('open')) {
     openDetail(sym);
