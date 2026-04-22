@@ -7791,6 +7791,15 @@ const watchlistMeta = {};
     we UNION local + cloud so the user never loses symbols they added offline
     before signing in). Subsequent pulls effectively replace local with cloud
     since local + cloud have already converged. */
+/* Tracks whether the current session has completed its initial sync.
+   First pull after sign-in does a UNION merge (so local-only symbols
+   uploaded before signing in get pushed to cloud). All subsequent pulls
+   treat cloud as authoritative — necessary for cross-device deletes to
+   actually propagate. Without this, a delete on device A would get
+   "undone" on device B the next time B pulls (B's local still has the
+   old symbol, union with cloud re-creates it and re-uploads to cloud). */
+let cloudInitialSyncDone = false;
+
 async function pullWatchlistFromCloud() {
   const sb = ensureSupabase();
   if (!sb || !currentUser) return;
@@ -7799,24 +7808,38 @@ async function pullWatchlistFromCloud() {
     if (error) { console.warn('cloud pull failed:', error.message); return; }
     const cloudRows = data || [];
     const cloudSymbols = cloudRows.map(r => r.symbol);
-    // Store addedAt timestamps for the account modal to display
-    cloudRows.forEach(r => { watchlistMeta[r.symbol] = { addedAt: r.added_at }; });
+    // Rebuild the meta map from cloud (authoritative), clearing stale entries
+    const newMeta = {};
+    cloudRows.forEach(r => { newMeta[r.symbol] = { addedAt: r.added_at }; });
+    watchlistMeta = newMeta;
 
-    const localBefore  = watchlist.slice();
+    const localBefore = watchlist.slice();
 
-    // Union merge — safe on first login, idempotent afterwards
-    const merged = [...new Set([...cloudSymbols, ...localBefore])];
-    watchlist = merged;
+    if (!cloudInitialSyncDone) {
+      // FIRST pull this session — union merge. Lets users who built a local
+      // watchlist while logged out carry it with them when they sign in.
+      const merged = [...new Set([...cloudSymbols, ...localBefore])];
+      watchlist = merged;
+      cloudInitialSyncDone = true;
+
+      // Push any local-only symbols to cloud to complete the merge
+      const localOnly = localBefore.filter(s => !cloudSymbols.includes(s));
+      for (const sym of localOnly) pushSymbolToCloud(sym);
+      console.info(`watchlist INITIAL sync: cloud=${cloudSymbols.length}, local-only=${localOnly.length}, total=${merged.length}`);
+    } else {
+      // SUBSEQUENT pulls — cloud is the source of truth. If a symbol was
+      // deleted on another device, it's missing from cloudSymbols now, so
+      // we must drop it from local rather than union-ing it back in.
+      watchlist = cloudSymbols.slice();
+      console.info(`watchlist replaced from cloud: ${cloudSymbols.length} symbols`);
+    }
+
     try { localStorage.setItem(WL_KEY, JSON.stringify(watchlist)); } catch(e){}
-
-    // Push any local-only symbols to cloud to complete the merge
-    const localOnly = localBefore.filter(s => !cloudSymbols.includes(s));
-    for (const sym of localOnly) pushSymbolToCloud(sym);
 
     // Reflect merged list in UI + refresh pill (count changed)
     renderAuthStatus();
     if (scanData) { renderWatchlist(); renderTable(); }
-    console.info(`watchlist merged: cloud=${cloudSymbols.length}, local-only=${localOnly.length}, total=${merged.length}`);
+    refreshAccountView();
   } catch(e) { console.warn('cloud pull error:', e); }
 }
 
@@ -7929,10 +7952,40 @@ function openAuthModal(mode) {
   } else if (mode === 'account') {
     title.textContent = 'החשבון שלי';
     body.innerHTML = renderAccountView();
+
+    // If we have no scan data yet (user opened account without visiting
+    // Advisor), kick off a standalone watchlist scan in the background
+    // and re-render once scores/signals are ready. This lets the user open
+    // their account panel from anywhere and see real data, not "לא נסרק".
+    if (!scanData && watchlist.length > 0) {
+      scanWatchlistStandalone().then(wlData => {
+        if (wlData) {
+          scanData = wlData;
+          // Re-render only if the account modal is still open — user may
+          // have closed it while we were fetching.
+          if ($('auth-overlay')?.classList.contains('open') && title.textContent === 'החשבון שלי') {
+            body.innerHTML = renderAccountView();
+          }
+        }
+      });
+    }
   }
 
   $('auth-overlay').classList.add('open');
   if (mode === 'login') setTimeout(() => $('auth-email-input')?.focus(), 100);
+}
+
+/** Re-render the account modal contents. Called after watchlist mutations
+    (add/remove) so the modal list, stat counters, and smart alerts stay in
+    sync without closing-and-reopening the modal. */
+function refreshAccountView() {
+  const overlay = $('auth-overlay');
+  const body = $('auth-body');
+  const title = $('auth-title');
+  if (!overlay || !body || !title) return;
+  if (!overlay.classList.contains('open')) return;
+  if (title.textContent !== 'החשבון שלי') return;
+  body.innerHTML = renderAccountView();
 }
 
 function closeAuthModal(e) {
@@ -8067,6 +8120,7 @@ function renderAccountView() {
                 ${addedStr ? `<span class="auth-stock-added">${addedStr}</span>` : ''}
                 <span class="auth-stock-score">${scoreStr}</span>
                 <span class="auth-stock-sig ${sigClass}">${sigLabel}</span>
+                <button class="auth-stock-remove" onclick="event.stopPropagation();toggleWatchlist('${i.sym}')" title="הסר מהרשימה" aria-label="הסר ${i.sym}">✕</button>
               </div>
             </div>`;
         }).join('')}
@@ -8177,6 +8231,7 @@ function relativeTimeHebrew(iso) {
 
 async function handleSignOut() {
   await signOut();
+  cloudInitialSyncDone = false;   // next sign-in should union-merge again
   closeAuthModalDirect();
 }
 
@@ -8219,6 +8274,7 @@ function toggleWatchlist(sym) {
     openDetail(sym);
   }
   if (scanData) renderTable();
+  refreshAccountView();            // no-op if account modal isn't open
 }
 
 function renderWatchlist() {
@@ -8377,7 +8433,7 @@ document.addEventListener('keydown', e => {
     toggleWatchlist, refreshWatchlist,
     openAuthModal, closeAuthModal, closeAuthModalDirect,
     handleSignIn, handleSignOut, handleGoogleSignIn,
-    initCloudSync,
+    initCloudSync, refreshAccountView,
     // Watchlist-first feature (add symbol + search box)
     openAddSymbolModal, handleAddSymbol,
     setTableSearch, clearTableSearch,
