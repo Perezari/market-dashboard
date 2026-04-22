@@ -7808,10 +7808,11 @@ async function pullWatchlistFromCloud() {
     if (error) { console.warn('cloud pull failed:', error.message); return; }
     const cloudRows = data || [];
     const cloudSymbols = cloudRows.map(r => r.symbol);
-    // Rebuild the meta map from cloud (authoritative), clearing stale entries
-    const newMeta = {};
-    cloudRows.forEach(r => { newMeta[r.symbol] = { addedAt: r.added_at }; });
-    watchlistMeta = newMeta;
+    // Rebuild the meta map from cloud (authoritative), clearing stale entries.
+    // Must mutate in place because watchlistMeta is a const binding — used
+    // as a module-level singleton by other functions.
+    for (const k of Object.keys(watchlistMeta)) delete watchlistMeta[k];
+    cloudRows.forEach(r => { watchlistMeta[r.symbol] = { addedAt: r.added_at }; });
 
     const localBefore = watchlist.slice();
 
