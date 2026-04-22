@@ -8045,12 +8045,22 @@ async function pullWatchlistFromCloud() {
     const { data, error } = await sb.from('watchlist').select('symbol, added_at').eq('user_id', currentUser.id);
     if (error) { console.warn('cloud pull failed:', error.message); return; }
     const cloudRows = data || [];
-    const cloudSymbols = cloudRows.map(r => r.symbol);
+    // Filter out symbols the user just removed locally — their DELETE is
+    // still in flight, so cloudRows may contain them even though they
+    // should be gone. Without this filter, deletes can appear to "undo".
+    const cloudSymbols = cloudRows
+      .map(r => r.symbol)
+      .filter(sym => !pendingRemovals.has(sym));
     // Rebuild the meta map from cloud (authoritative), clearing stale entries.
+    // Skip pending-removal symbols (same reason as cloudSymbols filter above).
     // Must mutate in place because watchlistMeta is a const binding — used
     // as a module-level singleton by other functions.
     for (const k of Object.keys(watchlistMeta)) delete watchlistMeta[k];
-    cloudRows.forEach(r => { watchlistMeta[r.symbol] = { addedAt: r.added_at }; });
+    cloudRows.forEach(r => {
+      if (!pendingRemovals.has(r.symbol)) {
+        watchlistMeta[r.symbol] = { addedAt: r.added_at };
+      }
+    });
 
     const localBefore = watchlist.slice();
 
@@ -8104,12 +8114,24 @@ async function pushSymbolToCloud(sym) {
 async function removeSymbolFromCloud(sym) {
   const sb = ensureSupabase();
   if (!sb || !currentUser) return;
+  // Track pending removals so a racing pullWatchlistFromCloud doesn't
+  // re-add the symbol before our DELETE round-trip completes.
+  pendingRemovals.add(sym);
   try {
     const { error } = await sb.from('watchlist').delete()
       .eq('user_id', currentUser.id).eq('symbol', sym);
     if (error) console.warn(`remove ${sym} failed:`, error.message);
   } catch(e) { console.warn(`remove ${sym} error:`, e); }
+  finally {
+    pendingRemovals.delete(sym);
+  }
 }
+
+/* Tracks symbols that the user just removed locally but whose cloud DELETE
+   call may still be in flight. Without this, a pullWatchlistFromCloud that
+   races a delete could resurrect the symbol (cloud still has it, local
+   union/replace brings it back, then our "push local-only" step re-uploads). */
+const pendingRemovals = new Set();
 
 // ─── AUTO-REFRESH ON BOOT ──────────────────────────────────────────────────
 // On every app load we refresh the watchlist automatically so signals reflect
@@ -8351,6 +8373,7 @@ function renderAccountView() {
           const scoreStr = i.stock?.score != null ? `${i.stock.score}` : '—';
           return `
             <div class="auth-stock">
+              <img class="auth-stock-logo" src="https://financialmodelingprep.com/image-stock/${i.sym}.png" alt="" loading="lazy" onerror="this.classList.add('auth-stock-logo-err')">
               <div class="auth-stock-main">
                 <div class="auth-stock-sym">${i.sym}</div>
                 <div class="auth-stock-name">${i.stock?.name || 'לא נסרק'}</div>

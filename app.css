@@ -4353,7 +4353,9 @@ body.overlay-scroll-locked {
 /* ═══ MOBILE: FULL-SCREEN ACCOUNT/AUTH MODAL ═══
    On phones, the cramped centered-card look wastes space — the user has
    a watchlist with 10-20 stocks that needs vertical room. Full-screen
-   gives them the same immersive feel as a native app's account view. */
+   gives them the same immersive feel as a native app's account view.
+   Starts BELOW the term-bar (46px + safe-area-inset-top) so the user can
+   still see the clock and close the modal without losing context. */
 @media (max-width: 600px) {
   .auth-overlay {
     padding: 0;
@@ -4363,14 +4365,22 @@ body.overlay-scroll-locked {
   .auth-panel {
     max-width: none;
     width: 100%;
-    max-height: 100vh;
-    max-height: 100dvh;  /* dynamic viewport — handles iOS Safari URL bar */
+    max-height: 100dvh;
     height: 100dvh;
     border-radius: 0;
     border: none;
-    transform: translateY(20px);  /* subtle slide-up instead of scale */
+    transform: translateY(20px);
   }
   .auth-overlay.open .auth-panel { transform: translateY(0) }
+  /* Reserve room for the OS status bar (notch / Dynamic Island / Android
+     clock) inside the sticky header itself — same pattern as .dt-hdr. */
+  .auth-hdr {
+    padding-top: calc(14px + env(safe-area-inset-top, 24px));
+  }
+  /* And bottom padding for home-indicator clearance on long scrolls */
+  .auth-body {
+    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 .auth-hdr{
@@ -4502,6 +4512,20 @@ body.overlay-scroll-locked {
   background:var(--bg3);
   border:1px solid var(--border);
   border-radius:6px;
+}
+/* Company logo — matches the picks-table sym-logo pattern. Graceful fallback
+   to a neutral tile when the image fails (many small/foreign stocks don't
+   have logos on financialmodelingprep). */
+.auth-stock-logo{
+  width:26px;height:26px;
+  flex-shrink:0;
+  border-radius:5px;
+  object-fit:contain;
+  background:var(--bg4);
+  border:1px solid var(--border);
+}
+.auth-stock-logo.auth-stock-logo-err{
+  visibility:hidden;
 }
 .auth-stock-main{flex:1;min-width:0}
 .auth-stock-sym{
