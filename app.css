@@ -4372,15 +4372,6 @@ body.overlay-scroll-locked {
     transform: translateY(20px);
   }
   .auth-overlay.open .auth-panel { transform: translateY(0) }
-  /* Reserve room for the OS status bar (notch / Dynamic Island / Android
-     clock) inside the sticky header itself — same pattern as .dt-hdr. */
-  .auth-hdr {
-    padding-top: calc(14px + env(safe-area-inset-top, 24px));
-  }
-  /* And bottom padding for home-indicator clearance on long scrolls */
-  .auth-body {
-    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
-  }
 }
 
 .auth-hdr{
@@ -4389,6 +4380,18 @@ body.overlay-scroll-locked {
   border-bottom:1px solid var(--border);
   background:var(--bg3);
   position:sticky;top:0;z-index:2;
+}
+
+/* Mobile safe-area padding for auth header. MUST come AFTER the base rule
+   above, otherwise base's padding:14px 18px shorthand wins and overrides
+   the padding-top here. CSS cascade order matters when specificity ties. */
+@media (max-width: 600px) {
+  .auth-hdr {
+    padding-top: calc(14px + env(safe-area-inset-top, 24px));
+  }
+  .auth-body {
+    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  }
 }
 .auth-title{font-size:14px;font-weight:600;color:var(--text)}
 .auth-close{
