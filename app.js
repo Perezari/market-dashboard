@@ -4461,7 +4461,7 @@ window.showKey = function(){
       d.textContent = 'build · ' + str;
     }
   }
-  tick(); setInterval(tick,1000);
+  tick(); setInterval(tick,30000);
   setInterval(()=>{
     const el=document.getElementById('term-latency');
     if(el) el.textContent=(50+Math.floor(Math.random()*50))+'ms';
@@ -4820,22 +4820,8 @@ function closeMobileMenu(){
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMobileMenu(); });
 
-/* ── Terminal clocks ── */
-(function(){
-  function tick(){
-    const now = new Date();
-    const tlv = now.toLocaleTimeString('en-GB',{hour12:false,timeZone:'Asia/Jerusalem'});
-    const ny  = now.toLocaleTimeString('en-GB',{hour12:false,timeZone:'America/New_York'});
-    const a=document.getElementById('term-clock-tlv'); if(a)a.textContent=tlv;
-    const b=document.getElementById('term-clock-ny'); if(b)b.textContent=ny;
-    const d=document.getElementById('hdr-build');
-    if(d){
-      const str=now.toLocaleDateString('en-US',{year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\//g,'.');
-      d.textContent = 'build · ' + str;
-    }
-  }
-  tick(); setInterval(tick,1000);
-})();
+/* Duplicate terminal-clock IIFE removed — the one at line 4450 already
+   handles term-clock-tlv/ny/hdr-build with HH:MM format (no seconds). */
 
 /* ── Indicators configuration ── */
 const INDICATORS = [

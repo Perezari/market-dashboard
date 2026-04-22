@@ -1877,7 +1877,6 @@ body::after{
   backdrop-filter:blur(16px);
   -webkit-backdrop-filter:blur(16px);
   direction:ltr;
-  box-shadow:0 2px 10px rgb(0 0 0 / 0%) !important);
 }
 
 /* LEFT side: clocks + LIVE */
@@ -1902,6 +1901,7 @@ body::after{
   background:rgba(240,181,106,.1);
   border:1px solid rgba(240,181,106,.35);
   border-radius:14px;
+  min-width:0;
   max-width:100%;
   transition:background .25s, border-color .25s;
 }
@@ -1971,10 +1971,14 @@ body::after{
   .tb-version{display:none}
   .tb-brand-text{display:none}
   .tb-item.tb-tlv{display:none}
-  .tb-status-pill{padding:4px 8px;min-width:0;overflow:hidden}
+  .tb-status-pill{padding:4px 8px}
   .tb-status-pill .label{font-size:8.5px;letter-spacing:1px}
   /* מסתיר את ה-"ישראל XX:XX" הפנימי במובייל כדי שהפיל לא יגלוש */
   .tb-countdown span{display:none !important}
+  /* Hide the "שוק פתוח / סגור" text on mobile — the dot color and the
+     countdown already communicate market state. Frees significant pill
+     width so "סגירה בעוד 00:52" fits comfortably. */
+  .tb-status-pill .market-label{display:none}
 }
 @media(max-width:520px){
   .term-bar{height:44px}
