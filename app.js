@@ -8780,4 +8780,58 @@ document.addEventListener('keydown', e => {
   window.navigate = function(route){
     location.hash = '#/' + route;
   };
+
+  // ── BODY SCROLL LOCK FOR OVERLAYS ──────────────────────────────────────
+  // When any modal overlay is open, we lock the background from scrolling.
+  // Rather than adding lock/unlock code at every open/close call site (30+
+  // in this file — easy to miss one), a MutationObserver watches the DOM
+  // and reacts to any element whose class matches `*-overlay` gaining/losing
+  // the `.open` modifier. Works for every current modal (detail panel, auth,
+  // methodology, lab, mobile menu, stock picker) AND any future one that
+  // follows the same convention. Safe on mobile because we preserve the
+  // scroll position using position:fixed + top offset, then restore on close.
+  function installOverlayScrollLock() {
+    let lockedScrollY = 0;
+
+    function isAnyOverlayOpen() {
+      // Check all elements whose class contains "-overlay"
+      const all = document.querySelectorAll('[class*="-overlay"]');
+      for (const el of all) {
+        if (el.classList.contains('open')) return true;
+      }
+      return false;
+    }
+
+    function applyLock(locked) {
+      const body = document.body;
+      const alreadyLocked = body.classList.contains('overlay-scroll-locked');
+      if (locked && !alreadyLocked) {
+        lockedScrollY = window.scrollY;
+        body.style.top = `-${lockedScrollY}px`;
+        body.classList.add('overlay-scroll-locked');
+      } else if (!locked && alreadyLocked) {
+        body.classList.remove('overlay-scroll-locked');
+        body.style.top = '';
+        window.scrollTo(0, lockedScrollY);
+      }
+    }
+
+    const observer = new MutationObserver(() => {
+      applyLock(isAnyOverlayOpen());
+    });
+
+    // Observe class changes anywhere in the document — classList toggles
+    // bubble up through attributes. subtree:true catches deep-nested overlays.
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['class'],
+      subtree: true,
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', installOverlayScrollLock);
+  } else {
+    installOverlayScrollLock();
+  }
 })();

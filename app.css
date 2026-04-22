@@ -3901,7 +3901,13 @@ table.picks thead th.sorted::after{content:' ↓';font-family:var(--mono)}
 table.picks thead th.sorted.asc::after{content:' ↑'}
 table.picks thead th.num{text-align:left;direction:ltr}
 table.picks tbody tr{border-bottom:1px solid var(--border);transition:background .12s;cursor:pointer}
-table.picks tbody tr:hover{background:rgba(79,199,138,.04)}
+/* Hover highlight only on devices with a real hover-capable pointer. Without
+   this media gate, tapping a row on mobile leaves it highlighted until the
+   user taps somewhere else — the browser treats the touch as a persistent
+   hover because there's no mouseout event on touch devices. */
+@media (hover: hover) and (pointer: fine) {
+  table.picks tbody tr:hover{background:rgba(79,199,138,.04)}
+}
 table.picks tbody tr:last-child{border-bottom:none}
 table.picks tbody td{padding:9px 8px;white-space:nowrap;vertical-align:middle}
 td.rk{font-family:var(--mono);color:var(--dim);font-weight:700;font-size:11px;width:34px;text-align:center}
@@ -4076,6 +4082,45 @@ td.pct.flat{color:var(--dim)}
      is tight. Keep "הוסף מניה" visible since it's the primary add action. */
   .wl-banner-actions .wl-refresh-btn span{display:none}
   .wl-refresh-btn{padding:5px 8px}
+}
+
+/* ═══ OVERLAY SCROLL LOCK ═══
+   Applied to body when any overlay (.auth-overlay, .dt-overlay, .mth-overlay,
+   .lab-overlay, .modal-overlay, .stock-overlay, .mob-overlay) has .open class.
+   Uses position:fixed instead of overflow:hidden because iOS Safari ignores
+   overflow on body — fixed-position is the only cross-browser reliable way
+   to stop background scroll. The JS-set top offset preserves scroll position
+   visually; on close it gets restored via window.scrollTo. */
+body.overlay-scroll-locked {
+  position: fixed;
+  left: 0;
+  right: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* ═══ TOUCH-DEVICE HOVER FIX ═══
+   Touch devices (phones, most tablets) don't fire mouseout when a tap ends,
+   so :hover styles "stick" to the last-tapped element until the user taps
+   elsewhere. The effect is most jarring on table rows where background
+   highlight and filter:brightness shifts linger.
+
+   `(hover: none)` matches devices without a hover-capable primary pointer.
+   On those, we strip background / filter hover effects from all table rows
+   globally. Regular button hovers stay untouched because they're momentary
+   in practice (the tap triggers the click and the element is usually
+   destroyed or the page navigates). */
+@media (hover: none) {
+  tr:hover td,
+  tr:hover {
+    background: unset !important;
+    filter: none !important;
+  }
+  /* Re-assert cursor for table rows — we want pointer to still indicate
+     clickable even though we stripped the visual highlight. */
+  table.picks tbody tr,
+  .t tbody tr,
+  .htbl tbody tr { cursor: pointer; }
 }
 
 /* ═══ TABLE SEARCH BOX ═══ */
