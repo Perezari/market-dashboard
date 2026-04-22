@@ -1496,7 +1496,7 @@ body.light .macro-chg.down{background:rgba(204,26,58,.1)}
 .econ-section-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden}
 .econ-section-hdr{padding:10px 14px;border-bottom:1px solid var(--border)}
 .econ-wrap{max-height:480px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
-.econ-row{display:flex;align-items:flex-start;gap:12px;padding:11px 14px;border-bottom:1px solid var(--border);transition:background .12s;cursor:pointer}
+.econ-row{display:flex;align-items:flex-start;gap:12px;padding:11px 14px;border-bottom:1px solid var(--border);transition:background .12s;cursor:pointer;position:relative}
 .econ-row:last-child{border-bottom:none}
 .econ-row:hover{background:var(--bg3)}
 .econ-row:hover .econ-name::after{content:' ↗';font-size:9px;color:var(--blue);opacity:.7}
@@ -1514,7 +1514,31 @@ body.light .macro-chg.down{background:rgba(204,26,58,.1)}
 .econ-dot.high+.econ-impact-lbl{color:#ef4444}.econ-dot.medium+.econ-impact-lbl{color:#f59e0b}.econ-dot.low+.econ-impact-lbl{color:var(--dim)}
 .econ-time{flex-shrink:0;font-family:var(--mono);font-size:9px;color:var(--dim);text-align:right}
 .econ-today-row{background:rgba(0,180,255,.05)!important;border-right:3px solid var(--blue)}
+.econ-soon-row{background:rgba(245,158,11,.04)!important}
 .econ-past{opacity:.4}
+
+/* Star icon for imminent events — absolutely positioned in the top-right
+   corner of the row (inline-start in RTL) so it doesn't affect row height
+   or push other content around. A tiny badge hovering over the row. */
+.econ-star{
+  position:absolute;
+  top:8px;
+  inset-inline-start:6px;
+  width:14px;height:14px;
+  display:flex;align-items:center;justify-content:center;
+  pointer-events:none;  /* click passes through to the row */
+  animation:econ-star-pulse 2.2s ease-in-out infinite;
+  z-index:1;
+}
+.econ-star svg{display:block}
+.econ-star.now{color:var(--blue)}
+.econ-star.soon{color:var(--amber)}
+@keyframes econ-star-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(.88)}}
+
+/* Inline "— היום" / "— מחר" tag in the event name. */
+.econ-when-now{color:var(--blue);font-size:10px;font-weight:700;margin-inline-start:4px}
+.econ-when-soon{color:var(--amber);font-size:10px;font-weight:700;margin-inline-start:4px}
+
 @media(max-width:480px){.econ-time{font-size:8px}}
 
 /* ── EARNINGS CALENDAR ── */
@@ -3400,7 +3424,12 @@ body.light .col.main .sectors-card .t tbody tr.avgrow td.sec-cell{background:var
 }
 #login-overlay .lo-input{
   width:100%;background:transparent;border:none;outline:none;
-  padding:13px 38px 13px 14px;
+  /* #login-overlay has direction:rtl, so inline-start = right side of the
+     box (where the pulse dot sits). Reserve padding on that side for the
+     dot; text scrolls into the open space on the other side. */
+  padding-block:13px;
+  padding-inline-start:30px;
+  padding-inline-end:0px;
   font-family:var(--mono);font-size:12px;color:var(--text);
   letter-spacing:.2px;direction:ltr;
   -webkit-user-select:text;user-select:text;
@@ -3408,7 +3437,7 @@ body.light .col.main .sectors-card .t tbody tr.avgrow td.sec-cell{background:var
 }
 #login-overlay .lo-input::placeholder{color:var(--dimmer)}
 #login-overlay .lo-input-shell::after{
-  content:'';position:absolute;top:50%;left:14px;transform:translateY(-50%);
+  content:'';position:absolute;top:50%;inset-inline-end:14px;transform:translateY(-50%);
   width:6px;height:6px;border-radius:50%;background:var(--dimmer);
 }
 #login-overlay .lo-input-shell:focus-within::after{background:var(--green);box-shadow:0 0 8px var(--green)}
@@ -4292,6 +4321,53 @@ body.overlay-scroll-locked {
   transition:transform .2s cubic-bezier(.2,.7,.3,1), opacity .2s;
 }
 .auth-overlay.open .auth-panel{transform:scale(1);opacity:1}
+
+/* ═══ REMOVE BUTTON IN ACCOUNT STOCK ROWS ═══
+   Small, unobtrusive ✕ on each row. Gets slightly more prominent (red) on
+   hover for desktop; on mobile it's always visible since there's no hover. */
+.auth-stock-remove {
+  width: 24px; height: 24px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--dim);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  transition: background .12s, color .12s, border-color .12s;
+  flex-shrink: 0;
+  font-family: inherit;
+}
+.auth-stock-remove:hover {
+  background: rgba(228,108,108,.1);
+  color: var(--red);
+  border-color: rgba(228,108,108,.3);
+}
+.auth-stock-remove:active { transform: scale(.95) }
+
+/* ═══ MOBILE: FULL-SCREEN ACCOUNT/AUTH MODAL ═══
+   On phones, the cramped centered-card look wastes space — the user has
+   a watchlist with 10-20 stocks that needs vertical room. Full-screen
+   gives them the same immersive feel as a native app's account view. */
+@media (max-width: 600px) {
+  .auth-overlay {
+    padding: 0;
+    align-items: stretch;
+    justify-content: stretch;
+  }
+  .auth-panel {
+    max-width: none;
+    width: 100%;
+    max-height: 100vh;
+    max-height: 100dvh;  /* dynamic viewport — handles iOS Safari URL bar */
+    height: 100dvh;
+    border-radius: 0;
+    border: none;
+    transform: translateY(20px);  /* subtle slide-up instead of scale */
+  }
+  .auth-overlay.open .auth-panel { transform: translateY(0) }
+}
 
 .auth-hdr{
   display:flex;align-items:center;justify-content:space-between;

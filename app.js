@@ -28,13 +28,14 @@ const HEBREW_NEWS_FEEDS = [
 
 // ── English ───────────────────────────────────────────────────
 const EN_NEWS_FEEDS = [
-  { name: 'Benzinga Markets',   url: 'https://rss.app/feeds/6xoFWSgjRpOcDBAX.xml', domain: 'benzinga.com' },
-  { name: 'Benzinga Financial', url: 'https://rss.app/feeds/GlMwezZhdiLNXGNT.xml', domain: 'benzinga.com' },
-  // Direct feeds — use Worker proxy for CORS. Added so English news keeps
-  // working when rss.app is rate-limited or endpoints expire.
-  { name: 'MarketWatch',     url: 'https://feeds.content.dowjones.io/public/rss/mw_realtimeheadlines', domain: 'marketwatch.com' },
+  // rss.app feeds removed — they started returning 402 Payment Required.
+  // Direct feeds below all go through the Cloudflare Worker proxy (bypasses
+  // CORS). Tested survivors: MarketWatch, CNBC, Investing.com, SeekingAlpha.
+  { name: 'MarketWatch',     url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories', domain: 'marketwatch.com' },
+  { name: 'MarketWatch Mkts',url: 'https://feeds.content.dowjones.io/public/rss/mw_marketpulse', domain: 'marketwatch.com' },
   { name: 'CNBC Markets',    url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258', domain: 'cnbc.com' },
-  { name: 'Yahoo Finance',   url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC&region=US&lang=en-US', domain: 'yahoo.com' },
+  { name: 'CNBC Business',   url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10001147', domain: 'cnbc.com' },
+  { name: 'Investing.com',   url: 'https://www.investing.com/rss/news_301.rss', domain: 'investing.com' },
   { name: 'Seeking Alpha',   url: 'https://seekingalpha.com/market_currents.xml', domain: 'seekingalpha.com' },
 ];
 
@@ -866,17 +867,34 @@ function _parseRSSItems(text, sourceName, domain) {
   return items;
 }
 
+// Known no-CORS domains — direct fetch always fails, so we skip straight
+// to the proxy. Prevents the 4s timeout + red console error for every load.
+const _NO_CORS_DOMAINS = [
+  'marketwatch.com', 'dowjones.io', 'cnbc.com', 'investing.com',
+  'seekingalpha.com', 'yahoo.com', 'reuters.com', 'sec.gov', 'federalreserve.gov',
+];
+
+function _needsProxy(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    return _NO_CORS_DOMAINS.some(d => host === d || host.endsWith('.' + d));
+  } catch(e) { return false; }
+}
+
 async function _fetchFeeds(feeds) {
   const allItems = [];
   await Promise.allSettled(feeds.map(async feed => {
     const domain = _getDomain(feed);
     try {
-      // נסה ישירות (rss.app תומך CORS) — אחרת Worker
       let text = null;
-      try {
-        const rd = await fetch(feed.url, {signal: AbortSignal.timeout(4000)});
-        if (rd.ok) text = await rd.text();
-      } catch(e) {}
+      // Only try direct fetch for domains that MIGHT allow CORS. For the
+      // known-blocked list, skip straight to proxy.
+      if (!_needsProxy(feed.url)) {
+        try {
+          const rd = await fetch(feed.url, {signal: AbortSignal.timeout(4000)});
+          if (rd.ok) text = await rd.text();
+        } catch(e) {}
+      }
       if (!text) {
         try {
           const rp = await fetch(`${_proxyUrl}/?url=${encodeURIComponent(feed.url)}`);
@@ -3653,17 +3671,33 @@ async function renderEconCalendar() {
 
   wrap.innerHTML = events.map((e, i) => {
     const isToday = e.d.toDateString() === todayD.toDateString();
+    const tomorrowD = new Date(todayD.getTime() + 24*3600*1000);
+    const isTomorrow = e.d.toDateString() === tomorrowD.toDateString();
     const isPast  = e.d < todayD;
-    const cls = isPast ? 'econ-past' : isToday ? 'econ-today-row' : '';
+    const cls = isPast      ? 'econ-past'
+              : isToday     ? 'econ-today-row'
+              : isTomorrow  ? 'econ-soon-row'
+              : '';
     const displayName = e.nameHe || e.name;
+    // Inline "מחר" / "היום" tag that catches the eye without being loud
+    const whenBadge = isToday    ? ' <span class="econ-when-now">— היום</span>'
+                    : isTomorrow ? ' <span class="econ-when-soon">— מחר</span>'
+                    : '';
+    // Star icon for imminent events (today or tomorrow) — right edge of row
+    const starIcon = (isToday || isTomorrow)
+      ? `<div class="econ-star ${isToday ? 'now' : 'soon'}">
+           <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 2l2.39 7.36H22l-6.19 4.5L18.2 21 12 16.48 5.8 21l2.39-7.14L2 9.36h7.61L12 2z"/></svg>
+         </div>`
+      : '';
     return `<div class="econ-row ${cls}" onclick="openEconPreview(${i})" style="cursor:pointer;display:flex">
+      ${starIcon}
       <div class="econ-date-col">
         <div class="econ-day">${e.d.getDate()}</div>
         <div class="econ-mon">${MONTHS_EN[e.d.getMonth()]}</div>
         <div class="econ-dow">${DAYS_HE[e.d.getDay()]}</div>
       </div>
       <div class="econ-body">
-        <div class="econ-name">${displayName}${isToday?' <span style="color:var(--blue);font-size:9px">• היום</span>':''}</div>
+        <div class="econ-name">${displayName}${whenBadge}</div>
         <div class="econ-he">${e.he}</div>
         <div class="econ-impact">
           <div class="econ-dot ${e.impact}"></div>
@@ -3735,7 +3769,11 @@ function openEconPreview(idx) {
           <div class="econ-prev-txt">${d.tip}</div>
         </div>` : ''}
       </div>
-      <div class="modal-footer" style="display:flex;gap:8px;justify-content:center;align-items:center;padding:12px 16px">
+      <div class="modal-footer" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center;padding:12px 16px">
+        <button onclick="downloadEventICS(${idx})" style="background:var(--green);color:#041612;font-weight:700;font-size:12px;padding:8px 16px;border-radius:6px;border:none;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/></svg>
+          הוסף ללוח שנה
+        </button>
         ${e.url ? `<a href="${e.url}" target="_blank" rel="noopener noreferrer" style="background:var(--blue);color:#000;font-weight:700;font-size:12px;padding:8px 16px;border-radius:6px;text-decoration:none;display:inline-flex;align-items:center;gap:6px">המשך למקור הרשמי <span style="font-size:10px">↗</span></a>` : ''}
         <button onclick="document.getElementById('econ-preview-overlay').remove()" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);font-size:12px;padding:8px 16px;border-radius:6px;cursor:pointer;font-family:inherit">סגור</button>
       </div>
@@ -3745,6 +3783,94 @@ function openEconPreview(idx) {
     if (ev.target === overlay) overlay.remove();
   });
   document.body.appendChild(overlay);
+}
+
+/**
+ * Generate and download an .ics calendar file for the given economic event.
+ * .ics is the universal calendar format — iOS opens in Calendar.app, Android
+ * in the system calendar chooser, desktops in Outlook/iCal/etc.
+ *
+ * Time handling: e.time is "HH:MM ET" (e.g. "08:30 ET"). We convert ET to
+ * UTC (ET is UTC-4 during DST which covers Mar-Nov, UTC-5 otherwise). We
+ * use DST-aware month-based approximation — close enough for a reminder.
+ */
+function downloadEventICS(idx) {
+  const e = (window._econEvents || [])[idx];
+  if (!e) return;
+
+  const displayName = e.nameHe || e.name;
+  const engName = e.nameHe ? e.name : '';
+
+  // Parse "HH:MM ET" → hours/minutes
+  const tm = /^(\d{1,2}):(\d{2})/.exec(e.time || '08:30');
+  const hET = tm ? parseInt(tm[1]) : 8;
+  const mET = tm ? parseInt(tm[2]) : 30;
+
+  // ET → UTC offset. Rough DST rule: Mar-Nov = UTC-4 (EDT), else UTC-5 (EST).
+  // Off by one hour around DST transitions, acceptable for a reminder.
+  const m = e.d.getMonth();  // 0-indexed: Mar=2, Nov=10
+  const etOffsetHours = (m >= 2 && m <= 10) ? 4 : 5;
+
+  // Build UTC date for the event (event is at hET:mET in Eastern Time)
+  const startUTC = new Date(Date.UTC(
+    e.d.getFullYear(), e.d.getMonth(), e.d.getDate(),
+    hET + etOffsetHours, mET, 0
+  ));
+  // End 30 minutes later — most econ releases are instantaneous, 30min is enough
+  const endUTC = new Date(startUTC.getTime() + 30 * 60 * 1000);
+
+  // Format as YYYYMMDDTHHMMSSZ per RFC5545
+  const fmtICS = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+
+  // Description: event explanation + bullish/bearish/tip if available
+  const d = e.details || {};
+  const descParts = [];
+  if (d.what)    descParts.push('מה זה מודד:\\n' + d.what);
+  else if (e.he) descParts.push(e.he);
+  if (d.bullish) descParts.push('\\n\\nתרחיש חיובי:\\n' + d.bullish);
+  if (d.bearish) descParts.push('\\n\\nתרחיש שלילי:\\n' + d.bearish);
+  if (d.tip)     descParts.push('\\n\\nטיפ:\\n' + d.tip);
+  if (e.url)     descParts.push('\\n\\nמקור: ' + e.url);
+  // Escape commas, semicolons, newlines per RFC5545
+  const icsEscape = (s) => (s || '').replace(/\\/g, '\\\\').replace(/,/g, '\\,').replace(/;/g, '\\;').replace(/\r?\n/g, '\\n');
+  const description = icsEscape(descParts.join(''));
+
+  const summary = icsEscape(engName ? `${displayName} (${engName})` : displayName);
+  const uid = `stockpulse-${e.date}-${(e.name || 'event').replace(/\s+/g, '-')}@stockpulse`;
+
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//StockPulse//Econ Calendar//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `DTSTAMP:${fmtICS(new Date())}`,
+    `DTSTART:${fmtICS(startUTC)}`,
+    `DTEND:${fmtICS(endUTC)}`,
+    `SUMMARY:${summary}`,
+    `DESCRIPTION:${description}`,
+    e.url ? `URL:${e.url}` : '',
+    'BEGIN:VALARM',
+    'TRIGGER:-PT30M',       // 30-minute reminder before
+    'ACTION:DISPLAY',
+    `DESCRIPTION:${summary}`,
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].filter(Boolean).join('\r\n');
+
+  // Trigger download
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${(e.name || 'event').replace(/\s+/g, '_')}_${e.date}.ics`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ── SECTOR MACRO COLUMN (uses existing qmap data — no extra fetch) ──
@@ -4620,7 +4746,7 @@ window.showKey = function(){
     if (actionsEl){
       actionsEl.innerHTML = `
         <div class="ai-a-row"><div class="ai-a-dot"></div><div class="ai-a-txt"><b>עקוב:</b> ${watchTxt}</div></div>
-        <div class="ai-a-row"><div class="ai-a-dot"></div><div class="ai-a-txt"><b>סיכון:</b> ${riskTxt}</div></div>
+        <div class="ai-a-row"><div class="ai-a-dot neu"></div><div class="ai-a-txt neu"><b>סיכון:</b> ${riskTxt}</div></div>
         <div class="ai-a-row"><div class="ai-a-dot"></div><div class="ai-a-txt"><b>הזדמנות:</b> ${oppTxt}</div></div>
         ${breadthAdviceRow}`;
     }
@@ -8405,24 +8531,9 @@ function toggleWatchlist(sym) {
 }
 
 function renderWatchlist() {
-  const strip = $('wl-strip');
-  if (!scanData || watchlist.length === 0) {
-    strip.innerHTML = '';
-    return;
-  }
-  const items = watchlist.map(sym => {
-    const s = scanData.stocks.find(x => x.sym === sym);
-    if (!s) return '';
-    const cls = s.y1 > 0 ? 'var(--green)' : 'var(--red)';
-    return `
-      <div class="wl-chip" onclick="openDetail('${s.sym}')">
-        <span class="wl-sym">${s.sym}</span>
-        <span class="wl-pct" style="color:${cls}">${fmtPct(s.y1)}</span>
-        <span style="color:var(--dim);font-size:10px">· ${s.score}</span>
-        <span class="wl-x" onclick="event.stopPropagation();toggleWatchlist('${s.sym}')">✕</span>
-      </div>`;
-  }).join('');
-  strip.innerHTML = `<div class="wl-label">הרשימה שלי</div>${items}`;
+  // The wl-strip element was removed — the "רשימה שלי" view in the picks
+  // table replaces it. This function stays as a no-op so we don't have to
+  // update every call site across the codebase (there are many).
 }
 
 // ═══ METHODOLOGY MODAL ═══
