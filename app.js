@@ -30,11 +30,12 @@ const HEBREW_NEWS_FEEDS = [
 const EN_NEWS_FEEDS = [
   { name: 'Benzinga Markets',   url: 'https://rss.app/feeds/6xoFWSgjRpOcDBAX.xml', domain: 'benzinga.com' },
   { name: 'Benzinga Financial', url: 'https://rss.app/feeds/GlMwezZhdiLNXGNT.xml', domain: 'benzinga.com' },
-  // { name: 'MarketWatch',    url: 'https://feeds.content.dowjones.io/public/rss/mw_realtimeheadlines', domain: 'marketwatch.com' },
-  // { name: 'CNBC Markets',   url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258', domain: 'cnbc.com' },
-  // { name: 'Reuters',        url: 'https://feeds.reuters.com/reuters/businessNews', domain: 'reuters.com' },
-  // { name: 'SEC 8-K',        url: 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=8-K&dateb=&owner=include&count=10&output=atom', domain: 'sec.gov' },
-  // { name: 'Federal Reserve',url: 'https://www.federalreserve.gov/feeds/press_all.xml', domain: 'federalreserve.gov' },
+  // Direct feeds — use Worker proxy for CORS. Added so English news keeps
+  // working when rss.app is rate-limited or endpoints expire.
+  { name: 'MarketWatch',     url: 'https://feeds.content.dowjones.io/public/rss/mw_realtimeheadlines', domain: 'marketwatch.com' },
+  { name: 'CNBC Markets',    url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258', domain: 'cnbc.com' },
+  { name: 'Yahoo Finance',   url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC&region=US&lang=en-US', domain: 'yahoo.com' },
+  { name: 'Seeking Alpha',   url: 'https://seekingalpha.com/market_currents.xml', domain: 'seekingalpha.com' },
 ];
 
 // ============================================================
@@ -3566,18 +3567,46 @@ async function fetchEconCalendarFRED() {
   const end     = new Date(today.getTime() + 35*24*3600*1000).toISOString().slice(0,10);
   const events  = [];
 
-  await Promise.allSettled(FRED_RELEASES.map(async rel => {
-    try {
-      const url = `https://api.stlouisfed.org/fred/release/dates?release_id=${rel.id}&api_key=${FRED_KEY}&file_type=json&sort_order=asc&realtime_start=${start}&realtime_end=${end}&include_release_dates_with_no_data=true`;
-      const r = await fetch(_proxyUrl + '/?url=' + encodeURIComponent(url));
-      if (!r.ok) return;
-      const d = await r.json();
-      (d.release_dates||[]).forEach(rd => {
-        if (rd.date >= start && rd.date <= end)
-          events.push({date:rd.date, name:rel.name, nameHe:rel.nameHe, he:rel.he, details:rel.details, impact:rel.impact, time:rel.time, url:rel.url, d:new Date(rd.date+'T12:00:00')});
+  // Fetch a single FRED release with one retry. Returns release_dates[] or [].
+  async function fetchReleaseDates(rel) {
+    const url = `https://api.stlouisfed.org/fred/release/dates?release_id=${rel.id}&api_key=${FRED_KEY}&file_type=json&sort_order=asc&realtime_start=${start}&realtime_end=${end}&include_release_dates_with_no_data=true`;
+    const proxied = _proxyUrl + '/?url=' + encodeURIComponent(url);
+    // Up to 2 attempts per release. FRED occasionally 429s when we hit
+    // the 120 req/min limit — a 600ms wait + retry almost always recovers.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const r = await fetch(proxied);
+        if (r.ok) {
+          const d = await r.json();
+          return d.release_dates || [];
+        }
+        if (r.status === 429) await new Promise(rs => setTimeout(rs, 600));
+      } catch(e) { /* network hiccup — retry */ }
+    }
+    return [];
+  }
+
+  // Serial batches of 4 to stay under FRED's 120-req/min budget.
+  // 10 releases * 2 attempts = 20 worst-case requests, ~5s serially.
+  const batchSize = 4;
+  for (let i = 0; i < FRED_RELEASES.length; i += batchSize) {
+    const batch = FRED_RELEASES.slice(i, i + batchSize);
+    const results = await Promise.all(batch.map(async rel => ({
+      rel,
+      dates: await fetchReleaseDates(rel),
+    })));
+    results.forEach(({ rel, dates }) => {
+      dates.forEach(rd => {
+        if (rd.date >= start && rd.date <= end) {
+          events.push({
+            date:rd.date, name:rel.name, nameHe:rel.nameHe, he:rel.he,
+            details:rel.details, impact:rel.impact, time:rel.time, url:rel.url,
+            d:new Date(rd.date+'T12:00:00'),
+          });
+        }
       });
-    } catch(e) {}
-  }));
+    });
+  }
 
   // Add FOMC
   const y = today.getFullYear();
@@ -5630,16 +5659,18 @@ async function advisorBoot() {
   if (scanData) {
     showResults();
     renderWatchlist();
-    // Auto-refresh watchlist signals in the background so every app load
-    // gives the user fresh MA40/price/y1 data without a manual click.
     scheduleAutoRefresh(500);
+    // If the cached scan is watchlist-only (no real scores), upgrade it
+    // silently to a full scan so the user gets ratings without any action.
+    if (scanData.watchlistOnly) {
+      runScanSilent();
+    }
     return;
   }
 
   // No cached full scan — but if the user has a watchlist, run a standalone
-  // watchlist-only scan. The user's personal list is the most important thing
-  // they see, so we prioritize it loading immediately without requiring a full
-  // universe scan click. Full scan is still available via the "סריקה" button.
+  // watchlist-only scan first (fast, ~3s) so they see their list immediately,
+  // then kick off a silent full scan in the background to get real scores.
   if (watchlist.length > 0) {
     showScreen('adv-screen-loading');
     $('loading-msg').textContent = `טוען את הרשימה שלך (${watchlist.length} מניות)...`;
@@ -5649,14 +5680,15 @@ async function advisorBoot() {
     const wlData = await scanWatchlistStandalone();
     if (wlData) {
       scanData = wlData;
-      // Force "watchlist" view since score/rank columns are empty in standalone mode
       displayState.view = 'watchlist';
       showResults();
       renderWatchlist();
       startMarketClock();
+      // Now silently run the full scan in the background so scores appear
+      // ~20s later. User sees the watchlist table immediately in the meantime.
+      runScanSilent();
       return;
     }
-    // If standalone scan failed, fall through to the welcome screen below
   }
 
   renderWatchlist();
@@ -6201,6 +6233,83 @@ function computeScores(stocksData, spyCloses, methodologyKey) {
 }
 
 // ═══ MAIN SCAN ═══
+
+/**
+ * Silent version of runScan — fetches the full universe + watchlist,
+ * computes scores, and replaces scanData without disrupting the UI. User
+ * continues to see the current table (usually watchlist-only mode) while
+ * this runs. When complete, the table re-renders with real scores.
+ *
+ * Trade-off vs. runScan():
+ *   - runScan shows the full-screen loader and blocks the advisor UI.
+ *     Appropriate when user explicitly clicked "סריקה".
+ *   - runScanSilent shows progress in the watchlist banner only. Appropriate
+ *     for automatic boot-time or post-login scoring so the user doesn't
+ *     have to click anything to get scores.
+ *
+ * Returns true on success, false if anything failed. Callers can decide
+ * whether to show an error.
+ */
+async function runScanSilent() {
+  if (!PROXY) return false;
+  if (runScanSilent._running) return false;   // prevent double-runs
+  runScanSilent._running = true;
+
+  const symbolsSet = new Set();
+  Object.values(getCurrentHoldings()).forEach(sec => sec.forEach(s => symbolsSet.add(s.s)));
+  watchlist.forEach(sym => symbolsSet.add(sym));
+  const symbols = Array.from(symbolsSet);
+
+  // Update banner status text (if it exists — it does when the user is on
+  // the advisor tab in watchlist view). For any other tab, we just run
+  // silently and surface the result on next renderWatchlistBanner call.
+  const setBannerStatus = (text) => {
+    const el = $('wl-silent-status');
+    if (el) el.textContent = text;
+  };
+
+  try {
+    setBannerStatus(`סורק ${symbols.length} מניות...`);
+    const spyData = await fetchChartWeekly('SPY');
+    if (!spyData) throw new Error('SPY fetch failed');
+
+    const stocksData = await fetchUniverseInChunks(symbols, (done, tot) => {
+      setBannerStatus(`סורק השוק... ${done}/${tot}`);
+    });
+
+    setBannerStatus('מחשב ציונים...');
+    const stocks = computeScores(stocksData, spyData.closes, currentMethodology);
+    if (stocks.length === 0) throw new Error('empty scores');
+
+    scanData = {
+      stocks: stocks.map(s => ({ ...s, refreshedAt: Date.now() })),
+      timestamp: Date.now(),
+      universeSize: stocks.length,
+      methodology: currentMethodology,
+      universe: currentUniverse,
+      // No watchlistOnly flag — this is a real full scan
+    };
+    persistScanData();
+
+    // Re-render current view with new data. If user is on advisor watchlist
+    // view, they'll see scores appear; if they're on a different tab, it's
+    // ready for when they switch.
+    if ($('adv-screen-results')?.style.display !== 'none' || $('wl-banner')) {
+      renderTable();
+      renderKPIs();
+      renderWatchlistBanner();
+    }
+
+    console.info(`silent scan complete: ${stocks.length} stocks scored`);
+    return true;
+  } catch(e) {
+    console.warn('silent scan failed:', e);
+    setBannerStatus('');
+    return false;
+  } finally {
+    runScanSilent._running = false;
+  }
+}
 
 async function runScan() {
   if (!PROXY) { showScreen('adv-screen-error'); return; }
@@ -7435,7 +7544,21 @@ function renderWatchlistBanner() {
     return;
   }
 
-  // Case 4: normal banner — has data, show freshness + refresh + add buttons
+  // Case 4: watchlist-only mode (no full scan yet). Scores are null. The
+  // background silent scan is (or should be) running — show its live progress.
+  if (scanData.watchlistOnly) {
+    container.className = 'wl-banner wl-banner-fresh';
+    container.style.display = 'flex';
+    container.innerHTML = `
+      <div class="wl-banner-info">
+        <span class="wl-banner-label">טוען ציונים ברקע</span>
+        <span class="wl-refresh-status" id="wl-silent-status">מכין נתונים...</span>
+      </div>
+      ${addBtn}`;
+    return;
+  }
+
+  // Case 5: normal banner — has full-scan data, show freshness + refresh + add buttons
   const oldestRefresh = Math.min(...wlInScan.map(s => s.refreshedAt || scanData.timestamp || 0));
   const age = Date.now() - oldestRefresh;
   const tier = age < STALE_FRESH_MS ? 'fresh'
@@ -7709,10 +7832,9 @@ async function initCloudSync() {
       // Order matters — a symbol added on another device needs to be in the
       // watchlist array before refreshWatchlist() can fetch its fresh data.
       pullWatchlistFromCloud().then(async () => {
-        // After pull: if we have no scan data yet but now have watchlist
-        // symbols (e.g., first login on a new device), run standalone scan.
-        // Otherwise just refresh existing scan data.
         if (!scanData && watchlist.length > 0) {
+          // First-time login on this device: quick standalone scan to show
+          // prices immediately, then silent full scan to get scores.
           const wlData = await scanWatchlistStandalone();
           if (wlData) {
             scanData = wlData;
@@ -7720,6 +7842,10 @@ async function initCloudSync() {
             showResults();
             renderWatchlist();
           }
+          runScanSilent();
+        } else if (scanData?.watchlistOnly) {
+          // Cached scan is watchlist-only — upgrade it silently
+          runScanSilent();
         } else {
           scheduleAutoRefresh(0);
         }
