@@ -4025,12 +4025,21 @@ td.pct.flat{color:var(--dim)}
 .wl-banner-fresh{background:var(--bg3);color:var(--dim)}
 .wl-banner-warm{background:var(--amber-soft);color:var(--amber);border-color:rgba(240,181,106,.3)}
 .wl-banner-cold{background:rgba(228,108,108,.08);color:var(--red);border-color:rgba(228,108,108,.3)}
+/* Empty state — invites user to add their first stock. Uses the green CTA tint
+   so it reads as "take action here", not "warning". */
+.wl-banner-empty{background:rgba(79,199,138,.06);color:var(--green);border-color:rgba(79,199,138,.25)}
 
 .wl-banner-info{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
 .wl-banner-label{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wl-refresh-status{font-size:10.5px;color:inherit;opacity:.75;font-family:var(--mono)}
 
-.wl-refresh-btn{
+/* Actions row — groups the Add + Refresh buttons side by side in the normal
+   banner state. Flex-shrink:0 prevents them from being squeezed as the info
+   text grows. */
+.wl-banner-actions{display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
+
+.wl-refresh-btn,
+.wl-add-btn{
   display:inline-flex;align-items:center;gap:6px;
   padding:6px 12px;
   background:transparent;
@@ -4041,16 +4050,109 @@ td.pct.flat{color:var(--dim)}
   cursor:pointer;
   transition:background .15s, transform .1s;
   flex-shrink:0;
+  font-family:inherit;
 }
-.wl-refresh-btn:hover:not(:disabled){background:rgba(255,255,255,.05)}
-.wl-refresh-btn:active:not(:disabled){transform:scale(.97)}
+.wl-refresh-btn:hover:not(:disabled),
+.wl-add-btn:hover:not(:disabled){background:rgba(255,255,255,.05)}
+.wl-refresh-btn:active:not(:disabled),
+.wl-add-btn:active:not(:disabled){transform:scale(.97)}
 .wl-refresh-btn:disabled{cursor:wait;opacity:.5}
 .wl-refresh-btn.refreshing svg{animation:wl-spin 1s linear infinite}
 @keyframes wl-spin{to{transform:rotate(360deg)}}
 
+/* In the empty state, the Add button IS the primary CTA — slightly bigger +
+   filled, pulls the user's eye. */
+.wl-banner-empty .wl-add-btn{
+  background:var(--green);color:var(--bg);
+  border-color:var(--green);
+  padding:7px 14px;font-size:11.5px;
+}
+.wl-banner-empty .wl-add-btn:hover{background:var(--green);opacity:.9}
+
 @media (max-width:600px){
   .wl-banner{padding:8px 10px;font-size:10.5px;gap:8px}
-  .wl-refresh-btn{padding:5px 10px;font-size:10.5px}
+  .wl-refresh-btn,.wl-add-btn{padding:5px 10px;font-size:10.5px}
+  /* On mobile, drop the "refresh" text — the icon alone is enough when space
+     is tight. Keep "הוסף מניה" visible since it's the primary add action. */
+  .wl-banner-actions .wl-refresh-btn span{display:none}
+  .wl-refresh-btn{padding:5px 8px}
+}
+
+/* ═══ TABLE SEARCH BOX ═══ */
+/* Slim search input above the picks table — lets the user filter by symbol
+   or company name without running a new scan. Sits in the same row as the
+   watchlist banner if both are shown, but on mobile stacks above it. */
+.tbl-search-wrap{
+  position:relative;
+  margin-bottom:8px;
+}
+.tbl-search-input{
+  width:100%;
+  /* Logical padding: start=where icon sits, end=where clear-X sits.
+     Works correctly in both RTL and LTR without conditional CSS. */
+  padding:9px 12px;
+  padding-inline-start:36px;
+  padding-inline-end:32px;
+  background:var(--bg3);
+  border:1px solid var(--border2);
+  border-radius:6px;
+  color:var(--text);
+  font-size:12px;
+  font-family:inherit;
+  transition:border-color .15s, background .15s;
+  box-sizing:border-box;
+}
+.tbl-search-input:focus{
+  outline:none;
+  border-color:var(--green);
+  background:var(--bg4);
+}
+.tbl-search-input::placeholder{color:var(--dimmer);opacity:1}
+/* Search icon: inline-start (= right side in RTL, left side in LTR) —
+   matches where the user's eye lands first when reading the input. */
+.tbl-search-icon{
+  position:absolute;
+  inset-inline-start:12px;
+  top:50%;transform:translateY(-50%);
+  color:var(--dim);
+  pointer-events:none;
+}
+/* Clear (✕): inline-end (= left side in RTL, right side in LTR) —
+   always opposite the icon, never in the typing path. */
+.tbl-search-clear{
+  position:absolute;
+  inset-inline-end:8px;
+  top:50%;transform:translateY(-50%);
+  background:transparent;border:none;
+  color:var(--dim);cursor:pointer;
+  padding:4px 8px;border-radius:4px;
+  font-size:14px;line-height:1;
+  display:none;
+}
+.tbl-search-wrap.has-query .tbl-search-clear{display:block}
+.tbl-search-clear:hover{background:var(--bg4);color:var(--text)}
+
+/* Empty-state message inside the table when the search matches nothing */
+.tbl-no-match{
+  padding:40px 16px;
+  text-align:center;
+  color:var(--dim);
+  font-size:12px;
+  line-height:1.5;
+}
+.tbl-no-match b{color:var(--text)}
+
+/* ═══ ADD SYMBOL MODAL ═══ */
+.add-sym-wrap{display:flex;flex-direction:column;gap:12px}
+.add-sym-intro{
+  font-size:12px;color:var(--dim);
+  line-height:1.5;
+}
+.add-sym-row{display:flex;flex-direction:column;gap:5px}
+.add-sym-row .auth-input{
+  text-transform:uppercase;
+  letter-spacing:1px;
+  font-size:14px;
 }
 
 /* ═══ CLOUD SYNC — AUTH STATUS BAR & MODAL ═══ */

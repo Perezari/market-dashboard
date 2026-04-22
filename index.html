@@ -764,6 +764,14 @@
   <!-- results table -->
   <div id="tbl-container" style="display:none">
     <div class="tbl-card">
+      <!-- Search box — filters the picks table in real time by symbol/name.
+           Available in all views (all/top20/watchlist); the filter is AND-ed
+           with whatever view/score filters are already applied. -->
+      <div id="tbl-search-wrap" class="tbl-search-wrap">
+        <svg class="tbl-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="tbl-search" class="tbl-search-input" type="text" placeholder="חפש מניה (סימבול או שם)..." autocomplete="off" oninput="setTableSearch(this.value)">
+        <button class="tbl-search-clear" onclick="clearTableSearch()" aria-label="נקה חיפוש">✕</button>
+      </div>
       <!-- Watchlist-view banner: freshness indicator + partial refresh button.
            JS toggles visibility via display:none/flex; hidden for other views. -->
       <div id="wl-banner" class="wl-banner" style="display:none"></div>
@@ -810,17 +818,6 @@
   </div>
 </div>
 
-<!-- ═══ AUTH MODAL (login / logout) ═══ -->
-<div class="auth-overlay" id="auth-overlay" onclick="closeAuthModal(event)">
-  <div class="auth-panel" onclick="event.stopPropagation()">
-    <div class="auth-hdr">
-      <div class="auth-title" id="auth-title">התחברות</div>
-      <button class="auth-close" onclick="closeAuthModalDirect()">✕</button>
-    </div>
-    <div class="auth-body" id="auth-body"></div>
-  </div>
-</div>
-
 <!-- ═══ METHODOLOGY MODAL ═══ -->
 <div class="mth-overlay" id="mth-overlay" onclick="closeMethodology(event)">
   <div class="mth-modal" onclick="event.stopPropagation()">
@@ -834,6 +831,21 @@
   </div>
 </div>
 </section>
+
+<!-- ═══ AUTH MODAL (login / logout) ═══
+     Placed OUTSIDE any .view section so it's accessible from dashboard, macro,
+     AND advisor tabs. Earlier it was nested inside view-advisor, which meant
+     clicking the profile pill on other tabs opened nothing — the modal was
+     hidden by the tab-switching `display:none` on its parent view. -->
+<div class="auth-overlay" id="auth-overlay" onclick="closeAuthModal(event)">
+  <div class="auth-panel" onclick="event.stopPropagation()">
+    <div class="auth-hdr">
+      <div class="auth-title" id="auth-title">התחברות</div>
+      <button class="auth-close" onclick="closeAuthModalDirect()">✕</button>
+    </div>
+    <div class="auth-body" id="auth-body"></div>
+  </div>
+</div>
 
 <!-- ─────────── POST-APP (anything dashboard put after #app) ─────────── -->
 <!-- /#app -->
@@ -904,7 +916,7 @@
 
 <!-- Consolidated script -->
 <!-- Consolidated script (cache-bust via ?v=) -->
-<script src="app.js?v=2026-04-20-pill-in-topbar"></script>
+<script src="app.js?v=2026-04-21-scan-includes-watchlist"></script>
 
 </body>
 </html>

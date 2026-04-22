@@ -494,6 +494,35 @@ const NASDAQ_100_HOLDINGS = {
   ],
 };
 
+/* ──────────── S&P SmallCap 600 hardcoded floor ─────────────────────────────
+   Compact 30-name floor, just so the dropdown has something to show during
+   the brief window before Wikipedia returns the full ~600-name list. Unlike
+   NDX (where Wikipedia occasionally fails to parse and we need to rely on
+   the floor long-term), S&P 600's page uses the identical table format to
+   S&P 500/400 — the parser succeeds every time. Floor is an insurance,
+   not a primary source. Names chosen as representative well-known small-caps.
+   All GICS sector assignments verified against their filings. */
+const SMALLCAP_600_HOLDINGS = {
+  XLK:  [{s:'CRDO',n:"Credo Technology",w:0.3},{s:'FN',n:"Fabrinet",w:0.3},
+         {s:'AEIS',n:"Advanced Energy Industries",w:0.3},{s:'RMBS',n:"Rambus",w:0.3},
+         {s:'CVLT',n:"Commvault Systems",w:0.3}],
+  XLI:  [{s:'KTOS',n:"Kratos Defense & Security",w:0.3},{s:'AVAV',n:"AeroVironment",w:0.3},
+         {s:'SPXC',n:"SPX Technologies",w:0.3},{s:'BMI',n:"Badger Meter",w:0.3},
+         {s:'MLI',n:"Mueller Industries",w:0.3}],
+  XLF:  [{s:'WTFC',n:"Wintrust Financial",w:0.3},{s:'PNFP',n:"Pinnacle Financial Partners",w:0.3},
+         {s:'UMBF',n:"UMB Financial",w:0.3}],
+  XLV:  [{s:'ENSG',n:"Ensign Group",w:0.3},{s:'HQY',n:"HealthEquity",w:0.3},
+         {s:'HALO',n:"Halozyme Therapeutics",w:0.3}],
+  XLY:  [{s:'EAT',n:"Brinker International",w:0.3},{s:'BOOT',n:"Boot Barn Holdings",w:0.3},
+         {s:'SHAK',n:"Shake Shack",w:0.3},{s:'CROX',n:"Crocs",w:0.3}],
+  XLE:  [{s:'PR',n:"Permian Resources",w:0.3},{s:'CIVI',n:"Civitas Resources",w:0.3}],
+  XLRE: [{s:'CUBE',n:"CubeSmart",w:0.3},{s:'STAG',n:"STAG Industrial",w:0.3}],
+  XLU:  [{s:'IDA',n:"IDACORP",w:0.3},{s:'OGS',n:"ONE Gas",w:0.3}],
+  XLB:  [{s:'BCC',n:"Boise Cascade",w:0.3},{s:'UFPI',n:"UFP Industries",w:0.3}],
+  XLP:  [{s:'FRPT',n:"Freshpet",w:0.3},{s:'WDFC',n:"WD-40 Company",w:0.3}],
+  XLC:  [{s:'IRDM',n:"Iridium Communications",w:0.3}],
+};
+
 
 
 /* ──────────── [2] CORE app.js ──────────── */
@@ -2767,7 +2796,8 @@ async function runBreadth() {
       const closes = d.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(p => p != null);
       if (!closes || closes.length < 20) return;
       const current = closes[closes.length - 1];
-      const sma200 = closes.slice(-200).reduce((a,b)=>a+b,0) / Math.min(200, closes.length);
+      const smaWindow = closes.slice(-200);
+      const sma200 = smaWindow.reduce((a,b)=>a+b,0) / smaWindow.length;
       total++;
       if (current > sma200) above++;
     } catch(e) {}
@@ -2802,6 +2832,25 @@ async function runBreadth() {
   $('breadth-above').textContent = `${above} מעל`;
   $('breadth-total').textContent = `מתוך ${total}`;
 
+  // Read today's market condition so breadth advice can take it into account.
+  // 63% breadth means very different things:
+  //   - on a GREEN day → healthy participation, lean bullish
+  //   - on a RED day   → early warning: many stocks still above MA200 but
+  //                      today's selling is broad-based, ride-out risk is real
+  // Without this context the advice was oblivious to red days and said
+  // "go long" even while the market was bleeding out.
+  const redDay = (() => {
+    try {
+      const secData = SECTORS.map(s => ({ d1: (qmap[s.sym]||{}).d1 }));
+      const valid = secData.filter(s => s.d1 != null && !isNaN(s.d1));
+      if (valid.length < 5) return false;
+      const avg = valid.reduce((a,s) => a + s.d1, 0) / valid.length;
+      const negatives = valid.filter(s => s.d1 < 0).length;
+      // "Red day" = meaningful negative average AND majority of sectors down
+      return avg < -0.3 && negatives >= valid.length * 0.6;
+    } catch(e) { return false; }
+  })();
+
   // ── Tiered Hebrew insight + actionable advice ──
   let subText, adviceClass, adviceHead, adviceBody;
   if (pct >= 85) {
@@ -2809,6 +2858,13 @@ async function runBreadth() {
     adviceClass = 'warn';
     adviceHead = 'שוק במצב "מתוח" (overextended)';
     adviceBody = `מעל 85% מהמניות מעל הממוצע — רמה נדירה שבעבר קידמה <b>תיקון של 2-5%</b>. אם יש רווחים פתוחים — שקול לנעול ${pct >= 90 ? '30-50%' : '20-30%'} מהפוזיציות. <b>לא הזמן להגדיל חשיפה</b> או לרדוף אחרי עליות.`;
+  } else if (pct >= 60 && redDay) {
+    // Healthy long-term breadth colliding with a red day — the day's action
+    // matters more for near-term decisions than the background state.
+    subText = 'רוחב טוב, יום אדום — זהירות';
+    adviceClass = 'warn';
+    adviceHead = 'יום שלילי על רקע רוחב תקין';
+    adviceBody = `${pct}% מהמניות עדיין מעל הממוצע — הבסיס עדיין חיובי, אבל היום הירידה רחבה בשוק. <b>אין זה הזמן לפתוח לונג חדש.</b> אם יש פוזיציות — הדק Stop Loss ל-2% ועקוב אחר המגמה למחר. אם יגמר עוד יום אדום רחב, זה עשוי להיות תחילת תיקון של 3-5%.`;
   } else if (pct >= 60) {
     subText = 'שוק בריא — עלייה רחבה';
     adviceClass = '';
@@ -4488,17 +4544,29 @@ window.showKey = function(){
         </div>`;
     }
 
-    const watchTxt = leaderPos
-      ? `המשך הובלת <b>${leader.name}</b> — עד מתי ימשיך להוביל.`
-      : `חולשה רחבה — עקוב אחר רמות תמיכה.`;
-    const riskTxt = laggard.d1 < -0.5
-      ? `<b>${laggard.name}</b> בחולשה (${fmt(laggard.d1)}) — עלול להעיב על השוק.`
-      : `תנודתיות נמוכה יחסית — סבלנות נדרשת.`;
-    const oppTxt = positives > 6
-      ? `מומנטום חיובי — כניסות <b>סלקטיביות</b> לסקטורים מובילים.`
-      : negatives > 6
-      ? `שוק חלש — <b>חכה ליציבות</b> לפני כניסה חדשה.`
-      : `שוק מעורב — פעל <b>סלקטיבית</b> בסקטורים יחסיים.`;
+    // Unified day classification — all three insight rows (watch/risk/opp)
+    // key off this, so they speak with one voice. A leader being green on
+    // a broadly red day shouldn't be the headline; the overall bleed is.
+    const dayRed   = avg < -0.3 && negatives >= 7;
+    const dayGreen = avg >  0.3 && positives >= 7;
+
+    const watchTxt = dayRed
+      ? `רוב הסקטורים יורדים (${negatives}/${total}) — גם <b>${leader.name}</b> המוביל לא מתקן. עקוב אם הירידה מעמיקה מחר.`
+      : leaderPos
+        ? `המשך הובלת <b>${leader.name}</b> — עד מתי ימשיך להוביל.`
+        : `חולשה רחבה — עקוב אחר רמות תמיכה.`;
+
+    const riskTxt = dayRed
+      ? `יום אדום רחב (ממוצע ${fmt(avg)}) — אם מחר עוד יום שלילי, זה מתחיל להיראות כמו תיקון. <b>${laggard.name}</b> בלט בחולשה (${fmt(laggard.d1)}).`
+      : laggard.d1 < -0.5
+        ? `<b>${laggard.name}</b> בחולשה (${fmt(laggard.d1)}) — עלול להעיב על השוק.`
+        : `תנודתיות נמוכה יחסית — סבלנות נדרשת.`;
+
+    const oppTxt = dayRed
+      ? `שוק חלש — <b>חכה ליציבות</b> לפני כניסה חדשה. אם חייבים חשיפה, רק סקטור חזק כמו <b>${leader.name}</b>.`
+      : dayGreen
+        ? `מומנטום חיובי — כניסות <b>סלקטיביות</b> לסקטורים מובילים.`
+        : `שוק מעורב — פעל <b>סלקטיבית</b> בסקטורים יחסיים.`;
 
     // Pull the detailed breadth advice from the hidden Breadth card into the AI actions
     const breadthAdviceRow = (() => {
@@ -5100,9 +5168,10 @@ const getSubIndHe = (sym) => {
    at the currently-active holdings object and keep caches separate per universe.
    ════════════════════════════════════════════════════════════════════════════ */
 const UNIVERSES = {
-  large: { label:'S&P 500',         labelShort:'S&P 500',         holdings: ETF_HOLDINGS        },
-  mid:   { label:'S&P MidCap 400',  labelShort:'S&P MidCap 400',  holdings: MID_CAP_HOLDINGS    },
-  ndx:   { label:'NASDAQ 100',      labelShort:'NASDAQ 100',      holdings: NASDAQ_100_HOLDINGS },
+  large: { label:'S&P 500',         labelShort:'S&P 500',         holdings: ETF_HOLDINGS         },
+  mid:   { label:'S&P MidCap 400',  labelShort:'S&P MidCap 400',  holdings: MID_CAP_HOLDINGS     },
+  ndx:   { label:'NASDAQ 100',      labelShort:'NASDAQ 100',      holdings: NASDAQ_100_HOLDINGS  },
+  small: { label:'S&P SmallCap 600',labelShort:'S&P SmallCap 600',holdings: SMALLCAP_600_HOLDINGS },
 };
 let currentUniverse = localStorage.getItem(UNIVERSE_KEY) || 'large';
 if (!UNIVERSES[currentUniverse]) currentUniverse = 'large';
@@ -5131,6 +5200,12 @@ function loadCachedScan() {
       cached.stocks.forEach(s => {
         if (s.subInd === undefined) s.subInd = SYM_SUBIND[s.sym] || null;
         if (s.subIndName === undefined) s.subIndName = getSubIndHe(s.sym);
+        // Self-heal: earlier versions stored subIndName as a {e,h} object
+        // instead of extracting .h. Fix on load so "[object Object]" doesn't
+        // render in the table for already-cached bad entries.
+        if (s.subIndName && typeof s.subIndName === 'object') {
+          s.subIndName = s.subIndName.h || s.subIndName.e || null;
+        }
         // Backfill per-stock freshness stamp for caches saved before this field
         // existed — all stocks share the scan timestamp in that case.
         if (s.refreshedAt === undefined) s.refreshedAt = cached.timestamp;
@@ -5382,12 +5457,14 @@ function applyUniversePayload(payload) {
   UNIVERSES.mid.holdings   = payload.sp400.holdings;
   // NDX is optional — if the parser fails for Nasdaq-100 specifically, we
   // keep the hardcoded floor rather than blocking the whole refresh.
-  if (payload.ndx) UNIVERSES.ndx.holdings = payload.ndx.holdings;
+  if (payload.ndx)   UNIVERSES.ndx.holdings   = payload.ndx.holdings;
+  // S&P 600 same as NDX — optional, falls back to hardcoded floor on failure.
+  if (payload.sp600) UNIVERSES.small.holdings = payload.sp600.holdings;
   // SYM_SUBIND: start from the hardcoded floor, overlay wiki data on top.
   Object.keys(SYM_SUBIND).forEach(k => delete SYM_SUBIND[k]);
   Object.assign(SYM_SUBIND, BASE_SYM_SUBIND,
     payload.sp500.symSubind, payload.sp400.symSubind,
-    payload.ndx?.symSubind || {});
+    payload.ndx?.symSubind || {}, payload.sp600?.symSubind || {});
   rebuildSymMaps();
   lastUniverseUpdate = payload.fetchedAt;
   universeUpdateSource = payload.source || 'wikipedia';
@@ -5408,7 +5485,7 @@ async function refreshUniversesFromWikipedia() {
   try {
     const cached = JSON.parse(localStorage.getItem(UNIVERSE_CACHE_KEY));
     const fresh = cached && Date.now() - cached.fetchedAt < UNIVERSE_CACHE_TTL;
-    const complete = cached && cached.sp500 && cached.sp400 && cached.ndx;
+    const complete = cached && cached.sp500 && cached.sp400 && cached.ndx && cached.sp600;
     if (fresh && complete) {
       applyUniversePayload({ ...cached, source: 'cache' });
       return { source: 'cache' };
@@ -5422,14 +5499,16 @@ async function refreshUniversesFromWikipedia() {
   } catch(e){}
 
   try {
-    const [sp500rows, sp400rows, ndxrows] = await Promise.all([
+    const [sp500rows, sp400rows, ndxrows, sp600rows] = await Promise.all([
       fetchWikipediaUniverse('List_of_S%26P_500_companies'),
       fetchWikipediaUniverse('List_of_S%26P_400_companies'),
       fetchWikipediaUniverse('Nasdaq-100').catch(() => []),
+      fetchWikipediaUniverse('List_of_S%26P_600_companies').catch(() => []),
     ]);
     const sp500 = buildUniverseFromWikiRows(sp500rows);
     const sp400 = buildUniverseFromWikiRows(sp400rows);
     const ndx   = buildUniverseFromWikiRows(ndxrows);
+    const sp600 = buildUniverseFromWikiRows(sp600rows);
 
     if (!isValidUniverse(sp500, 450, 520)) {
       throw new Error(`SP500 validation failed (got ${sp500.count})`);
@@ -5455,15 +5534,33 @@ async function refreshUniversesFromWikipedia() {
       console.warn(`NDX validation failed (got ${ndx.count}), keeping hardcoded floor for NDX`);
     }
 
+    // S&P 600: expect ~600 names. Wikipedia table has 603 entries (3 dual
+    // share classes), so we accept 550-650 to tolerate small ongoing changes.
+    // Dedupe against sp500+sp400 — rare but happens when a small-cap gets
+    // promoted to mid-cap and both listings haven't updated yet.
+    const sp600Valid = sp600.count >= 550 && sp600.count <= 650 && Object.keys(sp600.holdings).length >= 8;
+    if (sp600Valid) {
+      const inLarger = new Set();
+      Object.values(sp500.holdings).forEach(arr => arr.forEach(h => inLarger.add(h.s)));
+      Object.values(sp400.holdings).forEach(arr => arr.forEach(h => inLarger.add(h.s)));
+      for (const etf in sp600.holdings) {
+        sp600.holdings[etf] = sp600.holdings[etf].filter(h => !inLarger.has(h.s));
+      }
+      sp600.count = Object.values(sp600.holdings).reduce((a, arr) => a + arr.length, 0);
+    } else if (sp600.count > 0) {
+      console.warn(`SP600 validation failed (got ${sp600.count}), keeping hardcoded floor for SmallCap 600`);
+    }
+
     const payload = { sp500, sp400, fetchedAt: Date.now() };
-    if (ndxValid) payload.ndx = ndx;
+    if (ndxValid)   payload.ndx   = ndx;
+    if (sp600Valid) payload.sp600 = sp600;
     try { localStorage.setItem(UNIVERSE_CACHE_KEY, JSON.stringify(payload)); } catch(e){}
     applyUniversePayload({ ...payload, source: 'wikipedia' });
-    console.info(`universe refreshed: ${sp500.count} large + ${sp400.count} mid${ndxValid ? ` + ${ndx.count} ndx` : ''}`);
-    return { source: 'wikipedia', sp500: sp500.count, sp400: sp400.count, ndx: ndxValid ? ndx.count : null };
+    console.info(`universe refreshed: ${sp500.count} large + ${sp400.count} mid${ndxValid ? ` + ${ndx.count} ndx` : ''}${sp600Valid ? ` + ${sp600.count} small` : ''}`);
+    return { source: 'wikipedia', sp500: sp500.count, sp400: sp400.count, ndx: ndxValid ? ndx.count : null, sp600: sp600Valid ? sp600.count : null };
 
   } catch(e) {
-    console.warn('universe Wikipedia fetch failed, keeping current data:', e.message);
+    console.warn('universe fetch failed, keeping current data:', e.message);
     return { source: universeUpdateSource, error: e.message };
   }
 }
@@ -5498,12 +5595,13 @@ let displayState = {
   view: 'all',
   sortKey: 'score',
   sortDesc: true,
+  searchQuery: '',     // live filter from the search box above the table
 };
 let watchlist = [];
 try { watchlist = JSON.parse(localStorage.getItem(WL_KEY)) || []; } catch(e){}
 
 // ═══ INIT ═══
-function advisorBoot() {
+async function advisorBoot() {
   if (!PROXY) {
     $('screen-welcome').style.display = 'none';
     $('adv-err-msg').textContent = 'לא נמצא proxy. חזור ל-index.html והזן את כתובת ה-Cloudflare Worker.';
@@ -5537,6 +5635,30 @@ function advisorBoot() {
     scheduleAutoRefresh(500);
     return;
   }
+
+  // No cached full scan — but if the user has a watchlist, run a standalone
+  // watchlist-only scan. The user's personal list is the most important thing
+  // they see, so we prioritize it loading immediately without requiring a full
+  // universe scan click. Full scan is still available via the "סריקה" button.
+  if (watchlist.length > 0) {
+    showScreen('adv-screen-loading');
+    $('loading-msg').textContent = `טוען את הרשימה שלך (${watchlist.length} מניות)...`;
+    $('prog-txt').textContent = `0 / ${watchlist.length}`;
+    $('prog-fill').style.width = '0%';
+
+    const wlData = await scanWatchlistStandalone();
+    if (wlData) {
+      scanData = wlData;
+      // Force "watchlist" view since score/rank columns are empty in standalone mode
+      displayState.view = 'watchlist';
+      showResults();
+      renderWatchlist();
+      startMarketClock();
+      return;
+    }
+    // If standalone scan failed, fall through to the welcome screen below
+  }
+
   renderWatchlist();
   startMarketClock();
 } // advisorBoot end
@@ -6085,6 +6207,10 @@ async function runScan() {
 
   const symbolsSet = new Set();
   Object.values(getCurrentHoldings()).forEach(sec => sec.forEach(s => symbolsSet.add(s.s)));
+  // Include watchlist symbols in the scan so manually-added stocks (like IREN,
+  // MSTR, etc. that aren't in any index) participate in the ranking and get
+  // real scores. Otherwise they'd stay "—" forever even after a full scan.
+  watchlist.forEach(sym => symbolsSet.add(sym));
   const symbols = Array.from(symbolsSet);
 
   showScreen('adv-screen-loading');
@@ -6190,15 +6316,23 @@ function showResults() {
 
 function renderKPIs() {
   const { stocks, timestamp, universeSize } = scanData;
-  $('kpi-universe').textContent = universeSize;
+  $('kpi-universe').textContent = universeSize ?? '—';
 
-  const avg = stocks.reduce((a,s) => a + s.score, 0) / stocks.length;
+  // Compute KPIs only on stocks that have scores — standalone-added stocks
+  // have null scores and would poison the average / sector ranking.
+  const scored = stocks.filter(s => s.score != null);
+  if (scored.length === 0) {
+    $('kpi-avg').textContent = '—';
+    return;
+  }
+
+  const avg = scored.reduce((a,s) => a + s.score, 0) / scored.length;
   const avgEl = $('kpi-avg');
   avgEl.textContent = Math.round(avg);
   avgEl.className = 'meta-value ' + (avg >= 60 ? 'ok' : avg >= 45 ? '' : 'warn');
 
   const secAgg = {};
-  stocks.forEach(s => {
+  scored.forEach(s => {
     if (!s.sector || s.sector === '—') return;
     if (!secAgg[s.sector]) secAgg[s.sector] = { sum:0, n:0 };
     secAgg[s.sector].sum += s.score;
@@ -6493,10 +6627,34 @@ function sortBy(key) {
 function getFilteredStocks() {
   if (!scanData) return [];
   let list = scanData.stocks.slice();
-  list = list.filter(s => s.score >= displayState.minScore);
+
+  // Views "all" and "top20" show the public leaderboard — only stocks with
+  // a score from a full universe scan. Manually-added stocks (IREN, etc.)
+  // have score=null and are considered PRIVATE to the user's watchlist.
+  // Surfacing them in "all" would pollute the leaderboard: a user adds IREN
+  // and suddenly sees it mixed in with Top 500 results like it was ranked.
+  if (displayState.view === 'all' || displayState.view === 'top20') {
+    list = list.filter(s => s.score != null);
+  }
+
+  // Score filter only applies when scores exist. In watchlist-only mode,
+  // scores are null across the board — filtering by minScore would empty
+  // the list. Skip it when score is null on any given stock.
+  if (displayState.minScore > 0) {
+    list = list.filter(s => s.score == null || s.score >= displayState.minScore);
+  }
   if (displayState.sector) list = list.filter(s => s.sector === displayState.sector);
   if (displayState.view === 'top20') list = list.slice(0, 20);
   if (displayState.view === 'watchlist') list = list.filter(s => watchlist.includes(s.sym));
+  // Live search — matches symbol (starts-with-ish) or name (contains).
+  // Applied AFTER the other filters so it refines an already-narrowed set.
+  if (displayState.searchQuery) {
+    const q = displayState.searchQuery;
+    list = list.filter(s =>
+      s.sym.toLowerCase().includes(q) ||
+      (s.name && s.name.toLowerCase().includes(q))
+    );
+  }
   const k = displayState.sortKey;
   const dir = displayState.sortDesc ? -1 : 1;
   list.sort((a,b) => {
@@ -6543,11 +6701,22 @@ function renderTable() {
   }
 
   if (list.length === 0) {
-    tbody.innerHTML = `
-      <tr><td colspan="11" style="padding:40px;text-align:center;color:var(--dim)">
-        אין מניות שעונות על הקריטריונים.
-        ${displayState.view === 'watchlist' ? '<br><small style="font-size:10px;color:var(--dimmer)">הוסף מניות לרשימה שלך מפאנל הפירוט של כל מניה.</small>' : ''}
-      </td></tr>`;
+    // Distinguish between "no results for this search" vs "the whole view is empty".
+    // The former is transient (user can clear search); the latter usually means
+    // the user needs to add stocks / run a full scan.
+    if (displayState.searchQuery) {
+      tbody.innerHTML = `
+        <tr><td colspan="11" class="tbl-no-match">
+          לא נמצאה מניה עבור "<b>${displayState.searchQuery}</b>".
+          <br><small style="font-size:10px;color:var(--dimmer)">נסה סימבול או שם חברה אחר, או נקה את החיפוש.</small>
+        </td></tr>`;
+    } else {
+      tbody.innerHTML = `
+        <tr><td colspan="11" style="padding:40px;text-align:center;color:var(--dim)">
+          אין מניות שעונות על הקריטריונים.
+          ${displayState.view === 'watchlist' ? '<br><small style="font-size:10px;color:var(--dimmer)">הוסף מניות לרשימה שלך מפאנל הפירוט של כל מניה.</small>' : ''}
+        </td></tr>`;
+    }
     return;
   }
 
@@ -6564,16 +6733,24 @@ function renderTable() {
         badges.push('<span class="bdg bdg-wl">WL</span>');
       }
     }
-    if (s.rank <= 10 && s.score >= 80) badges.push('<span class="bdg bdg-star">★</span>');
+    if (s.rank != null && s.rank <= 10 && s.score != null && s.score >= 80) badges.push('<span class="bdg bdg-star">★</span>');
+
+    // Score/rank may be null in watchlist-only scans or for manually-added
+    // symbols (foreign stocks not in any indexed universe). Show em-dash in
+    // those cases — it signals "pending full scan" without breaking layout.
+    const scoreDisplay = s.score == null ? '—' : s.score;
+    const scoreClassStr = s.score == null ? 's-0' : scoreClass(s.score);
+    const rankDisplay = s.rank == null ? '—' : s.rank;
+    const sectorDisplay = s.sectorName || '—';
 
     return `
       <tr onclick="openDetail('${s.sym}')">
-        <td class="rk ${rkCls}">${s.rank}</td>
+        <td class="rk ${rkCls}">${rankDisplay}</td>
         <td class="sym"><img class="sym-logo" src="https://financialmodelingprep.com/image-stock/${s.sym}.png" alt="" loading="lazy" onerror="this.classList.add('sym-logo-err')"><b>${s.sym}</b>${badges.join('')}<span class="name">${s.name}</span></td>
-        <td class="sec">${s.sectorName}</td>
+        <td class="sec">${sectorDisplay}</td>
         <td class="subsec hide-m">${s.subIndName || '—'}</td>
-        <td><span class="score ${scoreClass(s.score)}">${s.score}</span></td>
-        <td class="hide-m">${renderFactorBars(s.scores)}</td>
+        <td><span class="score ${scoreClassStr}">${scoreDisplay}</span></td>
+        <td class="hide-m">${s.scores ? renderFactorBars(s.scores) : '<span style="color:var(--dimmer);font-size:10px">—</span>'}</td>
         <td class="num hide-m">$${fmt(s.price)}</td>
         <td class="num pct ${pctCls(s.y1)}">${fmtPct(s.y1)}</td>
         <td class="num pct hide-m ${pctCls(s.m3)}">${fmtPct(s.m3)}</td>
@@ -6781,47 +6958,370 @@ function formatMinutesAgo(ts) {
  * Runtime: ~0.3s for 10-15 stocks (vs. ~10s for full scan), small enough
  * to feel instant while still being honest about what it actually refreshed.
  */
+/**
+ * Build a minimal scanData from just the watchlist symbols, without running
+ * a full-universe scan. Called automatically on advisor boot so the user's
+ * personal list is always immediately visible, even without a "real" scan.
+ *
+ * Tradeoffs vs. runScan():
+ *   - MUCH faster (10-15 stocks = ~2s; full universe = ~20s)
+ *   - NO score/rank — those require universe-wide percentile data we don't
+ *     have. Those fields stay null and render as "—" until a full scan runs.
+ *   - NO sector rank, no scores breakdown.
+ *   - Gives: price, y1, m3, m1, fromHi, sma10, sma40 — enough for the user
+ *     to see their positions and for exit-signal calculations to work partly
+ *     (MA check works; Top-N rank check just says "unknown").
+ *
+ * Uses computeMetrics directly, skipping computeScores. Safe to call even
+ * when watchlist is empty (just no-ops).
+ */
+async function scanWatchlistStandalone() {
+  if (!PROXY) return null;
+  if (watchlist.length === 0) return null;
+
+  const symbols = watchlist.slice();
+  console.info(`standalone watchlist scan: ${symbols.length} symbols`);
+
+  try {
+    // SPY is the benchmark. Parallel with the watchlist fetches.
+    const [spyData, stocksData] = await Promise.all([
+      fetchChartWeekly('SPY'),
+      fetchUniverseInChunks(symbols, () => {}),
+    ]);
+    if (!spyData) throw new Error('SPY fetch failed');
+
+    const now = Date.now();
+    const stocks = [];
+    for (const sym of symbols) {
+      const chartData = stocksData[sym];
+      if (!chartData) continue;            // fetch failed for this symbol (bad ticker, 404, etc.)
+      const m = computeMetrics(chartData, spyData.closes);
+      if (!m) continue;
+
+      // Look up sector info from the current universe holdings (if the stock
+      // happens to be in it). For foreign/unscanned stocks like IREN, sector
+      // will be null — table handles that with "—" placeholder.
+      let sector = null, sectorName = null, subInd = null, subIndName = null, name = sym;
+      for (const [etf, holdings] of Object.entries(ETF_HOLDINGS)) {
+        const found = holdings.find(h => h.s === sym);
+        if (found) { sector = etf; sectorName = SECTOR_NAMES[etf]; name = found.n; break; }
+      }
+      if (!sector) {
+        // Try other universes too in case watchlist has a mid/small/NDX stock
+        for (const uni of [MID_CAP_HOLDINGS, NASDAQ_100_HOLDINGS, SMALLCAP_600_HOLDINGS]) {
+          for (const [etf, holdings] of Object.entries(uni)) {
+            const found = holdings.find(h => h.s === sym);
+            if (found) { sector = etf; sectorName = SECTOR_NAMES[etf]; name = found.n; break; }
+          }
+          if (sector) break;
+        }
+      }
+      subInd = SYM_SUBIND[sym] || null;
+      subIndName = subInd && SI_LABELS[subInd] ? SI_LABELS[subInd].h : null;
+
+      stocks.push({
+        sym, name,
+        sector, sectorName, subInd, subIndName,
+        score: null,             // requires universe-wide percentile
+        scores: null,
+        rank: null,
+        price:  m.price,
+        y1:     m.ret12m != null ? m.ret12m * 100 : null,
+        m3:     m.ret3m  != null ? m.ret3m  * 100 : null,
+        m1:     m.ret1m  != null ? m.ret1m  * 100 : null,
+        fromHi: m.fromHi != null ? m.fromHi * 100 : null,
+        metrics: {
+          price:      m.price,
+          fromHi:     m.fromHi,
+          ret1m:      m.ret1m,
+          sma10:      m.sma10,
+          sma40:      m.sma40,
+          sma10Slope: m.sma10Slope,
+        },
+        closes: chartData.closes,
+        refreshedAt: now,
+      });
+    }
+
+    if (stocks.length === 0) return null;
+
+    return {
+      stocks,
+      timestamp: now,
+      universeSize: null,        // null → "watchlist-only" mode; UI shows "—" in "מניות בסריקה"
+      methodology: currentMethodology,
+      universe: currentUniverse,
+      watchlistOnly: true,       // marker so renderTable / stats know this is partial
+    };
+  } catch(e) {
+    console.warn('standalone watchlist scan failed:', e);
+    return null;
+  }
+}
+
+/**
+ * Live filter for the picks table. Called from the search input's oninput.
+ * Stores the normalized query in displayState.searchQuery; renderTable applies
+ * it as an AND with existing view/score filters. Toggles the clear-button
+ * visibility via has-query class on the wrapper.
+ */
+function setTableSearch(q) {
+  const normalized = (q || '').trim();
+  displayState.searchQuery = normalized.toLowerCase();
+  const wrap = $('tbl-search-wrap');
+  if (wrap) wrap.classList.toggle('has-query', normalized.length > 0);
+  if (scanData) renderTable();
+}
+
+function clearTableSearch() {
+  const input = $('tbl-search');
+  if (input) input.value = '';
+  setTableSearch('');
+}
+
+/**
+ * Show the "Add symbol" modal. User types a ticker, we validate it against
+ * Yahoo Finance (a tiny chart fetch is cheap and definitive — if Yahoo returns
+ * valid data, the symbol trades somewhere), add to watchlist if valid.
+ *
+ * Why Yahoo validation rather than accepting any string: prevents the user
+ * from polluting their watchlist with typos like "APPL" or "MFST" that would
+ * later show up as empty rows.
+ */
+function openAddSymbolModal() {
+  // Reuse the generic auth-overlay shell, with custom body. Saves duplicating
+  // modal CSS and keeps the z-index / backdrop styling consistent.
+  const overlay = $('auth-overlay');
+  const title   = $('auth-title');
+  const body    = $('auth-body');
+  if (!overlay || !body) return;
+
+  title.textContent = 'הוסף מניה לרשימה';
+  body.innerHTML = `
+    <div class="add-sym-wrap">
+      <div class="add-sym-intro">הקלד סימבול של מניה (לדוגמה: IREN, AAPL, MSTR). נסרוק את הנתונים ונוסיף לרשימה שלך.</div>
+      <div class="add-sym-row">
+        <label class="auth-label" for="add-sym-input">סימבול</label>
+        <input id="add-sym-input" class="auth-input" type="text" autocomplete="off" autocapitalize="characters" placeholder="IREN" dir="ltr"
+               onkeydown="if(event.key==='Enter') handleAddSymbol()">
+      </div>
+      <button class="auth-submit" onclick="handleAddSymbol()" id="add-sym-submit">הוסף</button>
+      <div id="add-sym-msg" class="auth-msg"></div>
+    </div>`;
+  overlay.classList.add('open');
+  setTimeout(() => $('add-sym-input')?.focus(), 50);
+}
+
+/** Validate + add + scan new symbol. Called from the modal Add button. */
+async function handleAddSymbol() {
+  const input = $('add-sym-input');
+  const msgEl = $('add-sym-msg');
+  const btn   = $('add-sym-submit');
+  if (!input || !msgEl || !btn) return;
+
+  const sym = (input.value || '').trim().toUpperCase();
+  if (!sym) {
+    msgEl.className = 'auth-msg auth-msg-err';
+    msgEl.textContent = 'נא להקליד סימבול';
+    return;
+  }
+  if (!/^[A-Z][A-Z.\-]{0,7}$/.test(sym)) {
+    msgEl.className = 'auth-msg auth-msg-err';
+    msgEl.textContent = 'סימבול לא תקין (רק אותיות באנגלית)';
+    return;
+  }
+  if (watchlist.includes(sym)) {
+    msgEl.className = 'auth-msg auth-msg-err';
+    msgEl.textContent = `${sym} כבר ברשימה שלך`;
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'מאמת...';
+  msgEl.className = 'auth-msg';
+  msgEl.textContent = '';
+
+  try {
+    // Validate by fetching a weekly chart. No data → bad ticker.
+    const [chartData, spyData] = await Promise.all([
+      fetchChartWeekly(sym),
+      scanData ? null : fetchChartWeekly('SPY'),   // only fetch SPY if we don't have a scan
+    ]);
+
+    if (!chartData || !chartData.closes || chartData.closes.length < 10) {
+      msgEl.className = 'auth-msg auth-msg-err';
+      msgEl.textContent = `לא נמצאו נתונים עבור "${sym}" ב-Yahoo Finance. בדוק שהסימבול תקין.`;
+      btn.disabled = false;
+      btn.textContent = 'הוסף';
+      return;
+    }
+
+    // Add to watchlist (handles localStorage + cloud sync + pill count update).
+    // No-op if already there (we checked at the top of this function).
+    toggleWatchlist(sym);
+
+    // Add a row to scanData so the table shows it immediately. If we have
+    // a scan already, grab SPY from one of its stocks; otherwise use the
+    // fresh fetch we did above. Either way, compute metrics for the new sym.
+    const spyCloses = spyData?.closes
+      || scanData?.stocks?.find(s => s.sym === 'SPY')?.closes
+      || (await fetchChartWeekly('SPY'))?.closes;
+
+    if (spyCloses && scanData && scanData.stocks) {
+      const mm = computeMetrics(chartData, spyCloses);
+      if (mm) {
+        // Look up sector from any of our universes (may or may not find one)
+        let sector = null, sectorName = null, name = sym;
+        for (const uni of [ETF_HOLDINGS, MID_CAP_HOLDINGS, NASDAQ_100_HOLDINGS, SMALLCAP_600_HOLDINGS]) {
+          for (const [etf, holdings] of Object.entries(uni)) {
+            const found = holdings.find(h => h.s === sym);
+            if (found) { sector = etf; sectorName = SECTOR_NAMES[etf]; name = found.n; break; }
+          }
+          if (sector) break;
+        }
+
+        // Sub-industry: SI_LABELS is { code → {e, h} }, use .h for Hebrew.
+        // Previous code stored the whole {e,h} object, which rendered as
+        // "[object Object]" in the table.
+        const siCode = SYM_SUBIND[sym] || null;
+        const siLabel = siCode && SI_LABELS[siCode] ? SI_LABELS[siCode].h : null;
+
+        // Check if the stock already exists in scanData — if so, update in
+        // place instead of pushing a duplicate. This handles the case where
+        // the symbol is in the current scan (e.g., SNDK in the S&P 500 scan)
+        // and the user is "re-adding" it to get it into their watchlist.
+        const existing = scanData.stocks.find(s => s.sym === sym);
+        if (existing) {
+          existing.price  = mm.price;
+          existing.y1     = mm.ret12m != null ? mm.ret12m * 100 : null;
+          existing.m3     = mm.ret3m  != null ? mm.ret3m  * 100 : null;
+          existing.m1     = mm.ret1m  != null ? mm.ret1m  * 100 : null;
+          existing.fromHi = mm.fromHi != null ? mm.fromHi * 100 : null;
+          existing.metrics = {
+            price: mm.price, fromHi: mm.fromHi, ret1m: mm.ret1m,
+            sma10: mm.sma10, sma40: mm.sma40, sma10Slope: mm.sma10Slope,
+          };
+          existing.closes = chartData.closes;
+          existing.refreshedAt = Date.now();
+        } else {
+          scanData.stocks.push({
+            sym, name,
+            sector, sectorName,
+            subInd: siCode,
+            subIndName: siLabel,
+            score: null, scores: null, rank: null,
+            price: mm.price,
+            y1:  mm.ret12m != null ? mm.ret12m * 100 : null,
+            m3:  mm.ret3m  != null ? mm.ret3m  * 100 : null,
+            m1:  mm.ret1m  != null ? mm.ret1m  * 100 : null,
+            fromHi: mm.fromHi != null ? mm.fromHi * 100 : null,
+            metrics: {
+              price: mm.price, fromHi: mm.fromHi, ret1m: mm.ret1m,
+              sma10: mm.sma10, sma40: mm.sma40, sma10Slope: mm.sma10Slope,
+            },
+            closes: chartData.closes,
+            refreshedAt: Date.now(),
+          });
+        }
+      }
+    }
+
+    msgEl.className = 'auth-msg auth-msg-ok';
+    msgEl.textContent = `${sym} נוסף לרשימה`;
+    input.value = '';
+
+    // Persist to cache so the stock survives page reloads. Without this,
+    // reloading the page would lose the manually-added stock (it's in the
+    // watchlist but not in scanData cache).
+    persistScanData();
+
+    // Brief success flash, then close modal + refresh UI
+    setTimeout(() => {
+      closeAuthModalDirect();
+      renderWatchlist();
+      if (scanData) renderTable();
+    }, 800);
+  } catch(e) {
+    console.warn('add symbol failed:', e);
+    msgEl.className = 'auth-msg auth-msg-err';
+    msgEl.textContent = `שגיאה: ${e.message || 'לא הצלחתי להוסיף'}`;
+    btn.disabled = false;
+    btn.textContent = 'הוסף';
+  }
+}
+
 async function refreshWatchlist() {
-  if (!scanData || !scanData.stocks) return;
+  if (!PROXY) return;
   const btn = $('wl-refresh-btn');
   if (btn?.disabled) return;  // prevent double-clicks
+  if (watchlist.length === 0) return;
 
-  // Find watchlist stocks that exist in the current scan (others we can't
-  // refresh — they belong to a different universe or aren't loaded).
-  const wlInScan = scanData.stocks.filter(s => watchlist.includes(s.sym));
-  if (wlInScan.length === 0) return;
+  // Ensure scanData exists — if user jumped straight to adding stocks without
+  // any scan, we need a container.
+  if (!scanData) {
+    scanData = {
+      stocks: [], timestamp: Date.now(), universeSize: null,
+      methodology: currentMethodology, universe: currentUniverse,
+      watchlistOnly: true,
+    };
+  }
+  if (!scanData.stocks) scanData.stocks = [];
+
+  // Refresh ALL watchlist symbols, including those not yet in scanData
+  // (e.g., manually-added stocks like IREN that aren't in any universe).
+  // This was the key bug: previously we only refreshed stocks that were
+  // already in scanData, which dropped manually-added symbols on refresh.
+  const symbolsToRefresh = watchlist.slice();
+  if (symbolsToRefresh.length === 0) return;
 
   if (btn) { btn.disabled = true; btn.classList.add('refreshing'); }
   const bannerText = $('wl-refresh-status');
-  if (bannerText) bannerText.textContent = `מרענן ${wlInScan.length} מניות...`;
+  if (bannerText) bannerText.textContent = `מרענן ${symbolsToRefresh.length} מניות...`;
 
   try {
-    const symbols = wlInScan.map(s => s.sym);
-    // Parallel: SPY (needed for rs12m in computeMetrics) + all watchlist charts
     const [spyData, stocksData] = await Promise.all([
       fetchChartWeekly('SPY'),
-      fetchUniverseInChunks(symbols, () => {}),  // no progress UI for partial
+      fetchUniverseInChunks(symbolsToRefresh, () => {}),
     ]);
 
     if (!spyData) throw new Error('SPY fetch failed');
 
-    // Recompute metrics per stock and patch into scanData.stocks in-place.
-    // Keep score/rank/scores/scoreBreakdown from the full scan — they require
-    // universe-wide percentile data we don't have here.
     const now = Date.now();
     let refreshedCount = 0;
-    for (const stock of wlInScan) {
-      const chartData = stocksData[stock.sym];
-      if (!chartData) continue;   // fetch failed for this symbol
+    for (const sym of symbolsToRefresh) {
+      const chartData = stocksData[sym];
+      if (!chartData) continue;
       const m = computeMetrics(chartData, spyData.closes);
       if (!m) continue;
 
-      // Update the stock object in scanData.stocks (same reference as wlInScan entries)
+      // Find existing entry or create a new one (for manually-added stocks)
+      let stock = scanData.stocks.find(s => s.sym === sym);
+      if (!stock) {
+        // New entry — look up sector across universes, build minimal row
+        let sector = null, sectorName = null, name = sym;
+        for (const uni of [ETF_HOLDINGS, MID_CAP_HOLDINGS, NASDAQ_100_HOLDINGS, SMALLCAP_600_HOLDINGS]) {
+          for (const [etf, holdings] of Object.entries(uni)) {
+            const found = holdings.find(h => h.s === sym);
+            if (found) { sector = etf; sectorName = SECTOR_NAMES[etf]; name = found.n; break; }
+          }
+          if (sector) break;
+        }
+        stock = {
+          sym, name, sector, sectorName,
+          subInd: SYM_SUBIND[sym] || null,
+          subIndName: SYM_SUBIND[sym] && SI_LABELS[SYM_SUBIND[sym]] ? SI_LABELS[SYM_SUBIND[sym]].h : null,
+          score: null, scores: null, rank: null,
+        };
+        scanData.stocks.push(stock);
+      }
+
+      // Update metrics in-place. Keep score/rank if they already exist
+      // (from a prior full scan); null stays null for standalone entries.
       stock.price  = m.price;
       stock.y1     = m.ret12m != null ? m.ret12m * 100 : null;
       stock.m3     = m.ret3m  != null ? m.ret3m  * 100 : null;
       stock.m1     = m.ret1m  != null ? m.ret1m  * 100 : null;
-      stock.fromHi = m.fromHi * 100;
+      stock.fromHi = m.fromHi != null ? m.fromHi * 100 : null;
       stock.metrics = {
         price:      m.price,
         fromHi:     m.fromHi,
@@ -6830,28 +7330,16 @@ async function refreshWatchlist() {
         sma40:      m.sma40,
         sma10Slope: m.sma10Slope,
       };
+      stock.closes = chartData.closes;
       stock.refreshedAt = now;
       refreshedCount++;
     }
 
-    // Persist the update — next cache load will see the per-stock freshness.
-    try { localStorage.setItem(getCacheKey(), JSON.stringify({
-      timestamp: scanData.timestamp,
-      universeSize: scanData.universeSize,
-      methodology: scanData.methodology,
-      universe: scanData.universe,
-      stocks: scanData.stocks.map(s => ({
-        sym: s.sym, name: s.name, sector: s.sector, sectorName: s.sectorName,
-        subInd: s.subInd, subIndName: s.subIndName,
-        score: s.score, scores: s.scores, rank: s.rank,
-        price: s.price, y1: s.y1, m3: s.m3, m1: s.m1, fromHi: s.fromHi,
-        refreshedAt: s.refreshedAt,
-        metrics: s.metrics,
-      })),
-    })); } catch(e){}
+    // Persist the update. Include ALL stocks (including the manually-added
+    // ones with null scores) so a page reload still shows them.
+    persistScanData();
 
-    if (bannerText) bannerText.textContent = `עודכן · ${refreshedCount}/${wlInScan.length}`;
-    // Clear the status text after 2 seconds so it doesn't linger
+    if (bannerText) bannerText.textContent = `עודכן · ${refreshedCount}/${symbolsToRefresh.length}`;
     setTimeout(() => { if (bannerText) bannerText.textContent = ''; }, 2000);
 
     renderTable();
@@ -6864,6 +7352,30 @@ async function refreshWatchlist() {
   }
 }
 
+/** Write the current scanData to localStorage. Centralized so handleAddSymbol
+    and refreshWatchlist write exactly the same shape, preventing divergent
+    cache formats. */
+function persistScanData() {
+  if (!scanData) return;
+  try {
+    localStorage.setItem(getCacheKey(), JSON.stringify({
+      timestamp: scanData.timestamp,
+      universeSize: scanData.universeSize,
+      methodology: scanData.methodology,
+      universe: scanData.universe,
+      watchlistOnly: scanData.watchlistOnly,
+      stocks: scanData.stocks.map(s => ({
+        sym: s.sym, name: s.name, sector: s.sector, sectorName: s.sectorName,
+        subInd: s.subInd, subIndName: s.subIndName,
+        score: s.score, scores: s.scores, rank: s.rank,
+        price: s.price, y1: s.y1, m3: s.m3, m1: s.m1, fromHi: s.fromHi,
+        refreshedAt: s.refreshedAt,
+        metrics: s.metrics,
+      })),
+    }));
+  } catch(e) { console.warn('persistScanData failed:', e); }
+}
+
 /** Render the small status-bar banner that appears ABOVE the table when the
     user is in "רשימה שלי" view. Shows oldest-stock freshness across the list
     and a compact refresh button. Called from renderTable() before the tbody
@@ -6872,20 +7384,58 @@ function renderWatchlistBanner() {
   const container = $('wl-banner');
   if (!container) return;
 
-  if (displayState.view !== 'watchlist' || !scanData || !scanData.stocks) {
+  // Always show banner when in watchlist view — even if list is empty or there's
+  // no scan data yet. The "Add symbol" button MUST be reachable in all states.
+  if (displayState.view !== 'watchlist') {
     container.style.display = 'none';
+    return;
+  }
+
+  const addBtn = `
+    <button class="wl-add-btn" onclick="openAddSymbolModal()" title="הוסף מניה לרשימה">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <span>הוסף מניה</span>
+    </button>`;
+
+  // Case 1: watchlist empty — show CTA-style banner with just the add button
+  if (watchlist.length === 0) {
+    container.className = 'wl-banner wl-banner-empty';
+    container.style.display = 'flex';
+    container.innerHTML = `
+      <div class="wl-banner-info">
+        <span class="wl-banner-label">הרשימה שלך ריקה — הוסף מניות כדי להתחיל</span>
+      </div>
+      ${addBtn}`;
+    return;
+  }
+
+  // Case 2: have watchlist but no scan data yet — simpler banner, no freshness
+  if (!scanData || !scanData.stocks) {
+    container.className = 'wl-banner wl-banner-fresh';
+    container.style.display = 'flex';
+    container.innerHTML = `
+      <div class="wl-banner-info">
+        <span class="wl-banner-label">${watchlist.length} מניות ברשימה · טוען נתונים...</span>
+      </div>
+      ${addBtn}`;
     return;
   }
 
   const wlInScan = scanData.stocks.filter(s => watchlist.includes(s.sym));
+
+  // Case 3: watchlist has stocks but none in current scan
   if (wlInScan.length === 0) {
-    container.style.display = 'none';
+    container.className = 'wl-banner wl-banner-warm';
+    container.style.display = 'flex';
+    container.innerHTML = `
+      <div class="wl-banner-info">
+        <span class="wl-banner-label">המניות שלך אינן בסריקה הנוכחית</span>
+      </div>
+      ${addBtn}`;
     return;
   }
 
-  // Find the OLDEST refresh time in the list — the banner reflects the worst
-  // case. If even one stock is stale, show the warning; a refresh brings them
-  // all up to fresh at once.
+  // Case 4: normal banner — has data, show freshness + refresh + add buttons
   const oldestRefresh = Math.min(...wlInScan.map(s => s.refreshedAt || scanData.timestamp || 0));
   const age = Date.now() - oldestRefresh;
   const tier = age < STALE_FRESH_MS ? 'fresh'
@@ -6900,10 +7450,13 @@ function renderWatchlistBanner() {
       <span class="wl-banner-label">אותות יציאה · נתונים מ-${ageText}</span>
       <span class="wl-refresh-status" id="wl-refresh-status"></span>
     </div>
-    <button class="wl-refresh-btn" id="wl-refresh-btn" onclick="refreshWatchlist()" title="רענון מהיר של הרשימה בלבד">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-      <span>רענן רשימה</span>
-    </button>`;
+    <div class="wl-banner-actions">
+      ${addBtn}
+      <button class="wl-refresh-btn" id="wl-refresh-btn" onclick="refreshWatchlist()" title="רענון מהיר של הרשימה בלבד">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        <span>רענן</span>
+      </button>
+    </div>`;
 }
 
 // ═══ DETAIL PANEL ═══
@@ -6923,33 +7476,40 @@ function openDetail(sym) {
   const body = $('dt-body');
   const m = s.metrics;
 
+  // Stocks added manually or from a standalone-scan have no factor scores.
+  // The thesis and factor-breakdown sections depend on s.scores, so we guard
+  // those and fall back to metric-only insights that still work (fromHi, ret1m).
+  const hasScores = s.scores && typeof s.scores === 'object';
+
   const thesis = [];
-  if (s.score >= 85) thesis.push({ t: 'ציון גבוה במיוחד - המניה בדרגת Top Tier בקטגוריה.', cls: '' });
-  if (s.scores.RS >= 80) thesis.push({ t: `חוזק יחסי חזק מאוד (${s.scores.RS}/100) - עולה על S&P 500 לאורך זמן.`, cls: '' });
-  if (s.scores.TRD >= 80 && m.sma10 > m.sma40) thesis.push({ t: 'מגמה נקייה: Golden Cross פעיל + SMA עולה.', cls: '' });
+  if (hasScores && s.score >= 85) thesis.push({ t: 'ציון גבוה במיוחד - המניה בדרגת Top Tier בקטגוריה.', cls: '' });
+  if (hasScores && s.scores.RS >= 80) thesis.push({ t: `חוזק יחסי חזק מאוד (${s.scores.RS}/100) - עולה על S&P 500 לאורך זמן.`, cls: '' });
+  if (hasScores && s.scores.TRD >= 80 && m.sma10 > m.sma40) thesis.push({ t: 'מגמה נקייה: Golden Cross פעיל + SMA עולה.', cls: '' });
   if (m.fromHi > -3) thesis.push({ t: `קרוב לשיא 52 שבועות (${fmtPct(m.fromHi*100)}) - breakout potential.`, cls: '' });
-  if (s.scores.MOM >= 85) thesis.push({ t: `מומנטום חזק בכל הטווחים (3M/6M/12M).`, cls: '' });
+  if (hasScores && s.scores.MOM >= 85) thesis.push({ t: `מומנטום חזק בכל הטווחים (3M/6M/12M).`, cls: '' });
   if (m.fromHi < -20) thesis.push({ t: `רחוק מהשיא (${fmtPct(m.fromHi*100)}) - ייתכן downtrend.`, cls: 'neg' });
   if (m.ret1m != null && m.ret1m < -0.08) thesis.push({ t: `חולשה אחרונה (${fmtPct(m.ret1m*100)} בחודש).`, cls: 'warn' });
-  if (s.scores.TRD < 40) thesis.push({ t: 'איכות המגמה נמוכה - המחיר מתחת לממוצעים או מגמה שלילית.', cls: 'warn' });
-  if (s.scores.RS < 30) thesis.push({ t: 'חלשה מהשוק הכללי - underperforming S&P 500.', cls: 'neg' });
+  if (hasScores && s.scores.TRD < 40) thesis.push({ t: 'איכות המגמה נמוכה - המחיר מתחת לממוצעים או מגמה שלילית.', cls: 'warn' });
+  if (hasScores && s.scores.RS < 30) thesis.push({ t: 'חלשה מהשוק הכללי - underperforming S&P 500.', cls: 'neg' });
+  if (!hasScores) thesis.push({ t: 'הרץ "סריקה" מלאה כדי לקבל ציון, דירוג וניתוח פקטורים מלא מול כל השוק.', cls: 'warn' });
   if (thesis.length === 0) thesis.push({ t: 'ציון בינוני - ללא סיגנלים מובהקים בכיוון אחד.', cls: 'warn' });
 
   const inWL = watchlist.includes(s.sym);
 
   body.innerHTML = `
     <div class="dt-score-hero">
-      <div class="dt-score-circle" style="--s:${s.score}">
-        <div class="dt-score-val">${s.score}</div>
+      <div class="dt-score-circle" style="--s:${s.score ?? 0}">
+        <div class="dt-score-val">${s.score ?? '—'}</div>
       </div>
       <div class="dt-score-info">
-        <div class="dt-score-lbl">#${s.rank} מתוך ${scanData.universeSize}</div>
+        <div class="dt-score-lbl">${s.rank != null ? `#${s.rank} מתוך ${scanData.universeSize}` : 'ממתין לסריקה מלאה'}</div>
         <div class="dt-score-title">${s.name}</div>
-        <div class="dt-score-desc">${s.sectorName} · $${fmt(s.price)} · ${fmtPct(s.y1)} שנתי</div>
+        <div class="dt-score-desc">${s.sectorName || '—'} · $${fmt(s.price)} · ${fmtPct(s.y1)} שנתי</div>
         ${s.subIndName ? `<div class="dt-score-subind">${s.subIndName}</div>` : ''}
       </div>
     </div>
 
+    ${hasScores ? `
     <div class="dt-section">
       <div class="dt-section-title">פירוט פקטורים · <span style="font-weight:500;color:var(--dim)">${METHODOLOGIES[currentMethodology].label}</span></div>
       <div class="factor-grid">
@@ -6967,6 +7527,7 @@ function openDetail(sym) {
         `).join('')}
       </div>
     </div>
+    ` : ''}
 
     <div class="dt-section">
       <div class="dt-section-title">מטריקות מפתח</div>
@@ -7147,7 +7708,22 @@ async function initCloudSync() {
       // Chain: pull watchlist from cloud first, THEN auto-refresh signals.
       // Order matters — a symbol added on another device needs to be in the
       // watchlist array before refreshWatchlist() can fetch its fresh data.
-      pullWatchlistFromCloud().then(() => scheduleAutoRefresh(0));
+      pullWatchlistFromCloud().then(async () => {
+        // After pull: if we have no scan data yet but now have watchlist
+        // symbols (e.g., first login on a new device), run standalone scan.
+        // Otherwise just refresh existing scan data.
+        if (!scanData && watchlist.length > 0) {
+          const wlData = await scanWatchlistStandalone();
+          if (wlData) {
+            scanData = wlData;
+            displayState.view = 'watchlist';
+            showResults();
+            renderWatchlist();
+          }
+        } else {
+          scheduleAutoRefresh(0);
+        }
+      });
       // If this SIGNED_IN came from an OAuth redirect, the user landed on
       // whatever the OAuth provider redirected to — usually the root/dashboard
       // tab. Send them back to the advisor tab where the sync matters.
@@ -7801,7 +8377,10 @@ document.addEventListener('keydown', e => {
     toggleWatchlist, refreshWatchlist,
     openAuthModal, closeAuthModal, closeAuthModalDirect,
     handleSignIn, handleSignOut, handleGoogleSignIn,
-    initCloudSync
+    initCloudSync,
+    // Watchlist-first feature (add symbol + search box)
+    openAddSymbolModal, handleAddSymbol,
+    setTableSearch, clearTableSearch,
   });
 
   window.initAdvisor = function(){
@@ -8147,6 +8726,8 @@ document.addEventListener('keydown', e => {
     return VIEWS.includes(h) ? h : 'dashboard';
   }
 
+  let previousRoute = null;
+
   function applyRoute(){
     const r = currentRoute();
     // Show / hide views
@@ -8161,6 +8742,15 @@ document.addEventListener('keydown', e => {
       a.classList.toggle('active', a.dataset.route === r);
     });
     document.body.dataset.route = r;
+
+    // Scroll to top on ACTUAL tab changes. Skip on initial load (previousRoute
+    // is null) so we don't jarringly jump from a saved scroll position when
+    // the user reloads the page mid-tab. Also skip when the route didn't
+    // actually change (hashchange fires for any hash modification).
+    if (previousRoute !== null && previousRoute !== r) {
+      window.scrollTo(0, 0);
+    }
+    previousRoute = r;
 
     // Cloud sync boots on ANY route — needed because OAuth redirects return to
     // the root URL regardless of which tab the user started from. Without this,
