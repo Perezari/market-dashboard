@@ -914,6 +914,9 @@ const NEWS_CACHE_TTL=10*60*1000;
 async function fetchHebrewNews(force=false) {
   $('news-grid').innerHTML = '<div class="modal-loading" style="color:var(--dim);font-size:12px"><div class="mini-ring" style="margin:0 auto 8px"></div>טוען חדשות...</div>';
   _renderNewsGrid(await _fetchFeeds(HEBREW_NEWS_FEEDS), 'he', HEBREW_NEWS_FEEDS);
+  // Initial-load-only: signal that news finished so the page loader can hide.
+  // The coordinator ignores duplicate calls, so later refreshes are harmless.
+  if (typeof markLoaderStageDone === 'function') markLoaderStageDone('news');
 }
 
 async function fetchEnglishNews() {
@@ -2544,10 +2547,16 @@ async function init(){
     const pos=SECTORS.filter(s=>(qmap[s.sym]||{}).d1>0).length;
     $('footer').textContent=`${pos}/${SECTORS.length} סקטורים חיוביים • Yahoo Finance • ${now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}`;
 
+    // Dashboard data pipeline finished — mark this stage done for the page
+    // loader. See markLoaderStageDone() at the top of app.js. The loader
+    // hides only when both startWithKey and loadAll have completed.
+    markLoaderStageDone('dashboard');
+
   }catch(e){
     $('err-msg').textContent='שגיאה בטעינת נתונים.';
     $('err-code').textContent=e.message;$('err-code').style.display='block';
     showScreen('screen-error');
+    markLoaderStageDone('dashboard');   // still hide loader on error
   }finally{
     if(btn)btn.classList.remove('loading');
   }
@@ -3650,7 +3659,10 @@ async function fetchEconCalendarFRED() {
 
 async function renderEconCalendar() {
   const wrap = $('econ-wrap');
-  if (!wrap) return;
+  if (!wrap) {
+    if (typeof markLoaderStageDone === 'function') markLoaderStageDone('econ');
+    return;
+  }
   wrap.innerHTML = '<div class="modal-loading" style="padding:20px;font-size:11px"><div class="mini-ring" style="margin:0 auto 8px"></div>טוען מ-FRED...</div>';
 
   const today   = new Date();
@@ -3664,6 +3676,7 @@ async function renderEconCalendar() {
 
   if (!events.length) {
     wrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--dim);font-size:12px">אין אירועים ב-30 הימים הקרובים</div>';
+    if (typeof markLoaderStageDone === 'function') markLoaderStageDone('econ');
     return;
   }
 
@@ -3707,6 +3720,9 @@ async function renderEconCalendar() {
       <div class="econ-time">${e.time}</div>
     </div>`;
   }).join('') + '<div style="padding:6px 12px 8px;text-align:left;font-size:9px;color:var(--dim);opacity:.6">מקור: FRED — Federal Reserve Bank of St. Louis</div>';
+
+  // Econ calendar rendered — signal loader coordinator.
+  if (typeof markLoaderStageDone === 'function') markLoaderStageDone('econ');
 }
 
 // ── ECON PREVIEW MODAL ──
@@ -4343,11 +4359,115 @@ const INSIGHT_WHYS = {
   }
 };
 
+// ═══ PAGE LOADER COORDINATION ═══
+// Multiple independent data pipelines feed the dashboard:
+//   - dashboard: Yahoo quotes, sectors, correlation, YTD, AI brief (via init/startWithKey)
+//   - macro: FRED macro indicators (via loadAll)
+//   - news: Hebrew news feed (via initNewsSection → fetchHebrewNews)
+//   - econ: Economic calendar (via renderEconCalendar)
+// They run in parallel. The initial page loader should stay visible until
+// ALL finish — otherwise the user sees a loading screen fade out while
+// news panels and event rows are still populating underneath.
+const _loaderStages = { dashboard: false, macro: false, news: false, econ: false };
+
+// Hebrew labels per stage — shown in the dynamic text as stages complete
+const _loaderStageLabels = {
+  dashboard: 'נתוני שוק',
+  macro:     'אינדיקטורים מאקרו',
+  news:      'כותרות חדשות',
+  econ:      'יומן כלכלי',
+};
+
+let _loaderHidden = false;
+let _loaderTextInterval = null;
+
+/** Cycles the loader text through descriptive messages so the user sees
+ *  what's actually happening, not a static string. Prefers a message tied
+ *  to the next pending stage; falls back to a rotating "building dashboard"
+ *  sequence early in the load. Always one clean line — no prefixes, no
+ *  running lists. */
+function _startLoaderTextCycle() {
+  const el = document.getElementById('page-loading-text');
+  if (!el) return;
+
+  // Per-stage messages, rotated through while that stage is pending.
+  const stageMessages = {
+    dashboard: ['מביא מחירי מניות...', 'מחשב ציוני סקטורים...', 'מעדכן נתוני שוק...'],
+    macro:     ['טוען אינדיקטורים מ-FRED...', 'מחשב מגמות מאקרו...'],
+    news:      ['אוסף כותרות חדשות...', 'מסנן פיד חדשות...'],
+    econ:      ['בונה יומן אירועים כלכליים...', 'בודק אירועים קרובים...'],
+  };
+  const fallbackStart = 'מאתחל את לוח הבקרה...';
+  const fallbackEnd   = 'כמעט מוכן...';
+
+  let counter = 0;
+
+  const pick = () => {
+    // Priority order for "what's the user waiting for" — matches the dot order
+    const order = ['dashboard', 'macro', 'news', 'econ'];
+    const pending = order.filter(k => !_loaderStages[k]);
+    if (pending.length === 0) return fallbackEnd;
+    // Rotate through the messages for the first pending stage
+    const stage = pending[0];
+    const msgs = stageMessages[stage];
+    return msgs[counter % msgs.length];
+  };
+
+  el.textContent = fallbackStart;
+
+  const tick = () => {
+    if (_loaderHidden) return;
+    counter++;
+    const msg = pick();
+    el.style.opacity = '0';
+    setTimeout(() => { if (!_loaderHidden) { el.textContent = msg; el.style.opacity = '1'; } }, 180);
+  };
+
+  setTimeout(tick, 1300);                    // first swap after initial message
+  _loaderTextInterval = setInterval(tick, 1800);
+}
+_startLoaderTextCycle();
+
+function markLoaderStageDone(stage) {
+  if (stage in _loaderStages) _loaderStages[stage] = true;
+  // Fill dots sequentially based on how many stages have completed (not
+  // which specific stage). In the RTL container, dots[0] is visually
+  // rightmost, so filling in DOM order produces right-to-left progression
+  // — matching Hebrew reading direction. Gives a consistent visual feel
+  // regardless of which pipeline happened to finish first.
+  const doneCount = Object.values(_loaderStages).filter(v => v).length;
+  const dots = document.querySelectorAll('.page-loading-stage');
+  dots.forEach((d, i) => d.classList.toggle('done', i < doneCount));
+  if (doneCount === Object.keys(_loaderStages).length) hidePageLoader();
+}
+
+function hidePageLoader() {
+  if (_loaderHidden) return;
+  _loaderHidden = true;
+  if (_loaderTextInterval) { clearInterval(_loaderTextInterval); _loaderTextInterval = null; }
+  // Set .page-loaded first so content fades in while the overlay fades out.
+  document.body.classList.add('page-loaded');
+  const overlay = document.getElementById('page-loading');
+  if (overlay) overlay.classList.add('hidden');
+}
+
 // Auto-start if key saved
 startMarketClock(); // שעון שוק פועל תמיד, גם לפני לוגין
 if (_proxyUrl) {
+  // Pre-skip stages that don't apply to the current view. The news and econ
+  // widgets only exist on the main dashboard; advisor/macro views render
+  // neither. Calling markLoaderStageDone proactively prevents the loader
+  // from waiting indefinitely on views that never fire those callbacks.
+  setTimeout(() => {
+    if (!document.querySelector('.news-section-hdr')) markLoaderStageDone('news');
+    if (!document.getElementById('econ-wrap')) markLoaderStageDone('econ');
+  }, 100);
   init();
 } else {
+  // No key means no dashboard data to load — hide loader immediately so the
+  // key-prompt screen is visible. startWithKey will re-show it when the user
+  // provides a worker URL (existing screen-loading element takes over there).
+  hidePageLoader();
   showScreen('screen-key');
 }
 
@@ -5099,9 +5219,8 @@ async function loadAll(){
 
   await Promise.allSettled(fetches);
 
-  // Hide overlay
-  const overlay = document.getElementById('page-loading');
-  if (overlay) overlay.classList.add('hidden');
+  // FRED indicators loaded — mark this stage done for the page loader
+  markLoaderStageDone('macro');
 
   // Last-updated indicator
   const lu = document.getElementById('last-updated');
@@ -5110,6 +5229,12 @@ async function loadAll(){
     lu.textContent = 'עודכן: ' + now.toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'});
   }
 }
+
+// Safety: force-hide the page-loading overlay after 15s max, regardless of
+// whether the load stages complete. Prevents a permanent loader if a network
+// hang prevents Yahoo/FRED from responding. 15s is generous — typical total
+// load is 3-5s; 8s wasn't enough margin on slow networks.
+setTimeout(() => hidePageLoader(), 15000);
 
 // Run on load
 if (document.readyState === 'loading'){
@@ -6480,22 +6605,23 @@ async function runScan() {
     universe: currentUniverse,
   };
   try {
-    // Lean cache payload — drops the `closes` array (mini-chart falls back to
-    // a static placeholder when restored from cache; user can re-scan for live
-    // charts) and keeps only minimal metrics needed for the detail panel.
-    const lean = {
-      timestamp: scanData.timestamp,
-      universeSize: scanData.universeSize,
-      methodology: scanData.methodology,
-      universe: scanData.universe,
-      stocks: stocks.map(s => ({
+    // Lean cache payload — keep a 26-week downsample of `closes` (enough for
+    // the table's trend sparkline) instead of the full weekly series. The full
+    // chart in the detail panel now falls back to a placeholder on cache load,
+    // but the sparkline stays functional. Storage footprint: ~100KB for 500
+    // stocks (26 closes × 5 digits × 500), well under the 5MB budget.
+    const leanStocks = stocks.map(s => {
+      const full = s.closes || s.metrics?.closes || null;
+      const sparkCloses = full && full.length > 0
+        ? full.slice(-26).map(v => Math.round(v * 100) / 100)  // 2 decimals is enough for a trend line
+        : null;
+      return {
         sym: s.sym, name: s.name, sector: s.sector, sectorName: s.sectorName,
         subInd: s.subInd, subIndName: s.subIndName,
         score: s.score, scores: s.scores, rank: s.rank,
         price: s.price, y1: s.y1, m3: s.m3, m1: s.m1, fromHi: s.fromHi,
-        refreshedAt: s.refreshedAt,    // per-stock freshness stamp
-        // Only the metrics actually used by the detail panel logic.
-        // No `closes` → mini-chart shows a "re-scan for chart" placeholder on cache-load.
+        refreshedAt: s.refreshedAt,
+        closes: sparkCloses,  // ← compact series for the trend sparkline
         metrics: {
           price: s.metrics.price,
           fromHi: s.metrics.fromHi,
@@ -6504,7 +6630,14 @@ async function runScan() {
           sma40: s.metrics.sma40,
           sma10Slope: s.metrics.sma10Slope,
         },
-      })),
+      };
+    });
+    const lean = {
+      timestamp: scanData.timestamp,
+      universeSize: scanData.universeSize,
+      methodology: scanData.methodology,
+      universe: scanData.universe,
+      stocks: leanStocks,
     };
     const key = getCacheKey();
     const payload = JSON.stringify(lean);
@@ -6910,7 +7043,7 @@ function renderTable() {
   });
   // Identify the currently sorted header (indices reflect new sub-industry column)
   const headerMap = {
-    'sym': 1, 'sector': 2, 'subIndName': 3, 'score': 4, 'price': 6, 'y1': 7, 'm3': 8, 'fromHi': 9
+    'sym': 1, 'sector': 3, 'subIndName': 4, 'score': 5, 'price': 7, 'y1': 8, 'm3': 9, 'fromHi': 10
   };
   const idx = headerMap[displayState.sortKey];
   if (idx) {
@@ -6927,13 +7060,13 @@ function renderTable() {
     // the user needs to add stocks / run a full scan.
     if (displayState.searchQuery) {
       tbody.innerHTML = `
-        <tr><td colspan="11" class="tbl-no-match">
+        <tr><td colspan="12" class="tbl-no-match">
           לא נמצאה מניה עבור "<b>${displayState.searchQuery}</b>".
           <br><small style="font-size:10px;color:var(--dimmer)">נסה סימבול או שם חברה אחר, או נקה את החיפוש.</small>
         </td></tr>`;
     } else {
       tbody.innerHTML = `
-        <tr><td colspan="11" style="padding:40px;text-align:center;color:var(--dim)">
+        <tr><td colspan="12" style="padding:40px;text-align:center;color:var(--dim)">
           אין מניות שעונות על הקריטריונים.
           ${displayState.view === 'watchlist' ? '<br><small style="font-size:10px;color:var(--dimmer)">הוסף מניות לרשימה שלך מפאנל הפירוט של כל מניה.</small>' : ''}
         </td></tr>`;
@@ -6968,6 +7101,7 @@ function renderTable() {
       <tr onclick="openDetail('${s.sym}')">
         <td class="rk ${rkCls}">${rankDisplay}</td>
         <td class="sym"><img class="sym-logo" src="https://financialmodelingprep.com/image-stock/${s.sym}.png" alt="" loading="lazy" onerror="this.classList.add('sym-logo-err')"><b>${s.sym}</b>${badges.join('')}<span class="name">${s.name}</span></td>
+        <td class="spark hide-m">${renderSparkline(s.closes || s.metrics?.closes)}</td>
         <td class="sec">${sectorDisplay}</td>
         <td class="subsec hide-m">${s.subIndName || '—'}</td>
         <td><span class="score ${scoreClassStr}">${scoreDisplay}</span></td>
@@ -6975,11 +7109,40 @@ function renderTable() {
         <td class="num hide-m">$${fmt(s.price)}</td>
         <td class="num pct ${pctCls(s.y1)}">${fmtPct(s.y1)}</td>
         <td class="num pct hide-m ${pctCls(s.m3)}">${fmtPct(s.m3)}</td>
-        <td class="num hide-m" style="color:${s.fromHi > -3 ? 'var(--green)' : s.fromHi < -15 ? 'var(--red)' : 'var(--dim)'}">${fmtPct(s.fromHi)}</td>
+        <td class="num pct hide-m ${s.fromHi != null && s.fromHi > -0.5 ? 'at-high' : pctCls(s.fromHi)}">${s.fromHi != null && s.fromHi > -0.5 ? 'בשיא' : fmtPct(s.fromHi)}</td>
         <td class="num"><span style="color:var(--dim);font-size:11px">›</span></td>
       </tr>
     `;
   }).join('');
+}
+
+/**
+ * Compact sparkline for the picks table — single line, no labels, no
+ * fills (keeps the row light). Renders last 26 weekly closes at 56×20 px.
+ * Color follows the direction: green when last >= first, red otherwise.
+ * Returns an em-dash when closes aren't available (cache restore drops them).
+ */
+function renderSparkline(closes) {
+  if (!closes || closes.length < 4) {
+    return '<span style="color:var(--dimmer);font-size:10px">—</span>';
+  }
+  const last26 = closes.slice(-26);
+  const min = Math.min(...last26);
+  const max = Math.max(...last26);
+  const w = 96, h = 28;
+  const range = max - min || 1;
+  const xs = last26.map((c, i) => (i / (last26.length - 1)) * w);
+  const ys = last26.map(c => h - ((c - min) / range) * h);
+  const linePts = xs.map((x, i) => `${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
+  // Closed path for the fill — down to the bottom-right, along the bottom, up to origin
+  const areaPath = `M0,${h} L${linePts.split(' ').join(' L')} L${w},${h} Z`;
+  const isUp = last26[last26.length - 1] >= last26[0];
+  const color = isUp ? 'var(--green)' : 'var(--red)';
+  const fill  = isUp ? 'rgba(79,199,138,.15)' : 'rgba(228,108,108,.15)';
+  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" preserveAspectRatio="none" style="display:block">
+    <path d="${areaPath}" fill="${fill}"/>
+    <polyline points="${linePts}" fill="none" stroke="${color}" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
 }
 
 function renderFactorBars(scores) {
@@ -7585,14 +7748,21 @@ function persistScanData() {
       methodology: scanData.methodology,
       universe: scanData.universe,
       watchlistOnly: scanData.watchlistOnly,
-      stocks: scanData.stocks.map(s => ({
-        sym: s.sym, name: s.name, sector: s.sector, sectorName: s.sectorName,
-        subInd: s.subInd, subIndName: s.subIndName,
-        score: s.score, scores: s.scores, rank: s.rank,
-        price: s.price, y1: s.y1, m3: s.m3, m1: s.m1, fromHi: s.fromHi,
-        refreshedAt: s.refreshedAt,
-        metrics: s.metrics,
-      })),
+      stocks: scanData.stocks.map(s => {
+        const full = s.closes || null;
+        const sparkCloses = full && full.length > 0
+          ? full.slice(-26).map(v => Math.round(v * 100) / 100)
+          : null;
+        return {
+          sym: s.sym, name: s.name, sector: s.sector, sectorName: s.sectorName,
+          subInd: s.subInd, subIndName: s.subIndName,
+          score: s.score, scores: s.scores, rank: s.rank,
+          price: s.price, y1: s.y1, m3: s.m3, m1: s.m1, fromHi: s.fromHi,
+          refreshedAt: s.refreshedAt,
+          closes: sparkCloses,
+          metrics: s.metrics,
+        };
+      }),
     }));
   } catch(e) { console.warn('persistScanData failed:', e); }
 }

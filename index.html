@@ -24,6 +24,25 @@
 </head>
 <body>
 
+<!-- Initial page loader — hides once dashboard data is ready (loadAll sets
+     .hidden). Appears on every visit to prevent the "chaotic rearrange"
+     look as widgets, charts, and quotes fill in asynchronously. -->
+<div id="page-loading" class="page-loading-overlay">
+  <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.9">
+    <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+    <polyline points="16 7 22 7 22 13"/>
+  </svg>
+  <div class="page-loading-ring"></div>
+  <div class="page-loading-text" id="page-loading-text">מאתחל...</div>
+  <div class="page-loading-stages" id="page-loading-stages">
+    <div class="page-loading-stage" data-stage="dashboard" title="נתוני שוק"></div>
+    <div class="page-loading-stage" data-stage="macro" title="אינדיקטורים מאקרו"></div>
+    <div class="page-loading-stage" data-stage="news" title="חדשות"></div>
+    <div class="page-loading-stage" data-stage="econ" title="יומן כלכלי"></div>
+  </div>
+</div>
+
+
 <!-- ─────────── SHARED CHROME (login overlay, sidebar, bottom-nav, mobile-menu) ─────────── -->
 <!-- ═══════════ LOGIN OVERLAY (מחליף את index.html בתוך הדשבורד) ═══════════ -->
 <div id="login-overlay">
@@ -782,6 +801,7 @@
             <tr>
               <th style="width:34px">#</th>
               <th onclick="sortBy('sym')">מניה</th>
+              <th class="hide-m" style="width:100px">מגמה</th>
               <th class="h-sec" onclick="sortBy('sector')">סקטור</th>
               <th class="hide-m" onclick="sortBy('subIndName')">תת-סקטור</th>
               <th onclick="sortBy('score')" class="sorted num">ציון</th>
