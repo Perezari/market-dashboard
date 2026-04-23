@@ -7884,9 +7884,10 @@ function setMinScore(v, label) {
 
 /* ────────────── VIEW DROPDOWN ────────────── */
 const VIEW_OPTS = [
-  { val: 'watchlist', label: 'רשימה שלי' },
-  { val: 'top20',     label: 'Top 20' },
-  { val: 'all',       label: 'הכל' },
+  { val: 'watchlist',  label: 'רשימה שלי' },
+  { val: 'candidates', label: 'מועמדים SEPA' },
+  { val: 'top20',      label: 'Top 20' },
+  { val: 'all',        label: 'הכל' },
 ];
 function populateViewDropdown() {
   const panel = $('cdd-view-panel');
@@ -8232,12 +8233,13 @@ function getFilteredStocks() {
   if (!scanData) return [];
   let list = scanData.stocks.slice();
 
-  // Views "all" and "top20" show the public leaderboard — only stocks with
-  // a score from a full universe scan. Manually-added stocks (IREN, etc.)
-  // have score=null and are considered PRIVATE to the user's watchlist.
-  // Surfacing them in "all" would pollute the leaderboard: a user adds IREN
-  // and suddenly sees it mixed in with Top 500 results like it was ranked.
-  if (displayState.view === 'all' || displayState.view === 'top20') {
+  // Views "all", "top20", and "candidates" show the public leaderboard — only
+  // stocks with a score from a full universe scan. Manually-added stocks have
+  // score=null and are considered PRIVATE to the user's watchlist. Surfacing
+  // them would pollute the leaderboard: a user adds IREN and suddenly sees it
+  // mixed in with Top 500 results like it was ranked.
+  if (displayState.view === 'all' || displayState.view === 'top20' ||
+      displayState.view === 'candidates') {
     list = list.filter(s => s.score != null);
   }
 
@@ -8250,6 +8252,15 @@ function getFilteredStocks() {
   if (displayState.sector) list = list.filter(s => s.sector === displayState.sector);
   if (displayState.view === 'top20') list = list.slice(0, 20);
   if (displayState.view === 'watchlist') list = list.filter(s => watchlist.includes(s.sym));
+  // Candidates view: SEPA verdicts that represent actionable setups. Traders
+  // looking for "what to consider NOW" get the curated list. Attractive =
+  // buy zone active. Prebreakout = base formed, waiting on trigger.
+  if (displayState.view === 'candidates') {
+    list = list.filter(s => {
+      const v = s.entry?.verdict;
+      return v === 'attractive' || v === 'prebreakout';
+    });
+  }
   // Live search — matches symbol (starts-with-ish) or name (contains).
   // Applied AFTER the other filters so it refines an already-narrowed set.
   if (displayState.searchQuery) {
@@ -8364,6 +8375,12 @@ function renderTable() {
           לא נמצאה מניה עבור "<b>${displayState.searchQuery}</b>".
           <br><small style="font-size:10px;color:var(--dimmer)">נסה סימבול או שם חברה אחר, או נקה את החיפוש.</small>
         </td></tr>`;
+    } else if (displayState.view === 'candidates') {
+      tbody.innerHTML = `
+        <tr><td colspan="13" style="padding:36px;text-align:center;color:var(--dim);line-height:1.7">
+          אין setups אטרקטיביים כעת.
+          <br><small style="font-size:10px;color:var(--dimmer)">ברגע ש-SEPA יזהה מניה ב-buy zone (attractive) או בבסיס גמור (prebreakout), היא תופיע כאן אוטומטית.</small>
+        </td></tr>`;
     } else {
       tbody.innerHTML = `
         <tr><td colspan="13" style="padding:40px;text-align:center;color:var(--dim)">
@@ -8464,10 +8481,77 @@ function renderSparkline(dailyCloses, weeklyCloses, range) {
   </svg>`;
 }
 
+/** Interpret a factor score — maps 0-100 to a Hebrew qualitative label. */
+function _factorScoreLabel(score) {
+  if (score == null) return 'אין נתונים';
+  if (score >= 85) return 'חזק מאוד';
+  if (score >= 70) return 'חזק';
+  if (score >= 50) return 'בינוני-טוב';
+  if (score >= 30) return 'חלש';
+  return 'חלש מאוד';
+}
+
+/** Build a concrete data explanation for a factor code — links the abstract
+    0-100 score back to the actual price-action numbers it was computed from.
+    Returns a compact string or null if data isn't available for that factor. */
+function _factorConcreteExplanation(factorKey, m, s) {
+  if (!m) return null;
+  const pct = (x) => x == null ? '?' : (x >= 0 ? '+' : '') + (x * 100).toFixed(1) + '%';
+  const pctP = (x) => x == null ? '?' : (x >= 0 ? '+' : '') + (x * 100).toFixed(1) + 'pp';
+  switch (factorKey) {
+    // ─── Momentum-family ───
+    case 'MOM':      return `12M ${pct(m.ret12m_1m)} · 6M ${pct(m.ret6m)} · 3M ${pct(m.ret3m)}`;
+    case 'LTU':      return `תשואת 12M-1M: ${pct(m.ret12m_1m)}`;
+    case 'STW':      return `תשואת חודש אחרון: ${pct(m.ret1m)}`;
+    case 'DEV':      return `מרחק מ-SMA10: ${m.dev10 != null ? (m.dev10 * 100).toFixed(1) + '%' : '?'}`;
+    // ─── Relative Strength ───
+    case 'RS':       return `נגד SPY: 12M ${pctP(m.rs12m)} · 3M ${pctP(m.rs3m)}`;
+    case 'REL':      return `נגד SPY: 12M-1M ${pctP(m.rs12m)}`;
+    case 'ABS':      return `תשואת 12M-1M: ${pct(m.ret12m_1m)} (דורש > 0)`;
+    // ─── Trend quality ───
+    case 'TRD':
+    case 'TRG':
+    case 'TRN':
+    case 'STG': {
+      const above10 = m.price > m.sma10 ? '✓' : '✗';
+      const above40 = m.price > m.sma40 ? '✓' : '✗';
+      const golden  = m.sma10 > m.sma40 ? '✓' : '✗';
+      return `מחיר>SMA10 ${above10} · מחיר>SMA40 ${above40} · Golden Cross ${golden}`;
+    }
+    case 'SLP':
+    case 'INT':      return `שיפוע SMA10: ${m.sma10Slope != null ? (m.sma10Slope * 100).toFixed(1) + '%' : '?'}`;
+    case 'STK':      return `% זמן מעל SMA10 ב-20 שבועות: ${m.stickiness != null ? (m.stickiness * 100).toFixed(0) + '%' : '?'}`;
+    // ─── Position / breakout ───
+    case 'POS':
+    case 'PRX':
+    case 'ATH':      return `מרחק משיא 52ש: ${pct(m.fromHi)} · מיקום בטווח: ${m.rangePos != null ? (m.rangePos * 100).toFixed(0) + '%' : '?'}`;
+    case 'BRK':
+    case 'IGN':      return `תשואת חודש אחרון: ${pct(m.ret1m)} · מעל SMA10: ${m.price > m.sma10 ? '✓' : '✗'}`;
+    case 'CLM':      return `תשואת שנה: ${pct(m.ret12m)}`;
+    // ─── Volatility / Quality ───
+    case 'STB':      return `תנודתיות שבועית: ${m.vol != null ? (m.vol * 100).toFixed(1) + '%' : '?'}`;
+    case 'CMP':      return `תשואת שנה יציבה: ${pct(m.ret12m)}`;
+    case 'CTR':      return `יחס התכווצות (6w חדש/קודם): ${m.volContraction != null ? m.volContraction.toFixed(2) + '×' : '?'}`;
+    default:         return null;
+  }
+}
+
 function renderFactorBars(scores) {
-  const fs = METHODOLOGIES[currentMethodology].factors.map(f => f.k);
+  const factors = METHODOLOGIES[currentMethodology].factors;
   return `<div class="fbars">${
-    fs.map(f => `<div class="fbar" data-f="${f}" title="${f}: ${scores[f] ?? 0}"><div class="fbar-fill" style="height:${scores[f] ?? 0}%"></div></div>`).join('')
+    factors.map(f => {
+      const score = scores[f.k] ?? 0;
+      const label = _factorScoreLabel(score);
+      // Multi-line tooltip: full factor name, what it measures, weight in the
+      // model, this stock's score with percentile interpretation.
+      // Use \n for line breaks — native title= supports this on most browsers.
+      const tip = [
+        `${f.label} (${f.k}): ${score}/100 — ${label}`,
+        `משקל במודל: ${f.weight}%`,
+        `מודד: ${f.desc}`,
+      ].join('\n');
+      return `<div class="fbar" data-f="${f.k}" title="${tip.replace(/"/g, '&quot;')}"><div class="fbar-fill" style="height:${score}%"></div></div>`;
+    }).join('')
   }</div>`;
 }
 
@@ -8489,7 +8573,7 @@ function pctCls(n) {
 
 /* ════════════════════════════════════════════════════════════════════════════
    EXIT SIGNALS
-   For a stock in the user's watchlist, compute three independent signals that
+   For a stock in the user's watchlist, compute four independent signals that
    answer "should I still hold?" — based on classic momentum exit rules:
 
      1. TOP — still in the top N of the latest scan (we use 50)
@@ -8501,6 +8585,10 @@ function pctCls(n) {
      3. Y1  — 12-month return still positive
              → Antonacci Dual Momentum hard exit rule
 
+     4. STR — price still above most recent structural swing-low
+             → Minervini: structural break = immediate exit, don't wait for MA
+             (much earlier warning than MA break, catches fast drops)
+
    Scan age matters too — stale data can give false confidence. We track three
    freshness tiers: fresh (<1h), warm (1-4h), cold (>4h). The UI dims stale
    signals and nudges the user to re-scan before acting on them.
@@ -8509,29 +8597,61 @@ const EXIT_TOP_N = 50;
 const STALE_FRESH_MS = 60 * 60 * 1000;          // 1 hour — signals fully trusted
 const STALE_WARM_MS  = 4 * 60 * 60 * 1000;      // 4 hours — show warning
 
+/** Structural signal: is the current close above the MOST RECENT swing low?
+    Returns { pass: boolean|null, swingLow: number|null, currentClose: number }.
+    Uses 3-bar pivot detection over last 30 bars. */
+function _structureSignal(stock) {
+  const highs  = stock.dailyHighs;
+  const lows   = stock.dailyLows;
+  const closes = stock.dailyCloses;
+  if (!highs || !lows || !closes || lows.length < 15) {
+    return { pass: null, swingLow: null, currentClose: null };
+  }
+  const window = Math.min(30, lows.length);
+  const winH = highs.slice(-window);
+  const winL = lows.slice(-window);
+  const swings = _findSwings(winH, winL, 3);
+  const swLows = swings.filter(s => s.type === 'low');
+  const currentClose = closes[closes.length - 1];
+  if (swLows.length === 0) {
+    return { pass: null, swingLow: null, currentClose };
+  }
+  const mostRecent = swLows[swLows.length - 1].price;
+  // 1% buffer for noise — a brief dip below by <1% still counts as "holding"
+  const pass = currentClose > mostRecent * 0.99;
+  return { pass, swingLow: mostRecent, currentClose };
+}
+
 function computeExitSignal(sym) {
   if (!scanData || !scanData.stocks) return null;
   const stock = scanData.stocks.find(s => s.sym === sym);
-  if (!stock) return { state: 'unknown', pass: 0, signals: { top: null, ma: null, y1: null }, freshness: 'cold' };
+  if (!stock) return { state: 'unknown', pass: 0, signals: { top: null, ma: null, y1: null, str: null }, freshness: 'cold' };
 
   const price = stock.metrics?.price;
   const sma40 = stock.metrics?.sma40;
   const y1    = stock.y1;
   const rank  = stock.rank;
+  const structure = _structureSignal(stock);
 
   const sig = {
     top: rank != null ? rank <= EXIT_TOP_N : null,
     ma:  (price != null && sma40 != null) ? price > sma40 : null,
     y1:  y1 != null ? y1 > 0 : null,
+    str: structure.pass,
   };
 
-  // Count passes, counting nulls as failures for the overall verdict (conservative:
-  // missing data shouldn't inflate confidence).
-  const pass = (sig.top === true ? 1 : 0) + (sig.ma === true ? 1 : 0) + (sig.y1 === true ? 1 : 0);
+  // Count passes (nulls count as failures — missing data ≠ confidence)
+  const pass = (sig.top === true ? 1 : 0) + (sig.ma === true ? 1 : 0)
+             + (sig.y1  === true ? 1 : 0) + (sig.str === true ? 1 : 0);
+  // 4 signals now. Thresholds calibrated so a SINGLE structural break (fast
+  // exit trigger) puts us in "caution" even if all others pass.
   let state;
-  if      (pass === 3) state = 'strong';   // 3/3 — hold
-  else if (pass === 2) state = 'caution';  // 2/3 — watch
-  else                 state = 'exit';     // 0-1/3 — consider selling
+  if      (pass === 4) state = 'strong';   // 4/4 — hold confidently
+  else if (pass === 3) state = 'caution';  // 3/4 — watch closely
+  else                 state = 'exit';     // 0-2/4 — consider selling
+
+  // Attach structure details for the renderer to use
+  sig._structure = structure;
 
   // Freshness tier from per-stock refreshedAt (not scan timestamp). Partial
   // watchlist refresh updates refreshedAt for just the refreshed subset, so
@@ -8554,8 +8674,8 @@ function renderExitBadge(sym) {
   const labels = { strong: 'חזק', caution: 'חלש', exit: 'יציאה' };
   const freshClass = r.freshness === 'fresh' ? '' : ` bdg-exit-${r.freshness}`;
   const title = r.freshness === 'fresh'
-    ? `${r.pass}/3 סיגנלי החזקה`
-    : `${r.pass}/3 סיגנלי החזקה · הסריקה ישנה, סרוק מחדש`;
+    ? `${r.pass}/4 סיגנלי החזקה`
+    : `${r.pass}/4 סיגנלי החזקה · הסריקה ישנה, סרוק מחדש`;
   return `<span class="bdg bdg-exit bdg-exit-${r.state}${freshClass}" title="${title}">${labels[r.state]}</span>`;
 }
 
@@ -8568,9 +8688,9 @@ function renderExitSection(s) {
   if (!r) return '';
 
   const verdictCls   = `exit-verdict exit-verdict-${r.state}`;
-  const verdictText  = { strong:  'החזק — שלושת הסיגנלים תקינים',
-                         caution: 'שים לב — סיגנל אחד שבור',
-                         exit:    'שקול למכור — שני סיגנלים שבורים',
+  const verdictText  = { strong:  `החזק — כל 4 הסיגנלים תקינים (${r.pass}/4)`,
+                         caution: `שים לב — סיגנל אחד שבור (${r.pass}/4)`,
+                         exit:    `שקול למכור — ${4 - r.pass} סיגנלים שבורים (${r.pass}/4)`,
                          unknown: 'אין נתונים עדכניים' }[r.state];
 
   const row = (ok, label, detail) => {
@@ -8623,15 +8743,24 @@ function renderExitSection(s) {
   const stockData = scanData.stocks.find(x => x.sym === s.sym);
   const refreshedAt = stockData?.refreshedAt || scanData.timestamp;
 
+  // Structural signal detail — show the swing low reference price
+  const str = r.signals._structure;
+  const strDetail = r.signals.str === null
+    ? (str && !str.swingLow ? 'לא זוהה swing low תקין ב-30 ימים האחרונים' : 'חסרים נתוני מבנה')
+    : r.signals.str
+      ? `$${fmt(str.currentClose)} מעל swing low ($${fmt(str.swingLow)}) — מבנה שלם`
+      : `$${fmt(str.currentClose)} תחת swing low ($${fmt(str.swingLow)}) — שבירה מבנית`;
+
   return `
     <div class="dt-section">
       <div class="dt-section-title">אותות יציאה · לפי חוקי המומנטום</div>
       ${staleWarning}
       <div class="${verdictCls}">${verdictText}</div>
       <div class="exit-signals">
-        ${row(r.signals.top, 'עדיין בטופ הסריקה',   topDetail)}
-        ${row(r.signals.ma,  'מעל הממוצע הנע 40 יום', maDetail)}
-        ${row(r.signals.y1,  'תשואת 12 חודשים חיובית', y1Detail)}
+        ${row(r.signals.str, 'מעל ה-swing low האחרון',      strDetail)}
+        ${row(r.signals.ma,  'מעל הממוצע הנע 40 יום',       maDetail)}
+        ${row(r.signals.top, 'עדיין בטופ הסריקה',           topDetail)}
+        ${row(r.signals.y1,  'תשואת 12 חודשים חיובית',      y1Detail)}
       </div>
       <div class="exit-footer">עדכון אחרון לסיגנל זה: ${formatMinutesAgo(refreshedAt)}</div>
     </div>`;
@@ -8725,6 +8854,57 @@ function renderEntrySection(s) {
     if (t === 'none')     return 'לא זוהה setup';
     return 'דורש setup פעיל';
   })();
+
+  /* ── TRADE PLAN (C4) — Target price + Risk/Reward ratio
+     The ENTRY PRICE depends on the SEPA verdict:
+       · attractive  → entry = current price (already in buy zone, act now)
+       · prebreakout → entry = pivot (waiting for breakout; that's where the
+                        order will fire). Using current price here would
+                        understate risk and overstate R:R.
+     Other verdicts don't get a plan:
+       · chasing     → already above buy zone, waiting to chase is the wrong
+                        response per SEPA (wait for next base instead)
+       · distribution→ volume weakness overrides the setup
+       · running/extended/broken → no valid pivot anyway
+
+     Targets are always computed vs PIVOT (Minervini's convention): 1.20× pivot
+     = first profit zone, 1.50× pivot = second. The reward is measured from
+     planned entry, not from pivot, so R:R reflects the actual trade. */
+  let tradePlan = null;
+  if (e.price && e.structuralStop && e.pivot && e.stopPct > 0) {
+    let entry = null, entryType = null, entryNote = null;
+    if (e.verdict === 'attractive') {
+      entry = e.price;
+      entryType = 'current';
+      entryNote = 'מחיר נוכחי · אתה כבר ב-buy zone';
+    } else if (e.verdict === 'prebreakout') {
+      entry = e.pivot;
+      entryType = 'pivot';
+      entryNote = 'pivot · מחכה לאישור פריצה';
+    }
+    // If entry was resolved, build the plan
+    if (entry != null) {
+      const risk = entry - e.structuralStop;
+      const target1 = e.pivot * 1.20;
+      const target2 = e.pivot * 1.50;
+      const reward1 = target1 - entry;
+      const reward2 = target2 - entry;
+      const rr1 = (risk > 0 && reward1 > 0) ? reward1 / risk : null;
+      const rr2 = (risk > 0 && reward2 > 0) ? reward2 / risk : null;
+      const rrCls = (rr) => rr == null ? 'na' : rr >= 3 ? 'ok' : rr >= 2 ? 'warn' : 'bad';
+      const pctFromEntry = (t) => ((t - entry) / entry * 100).toFixed(1);
+      // Stop % from ENTRY (not from current price) — accurate risk for the trade
+      const stopPctFromEntry = (entry - e.structuralStop) / entry * 100;
+      tradePlan = {
+        entry, entryType, entryNote,
+        target1, target2, rr1, rr2,
+        stopPct: -stopPctFromEntry,
+        target1Pct: pctFromEntry(target1),
+        target2Pct: pctFromEntry(target2),
+        rr1Cls: rrCls(rr1), rr2Cls: rrCls(rr2),
+      };
+    }
+  }
 
   // Position sizing per Minervini — TWO constraints, take the minimum:
   //   (1) Risk budget:   shares ≤ (portfolio × 1%) / (price × stopPct)
@@ -8841,6 +9021,105 @@ function renderEntrySection(s) {
           </div>
         </div>
       </div>
+
+      ${tradePlan ? `
+      <div class="entry-plan">
+        <div class="entry-plan-header">📊 תכנון עסקה</div>
+        <div class="entry-plan-row">
+          <div class="entry-plan-item">
+            <div class="entry-plan-lbl">כניסה</div>
+            <div class="entry-plan-val">${fmtUsd(tradePlan.entry)}</div>
+            <div class="entry-plan-sub">${tradePlan.entryNote}</div>
+          </div>
+          <div class="entry-plan-item">
+            <div class="entry-plan-lbl">Stop</div>
+            <div class="entry-plan-val entry-bad">${fmtUsd(e.structuralStop)}</div>
+            <div class="entry-plan-sub">${tradePlan.stopPct.toFixed(1)}% מהכניסה</div>
+          </div>
+          <div class="entry-plan-item">
+            <div class="entry-plan-lbl">יעד 1</div>
+            <div class="entry-plan-val entry-${tradePlan.rr1Cls}">${fmtUsd(tradePlan.target1)}</div>
+            <div class="entry-plan-sub">+${tradePlan.target1Pct}% · R:R ${tradePlan.rr1 ? tradePlan.rr1.toFixed(1) : '—'}:1</div>
+          </div>
+          <div class="entry-plan-item">
+            <div class="entry-plan-lbl">יעד 2</div>
+            <div class="entry-plan-val entry-${tradePlan.rr2Cls}">${fmtUsd(tradePlan.target2)}</div>
+            <div class="entry-plan-sub">+${tradePlan.target2Pct}% · R:R ${tradePlan.rr2 ? tradePlan.rr2.toFixed(1) : '—'}:1</div>
+          </div>
+        </div>
+
+        <details class="entry-plan-explain">
+          <summary>איך מחושב תכנון העסקה?</summary>
+          <div class="entry-plan-explain-body">
+            <p>
+              תכנון העסקה מציג את 4 הרמות המרכזיות של עסקת SEPA: מחיר כניסה, Stop Loss,
+              ויעדי רווח 1 ו-2. ביחד הן מאפשרות לחשב <b>יחס Risk-to-Reward (R:R)</b> —
+              כמה דולר פוטנציאל רווח על כל דולר בסיכון.
+            </p>
+
+            <h4>1. מחיר כניסה</h4>
+            <p>תלוי במצב ה-verdict של SEPA:</p>
+            <ul>
+              <li><b>🟢 attractive (קנייה)</b> — המניה בתוך buy zone (בין pivot ל-pivot×1.05).
+                  <b>כניסה = מחיר השוק הנוכחי</b>. אפשר לפעול עכשיו.</li>
+              <li><b>🔵 prebreakout (בבסיס)</b> — המניה בבסיס מתחת ל-pivot.
+                  <b>כניסה = pivot</b>, לא המחיר הנוכחי. העסקה תתבצע רק אם המחיר
+                  אכן יפרוץ את ה-pivot (עם volume confirmation ≥ 1.4× ממוצע).</li>
+              <li><b>🟠 chasing / distribution / extended</b> — אין תכנון עסקה. כניסה עכשיו
+                  מנוגדת ל-SEPA (המתן לבסיס הבא).</li>
+            </ul>
+
+            <h4>2. Stop Loss</h4>
+            <p>
+              structural stop — הרמה הטכנית ההדוקה ביותר מתוך שלושה מועמדים:
+            </p>
+            <ol>
+              <li><b>Swing low אחרון מינוס 1%</b> — pivot low מאומת (3 ברים גבוהים לכל צד)
+                  ב-30 הימים האחרונים.</li>
+              <li><b>מחיר − 2 × ATR(14)</b> — 2 תנודתיות ממוצעת יומית.</li>
+              <li><b>Pivot × 0.97</b> — כשיש base setup, 3% מתחת לפריצה.</li>
+            </ol>
+            <p>
+              לאחר בחירה, ה-stop מוגבל: לא הדוק יותר מ-max(1×ATR, 2% מהמחיר) —
+              כדי לא להוציא על רעש — ולא רחב יותר מ-8% — תקרה מובהקת של Minervini.
+            </p>
+
+            <h4>3. יעדי רווח</h4>
+            <p>מחושבים כ-multiples של <b>pivot</b> (לא של מחיר הכניסה). מקור: Minervini,
+              "Trade Like a Stock Market Wizard" פרק 9:</p>
+            <ul>
+              <li><b>יעד 1 = pivot × 1.20</b> (+20%). בנקודה זו Minervini מוציא 1/3 עד 1/2
+                  מהפוזיציה. סטטיסטית, רוב העליות הראשוניות של בסיסים איכותיים (VCP/Flat/HTF)
+                  מתעייפות כאן.</li>
+              <li><b>יעד 2 = pivot × 1.50</b> (+50%). הוצאה נוספת. מניות שממשיכות מעבר
+                  לזה הן "runners" — פוטנציאל 100%+.</li>
+            </ul>
+
+            <h4>4. R:R — יחס סיכון לתמורה</h4>
+            <pre>R:R = (יעד − כניסה) / (כניסה − stop)</pre>
+            <ul>
+              <li><b>R:R ≥ 3:1</b> 🟢 מצוין — על כל $1 בסיכון, $3+ פוטנציאל רווח.</li>
+              <li><b>R:R 2-3:1</b> 🟡 מקובל — מינימום של Minervini לעסקה.</li>
+              <li><b>R:R &lt; 2:1</b> 🔴 לא כדאי — הסיכון לא משתלם.</li>
+            </ul>
+
+            <h4>למה יעדים מבוססי pivot ולא מחיר נוכחי?</h4>
+            <p>
+              ה-pivot הוא הרמה ההיסטורית שמעליה המניה מתחילה את ה-move. יעדים יחסיים אליו
+              מודדים את עוצמת הפריצה עצמה ולא את "כמה היא רצה מאז שנכנסת". זה שומר על
+              משוואה אחידה בין מניה אחת לאחרת — בלי קשר לתזמון הכניסה שלך.
+            </p>
+
+            <h4>דוגמה מספרית</h4>
+            <p>מניה עם pivot $100, מחיר נוכחי $102 (attractive), stop $93:</p>
+            <pre>כניסה  = $102 (מחיר נוכחי)
+Risk   = $102 − $93 = $9  (8.8%)
+יעד 1  = $100 × 1.20 = $120  → Reward $18  → R:R 2.0:1
+יעד 2  = $100 × 1.50 = $150  → Reward $48  → R:R 5.3:1</pre>
+          </div>
+        </details>
+      </div>
+      ` : ''}
 
       ${sizingText ? `<div class="entry-sizing">${sizingText}</div>` : ''}
       ${marketNote ? `<div class="entry-market">${marketNote}</div>` : ''}
@@ -9498,18 +9777,33 @@ function openDetail(sym) {
     <div class="dt-section">
       <div class="dt-section-title">פירוט פקטורים · <span style="font-weight:500;color:var(--dim)">${METHODOLOGIES[currentMethodology].label}</span></div>
       <div class="factor-grid">
-        ${METHODOLOGIES[currentMethodology].factors.map(f => `
-          <div class="factor-row" data-f="${f.k}">
+        ${METHODOLOGIES[currentMethodology].factors.map(f => {
+          const val = s.scores[f.k] ?? 0;
+          const qualLabel = _factorScoreLabel(val);
+          // Build a factor-specific "source data" line — the concrete metrics
+          // that feed this factor, so the user can trace the 0-100 score back
+          // to their price-action inputs.
+          const concreteData = _factorConcreteExplanation(f.k, m, s);
+          const tipLines = [
+            `${f.label} (${f.k}): ${val}/100 — ${qualLabel}`,
+            `משקל במודל: ${f.weight}%`,
+            `מודד: ${f.desc}`,
+          ];
+          if (concreteData) tipLines.push('', `נתונים: ${concreteData}`);
+          const tip = tipLines.join('\n').replace(/"/g, '&quot;');
+          return `
+          <div class="factor-row factor-row-tip" data-f="${f.k}" title="${tip}">
             <div>
               <div class="factor-name">${f.label}</div>
               <div class="factor-sub">${f.desc} · ${f.weight}%</div>
             </div>
             <div class="factor-bar-wrap">
-              <div class="factor-bar-fill" style="width:${s.scores[f.k] ?? 0}%"></div>
+              <div class="factor-bar-fill" style="width:${val}%"></div>
             </div>
-            <div class="factor-val" style="color:${(s.scores[f.k]??0)>=70?'var(--green)':(s.scores[f.k]??0)>=40?'var(--text)':'var(--red)'}">${s.scores[f.k] ?? '—'}</div>
+            <div class="factor-val" style="color:${val>=70?'var(--green)':val>=40?'var(--text)':'var(--red)'}">${s.scores[f.k] ?? '—'}</div>
           </div>
-        `).join('')}
+          `;
+        }).join('')}
       </div>
     </div>
     ` : ''}
