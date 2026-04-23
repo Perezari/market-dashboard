@@ -6380,6 +6380,7 @@ function computeMetrics(chartData, spy) {
   };
   const hasDaily = dailyCloses && dailyCloses.length >= 20;
   const ret12m = hasDaily ? m(12) : r(52);
+  const ret9m  = hasDaily ? m(9)  : r(39);
   const ret6m  = hasDaily ? m(6)  : r(26);
   const ret3m  = hasDaily ? m(3)  : r(13);
   const ret1m  = hasDaily ? m(1)  : r(4);
@@ -6468,10 +6469,68 @@ function computeMetrics(chartData, spy) {
   const rs3m = (ret3m != null && spy3m != null) ? ret3m - spy3m : null;
 
   return {
-    price, ret12m, ret12m_1m, ret6m, ret3m, ret1m,
+    price, ret12m, ret12m_1m, ret9m, ret6m, ret3m, ret1m,
     sma10, sma40, sma10Slope, stickiness,
     fromHi, rangePos, rs12m, rs3m, closes,
   };
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   IBD RELATIVE STRENGTH RATING
+   ════════════════════════════════════════════════════════════════════════════
+   The canonical Wall Street benchmark for a stock's price performance vs. the
+   rest of the market. Mark Minervini explicitly references this rating as
+   point 8 of the Trend Template: "RS Rating ≥ 70". William O'Neil's IBD uses
+   it as the primary gatekeeper for their CAN SLIM stock selection.
+
+   Formula (IBD variant used by Minervini):
+     Raw score = 0.40 × ret3m + 0.20 × ret6m + 0.20 × ret9m + 0.20 × ret12m
+   Recent quarter carries 2× the weight of older quarters — the empirical
+   finding is that *recent* momentum is the strongest predictor of *forward*
+   momentum (Jegadeesh-Titman, 1993).
+
+   Then percentile-rank across the universe → 1-99 rating. A rating of 87
+   means "this stock's weighted return beats 87% of the universe". Stocks
+   with rating < 70 are structurally weaker regardless of their absolute
+   return — they're lagging peers even if they're up.
+
+   Returns: { [sym]: 1-99 | null }  — null if not enough history. */
+function computeIBDRelativeStrength(raw, symbols) {
+  // Step 1: raw weighted return per symbol
+  const rawScores = {};
+  for (const sym of symbols) {
+    const m = raw[sym];
+    if (m.ret3m == null || m.ret6m == null ||
+        m.ret9m == null || m.ret12m == null) {
+      rawScores[sym] = null;
+      continue;
+    }
+    rawScores[sym] = 0.40 * m.ret3m + 0.20 * m.ret6m +
+                     0.20 * m.ret9m + 0.20 * m.ret12m;
+  }
+
+  // Step 2: percentile rank the valid scores → 1-99
+  const validVals = Object.values(rawScores)
+    .filter(v => v != null)
+    .sort((a, b) => a - b);
+  if (validVals.length < 20) {
+    // Too few stocks for meaningful percentile — return null for all
+    const out = {};
+    for (const sym of symbols) out[sym] = null;
+    return out;
+  }
+
+  const out = {};
+  for (const sym of symbols) {
+    const v = rawScores[sym];
+    if (v == null) { out[sym] = null; continue; }
+    let below = 0;
+    for (const x of validVals) if (x < v) below++;
+    // Map 0-1 proportion to 1-99 rating (1 = weakest, 99 = strongest)
+    const rating = Math.max(1, Math.min(99, Math.round((below / validVals.length) * 99)));
+    out[sym] = rating;
+  }
+  return out;
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -6591,30 +6650,41 @@ function _trendTemplate(closes, lows, relativeStrengthPct) {
 }
 
 /** VCP (Volatility Contraction Pattern) detector — Minervini's signature setup.
-    Looks at the last 45 trading days (about 9 weeks, the typical VCP length)
-    for a sequence of 2-4 pullbacks that CONTRACT in depth, with the final
-    contraction being tight (≤10% ideally, ≤15% acceptable).
-
-    Returns { found, contractions: [{depthPct}...], tightness, pivot, baseStart, baseDepthPct }.
-    A valid VCP has: 2+ contractions, each ≤ previous, final ≤15%, base ≤30% overall. */
+    Multi-window variant: tries 90-day (long base), 45-day (standard), and
+    21-day (short/tight) windows and returns the LONGEST valid VCP found.
+    Longer bases are statistically stronger breakout candidates — Minervini's
+    audited track record shows 9-week bases outperform 4-week bases. */
 function _detectVCP(closes, highs, lows, volumes) {
-  const n = closes.length;
-  if (n < 45) return { found: false };
+  const windows = [90, 45, 21];   // check longest first — first match wins
+  for (const winSize of windows) {
+    if (closes.length < winSize) continue;
+    const result = _detectVCPInWindow(closes, highs, lows, volumes, winSize);
+    if (result.found) {
+      return { ...result, windowSize: winSize, windowWeeks: Math.round(winSize / 5) };
+    }
+  }
+  return { found: false };
+}
 
-  // Analysis window: last 45 bars
-  const start = n - 45;
+/** Single-window VCP check — 2+ contracting pullbacks, final ≤15%, base ≤30%.
+    Pivot lookback `k` scales with window size (noisier data in larger windows
+    needs stronger pivots to avoid false swings). */
+function _detectVCPInWindow(closes, highs, lows, volumes, winSize) {
+  const n = closes.length;
+  if (n < winSize) return { found: false };
+
+  const start = n - winSize;
   const winHighs = highs.slice(start);
   const winLows  = lows.slice(start);
-  const winCloses = closes.slice(start);
 
-  // Find swing highs in the window (3-bar pivots)
-  const swings = _findSwings(winHighs, winLows, 3);
+  // Scale pivot lookback with window: 3 for 21-bar, 4 for 45-bar, 5 for 90-bar
+  const k = winSize >= 90 ? 5 : winSize >= 45 ? 4 : 3;
+  const swings = _findSwings(winHighs, winLows, k);
   const highs_in = swings.filter(s => s.type === 'high');
   const lows_in  = swings.filter(s => s.type === 'low');
 
   if (highs_in.length < 2 || lows_in.length < 2) return { found: false };
 
-  // Walk: pair each swing high with the following swing low to measure pullback
   const contractions = [];
   for (let i = 0; i < highs_in.length; i++) {
     const hi = highs_in[i];
@@ -6623,15 +6693,13 @@ function _detectVCP(closes, highs, lows, volumes) {
     const depth = (hi.price - nextLow.price) / hi.price;
     contractions.push({
       depthPct: depth * 100,
-      highIdx: hi.i,
-      lowIdx: nextLow.i,
-      highPrice: hi.price,
-      lowPrice: nextLow.price,
+      highIdx: hi.i, lowIdx: nextLow.i,
+      highPrice: hi.price, lowPrice: nextLow.price,
     });
   }
   if (contractions.length < 2) return { found: false };
 
-  // Test: each contraction must be <= previous (allow 10% tolerance)
+  // Each contraction must be <= previous (10% tolerance for noise)
   let contracting = true;
   for (let i = 1; i < contractions.length; i++) {
     if (contractions[i].depthPct > contractions[i-1].depthPct * 1.10) {
@@ -6640,19 +6708,11 @@ function _detectVCP(closes, highs, lows, volumes) {
     }
   }
 
-  // Final contraction tightness
   const final = contractions[contractions.length - 1];
   const finalTight = final.depthPct <= 15;
-
-  // Overall base depth (all contractions)
   const baseDepthPct = contractions[0].depthPct;
   const baseShallow = baseDepthPct <= 30;
-
-  // Pivot = highest high in the base window
   const pivot = Math.max(...winHighs);
-
-  // Base start index (in absolute terms in the full closes array)
-  const baseStart = start;
 
   return {
     found: contracting && finalTight && baseShallow && contractions.length >= 2,
@@ -6660,7 +6720,7 @@ function _detectVCP(closes, highs, lows, volumes) {
     tightness: final.depthPct,
     baseDepthPct,
     pivot,
-    baseStart,
+    baseStart: start,
     numContractions: contractions.length,
   };
 }
@@ -6813,29 +6873,84 @@ function _classifySetup(closes, highs, lows, volumes, sma20) {
   return { type: 'none', label: 'אין setup ברור', pivot: null };
 }
 
-/** Volume quality — accumulation vs distribution days over last 25 trading days.
-    Accumulation: up day (>+0.2%) with volume >1.25× 50-day average.
-    Distribution: down day (<-0.2%) with volume >1.00× 50-day average.
-    O'Neil's rule: >5 distribution days in 25 = institutional selling pressure. */
+/** Volume quality — accumulation vs distribution days weighted by recency,
+    plus breakout-day confirmation and pocket pivot detection.
+
+    Core rule (O'Neil): "Institutional footprint" — stocks with more accum
+    days than distrib days tend to outperform their breakouts. Stocks with
+    ≥5 distrib days in 25 are at risk of failing the breakout.
+
+    RECENCY WEIGHTING (C5): Linear decay from 1.0 (today) to ~0.04 (25 days
+    ago). 5 distrib days ALL in the last 5 bars = weighted 4.5+ = very bad.
+    5 distrib days spread over 25 bars = weighted ~2.5 = moderate concern.
+    Flag "distressed" when weighted distrib ≥ 3.5.
+
+    BREAKOUT VOLUME (C1): Minervini requires volume ≥ 140% of 50-day average
+    on the actual breakout day. Without it, breakouts fail at ~2x the rate.
+
+    POCKET PIVOT (O'Neil bonus): An up-day whose volume exceeds any down-day
+    volume in the prior 10 bars. Signals strong institutional accumulation
+    inside a base. */
 function _volumeQuality(closes, volumes) {
   const n = closes.length;
   if (n < 50 || !volumes || volumes.length < 50) return null;
   const avgVol50 = _sma(volumes, 50);
   if (!avgVol50) return null;
 
-  let accum = 0, distrib = 0;
+  // ─── Accum vs Distrib days over last 25, with recency weighting ───
+  let accumDays = 0, distribDays = 0;
+  let weightedAccum = 0, weightedDistrib = 0;
   const startI = Math.max(1, n - 25);
+  const totalBars = n - startI;
   for (let i = startI; i < n; i++) {
     const chg = (closes[i] - closes[i - 1]) / closes[i - 1];
     const volRatio = volumes[i] / avgVol50;
-    if (chg >  0.002 && volRatio >= 1.25) accum++;
-    if (chg < -0.002 && volRatio >= 1.00) distrib++;
+    // Linear recency weight: today = 1.0, 25 bars ago ≈ 0.04
+    const barsBack = n - 1 - i;
+    const weight = 1 - (barsBack / totalBars);
+    if (chg >  0.002 && volRatio >= 1.25) { accumDays++;   weightedAccum   += weight; }
+    if (chg < -0.002 && volRatio >= 1.00) { distribDays++; weightedDistrib += weight; }
   }
-  return { accumDays: accum, distribDays: distrib, netQuality: accum - distrib };
+  // Distressed = weighted distrib ≥ 3.5 (roughly: 4+ recent distrib days,
+  // or 5+ moderately-recent ones). Replaces the old "raw count ≥ 5" rule.
+  const distressed = weightedDistrib >= 3.5;
+
+  // ─── Today's breakout confirmation (Minervini's ≥140% of avg) ───
+  const todayVol = volumes[n - 1];
+  const todayChg = (closes[n - 1] - closes[n - 2]) / closes[n - 2];
+  const volRatio = avgVol50 ? todayVol / avgVol50 : 0;
+  const breakoutConfirmed = todayChg > 0 && volRatio >= 1.40;
+
+  // ─── Pocket Pivot (O'Neil) — up-day volume beats any down-day vol in prior 10 ───
+  let maxDownVolPrior10 = 0;
+  for (let i = Math.max(1, n - 11); i < n - 1; i++) {
+    if (closes[i] < closes[i - 1]) {
+      maxDownVolPrior10 = Math.max(maxDownVolPrior10, volumes[i]);
+    }
+  }
+  const pocketPivot = todayChg > 0.005 && maxDownVolPrior10 > 0 && todayVol > maxDownVolPrior10;
+
+  return {
+    accumDays, distribDays,
+    netQuality: accumDays - distribDays,
+    weightedAccum: Math.round(weightedAccum * 10) / 10,
+    weightedDistrib: Math.round(weightedDistrib * 10) / 10,
+    distressed,
+    // Breakout-day metrics (today)
+    todayVolRatio: Math.round(volRatio * 100) / 100,
+    breakoutConfirmed,
+    pocketPivot,
+  };
 }
 
-/** MAIN ENTRY SIGNAL COMPUTATION — synthesizes all the above into a verdict. */
-function computeEntrySignals(chartData, spyData, relativeStrengthPct) {
+/** MAIN ENTRY SIGNAL COMPUTATION — synthesizes all the above into a verdict.
+ * @param chartData      - { dailyCloses, dailyHighs, dailyLows, dailyVolumes }
+ * @param spyData        - SPY chart data for market context check
+ * @param ibdRsRating    - IBD-style Relative Strength Rating (1-99) computed
+ *                         universe-wide. Feeds Trend Template point 8.
+ *                         Pass null if not yet computed (e.g., add-symbol
+ *                         path); TT8 will auto-pass in that case. */
+function computeEntrySignals(chartData, spyData, ibdRsRating) {
   const { dailyCloses, dailyHighs, dailyLows, dailyVolumes } = chartData;
   if (!dailyCloses || dailyCloses.length < 100) {
     return { verdict: 'unknown', label: 'נתונים לא מספיקים (פחות מ-5 חודשי מסחר)', details: null };
@@ -6844,15 +6959,13 @@ function computeEntrySignals(chartData, spyData, relativeStrengthPct) {
   const n = dailyCloses.length;
   const price = dailyCloses[n - 1];
 
-  // Trend template
-  const tt = _trendTemplate(dailyCloses, dailyLows, relativeStrengthPct);
+  // Trend template — pass IBD RS as the 8th point
+  const tt = _trendTemplate(dailyCloses, dailyLows, ibdRsRating);
 
-  // Key moving averages for reference
+  // Moving averages
   const sma20  = _sma(dailyCloses, 20);
   const sma50  = _sma(dailyCloses, 50);
   const sma200 = _sma(dailyCloses, 200);
-
-  // Distance from key MAs (used by extended check)
   const distSma20  = sma20  ? (price - sma20)  / sma20  : null;
   const distSma50  = sma50  ? (price - sma50)  / sma50  : null;
   const distSma200 = sma200 ? (price - sma200) / sma200 : null;
@@ -6860,15 +6973,14 @@ function computeEntrySignals(chartData, spyData, relativeStrengthPct) {
   // Setup classification
   const setup = _classifySetup(dailyCloses, dailyHighs, dailyLows, dailyVolumes, sma20);
 
-  // Volume quality
+  // Volume quality (now includes weighted distrib + breakout confirmation + pocket pivot)
   const vq = _volumeQuality(dailyCloses, dailyVolumes);
 
   // ATR for stop sizing
   const atr14 = _atr(dailyHighs, dailyLows, dailyCloses, 14);
   const atrPct = atr14 && price ? atr14 / price : null;
 
-  // Buy zone: within 5% above pivot (or right at the pivot) counts as buyable.
-  // Below pivot = "waiting for breakout"; >5% above pivot = "chasing / extended".
+  // Buy zone
   let inBuyZone = false, buyZoneLow = null, buyZoneHigh = null, distFromPivotPct = null;
   if (setup.pivot) {
     buyZoneLow  = setup.pivot;
@@ -6877,29 +6989,73 @@ function computeEntrySignals(chartData, spyData, relativeStrengthPct) {
     inBuyZone = price >= setup.pivot * 0.99 && price <= setup.pivot * 1.05;
   }
 
-  // Structural stop = max (tightest) of:
-  //   - 2×ATR below current price
-  //   - Recent 10-day low
-  //   - Pivot - 3% (if in a base setup)
-  let structuralStop = null;
-  const candidates = [];
-  if (atr14) candidates.push(price - 2 * atr14);
-  if (dailyLows && dailyLows.length >= 10) {
-    candidates.push(Math.min(...dailyLows.slice(-10)));
+  /* ── STRUCTURAL STOP (B1) ──
+     Priority-ordered candidates, take the TIGHTEST (closest to price) valid
+     level, then floor at max(1×ATR, 2%) and cap at 8% (Minervini max).
+
+     Candidates (in order of preference):
+       1. Most recent SWING LOW in the last 30 bars (NOT a rolling min — a
+          proper pivot low with 3 bars higher on each side). Stop 1% below it.
+       2. 2×ATR below current price (volatility-based fallback).
+       3. Pivot - 3% (only valid when in a base setup).
+  */
+  const stopCandidates = [];
+  if (dailyHighs && dailyLows && dailyLows.length >= 15) {
+    const window = Math.min(30, dailyLows.length);
+    const winH = dailyHighs.slice(-window);
+    const winL = dailyLows.slice(-window);
+    const swings = _findSwings(winH, winL, 3);
+    const swLows = swings.filter(s => s.type === 'low');
+    if (swLows.length > 0) {
+      // Use the most recent swing low (last entry)
+      const recentSwLow = swLows[swLows.length - 1].price;
+      stopCandidates.push({ level: recentSwLow * 0.99, reason: 'swing-low' });
+    }
   }
-  if (setup.pivot) candidates.push(setup.pivot * 0.97);
-  if (candidates.length) structuralStop = Math.max(...candidates);
+  if (atr14) {
+    stopCandidates.push({ level: price - 2 * atr14, reason: 'ATR×2' });
+  }
+  if (setup.pivot) {
+    stopCandidates.push({ level: setup.pivot * 0.97, reason: 'below-pivot' });
+  }
+
+  // Pick the TIGHTEST (highest) structural level
+  let structuralStop = null, stopReason = null;
+  if (stopCandidates.length > 0) {
+    const best = stopCandidates.reduce((a, b) => (a.level > b.level ? a : b));
+    structuralStop = best.level;
+    stopReason = best.reason;
+  }
+
+  // Floor: stop cannot be tighter than max(1 ATR, 2% of price) — normal
+  // daily volatility shouldn't trigger it
+  if (structuralStop != null && atr14) {
+    const minStopDist = Math.max(atr14, 0.02 * price);
+    const flooredLevel = price - minStopDist;
+    if (structuralStop > flooredLevel) {
+      structuralStop = flooredLevel;
+      stopReason = 'ATR floor';
+    }
+  }
+  // Cap: stop cannot be wider than 8% (Minervini's hard maximum)
+  if (structuralStop != null) {
+    const cappedLevel = price * 0.92;
+    if (structuralStop < cappedLevel) {
+      structuralStop = cappedLevel;
+      stopReason = '8% cap';
+    }
+  }
   const stopPct = structuralStop ? (price - structuralStop) / price : null;
 
-  // Market context — is SPY itself in Stage 2?
+  // Market context
   let spyStage2 = null;
   if (spyData?.dailyCloses && spyData.dailyCloses.length >= 200) {
     const spyTT = _trendTemplate(spyData.dailyCloses, spyData.dailyLows, null);
     spyStage2 = spyTT.stage2;
   }
 
-  // ─── VERDICT LOGIC ───
-  // Priority chain. First matching condition wins.
+  /* ── VERDICT LOGIC ──
+     Priority chain. First matching condition wins. */
   let verdict, label, reasons = [];
 
   if (!tt.stage2) {
@@ -6910,20 +7066,31 @@ function computeEntrySignals(chartData, spyData, relativeStrengthPct) {
       if (!tt.details.tt1) reasons.push('מחיר תחת SMA150 / SMA200');
       if (!tt.details.tt3) reasons.push('SMA200 יורד');
       if (!tt.details.tt7) reasons.push('רחוק מדי משיא 52 שבועות');
+      if (!tt.details.tt8) reasons.push(`RS Rating ${ibdRsRating ?? '?'} < 70`);
     }
   } else if (setup.type === 'extended') {
     verdict = 'extended';
     label = 'המתן — מתוח מדי';
     reasons.push(`${setup.distPct.toFixed(0)}% מעל SMA20 — מחכה לפולבק או ל-consolidation`);
-  } else if (vq && vq.distribDays >= 5) {
+  } else if (vq && vq.distressed) {
+    // C5 — weighted recency-based distribution check replaces raw count
     verdict = 'distribution';
     label = 'חולשה פנימית — distribution מוסדי';
-    reasons.push(`${vq.distribDays} ימי distribution ב-25 ימים אחרונים (נדרש ≤4)`);
+    reasons.push(`${vq.distribDays} ימי distribution (משוקלל ${vq.weightedDistrib}) ב-25 ימים אחרונים`);
   } else if (['vcp', 'htf', 'flat_base', 'pullback'].includes(setup.type) && inBuyZone) {
     verdict = 'attractive';
     label = 'אטרקטיבי — כניסה מומלצת';
     reasons.push(`${setup.label} + מחיר ב-buy zone`);
     if (setup.narrative) reasons.push(setup.narrative);
+    // C1 — if breakout day lacks volume confirmation, flag it as a concern
+    if (inBuyZone && vq && !vq.breakoutConfirmed && setup.type !== 'pullback') {
+      reasons.push(`⚠ volume today ${vq.todayVolRatio}× ממוצע (Minervini: ≥1.4× לפריצה אמינה)`);
+    } else if (vq && vq.breakoutConfirmed) {
+      reasons.push(`✓ volume מאשר (${vq.todayVolRatio}× ממוצע)`);
+    }
+    if (vq && vq.pocketPivot) {
+      reasons.push(`✓ Pocket Pivot — accumulation מוסדית`);
+    }
   } else if (['vcp', 'htf', 'flat_base'].includes(setup.type) && setup.pivot && price < setup.pivot) {
     verdict = 'prebreakout';
     label = 'בבסיס — המתן לפריצה';
@@ -6946,8 +7113,7 @@ function computeEntrySignals(chartData, spyData, relativeStrengthPct) {
     reasons.push('Stage 2 אך מחכה לבסיס / פולבק / פריצה');
   }
 
-  // Market-context modifier — if SPY isn't in Stage 2, downgrade speculative
-  // entries ("don't fight the tape" — O'Neil, Minervini)
+  // Market-context modifier
   if (spyStage2 === false && verdict === 'attractive') {
     verdict = 'speculative';
     label = 'ספקולטיבי — השוק הכללי לא ב-Stage 2';
@@ -6963,7 +7129,8 @@ function computeEntrySignals(chartData, spyData, relativeStrengthPct) {
     atr14, atrPct,
     pivot: setup.pivot,
     inBuyZone, buyZoneLow, buyZoneHigh, distFromPivotPct,
-    structuralStop, stopPct,
+    structuralStop, stopPct, stopReason,
+    ibdRsRating,
     volumeQuality: vq,
     spyStage2,
     price,
@@ -6985,6 +7152,8 @@ function _leanEntry(e) {
     distFromPivotPct: rd(e.distFromPivotPct),
     structuralStop: rd(e.structuralStop),
     stopPct: rd(e.stopPct),
+    stopReason: e.stopReason,
+    ibdRsRating: e.ibdRsRating,
     atrPct: rd(e.atrPct),
     distSma20: rd(e.distSma20),
     distSma50: rd(e.distSma50),
@@ -7002,12 +7171,19 @@ function _leanEntry(e) {
         numContractions: e.setup.vcp.numContractions,
         tightness: rd(e.setup.vcp.tightness),
         baseDepthPct: rd(e.setup.vcp.baseDepthPct),
+        windowWeeks: e.setup.vcp.windowWeeks,  // C6: which time frame matched
       } : null,
     } : null,
     volumeQuality: e.volumeQuality ? {
       accumDays: e.volumeQuality.accumDays,
       distribDays: e.volumeQuality.distribDays,
       netQuality: e.volumeQuality.netQuality,
+      weightedAccum: e.volumeQuality.weightedAccum,
+      weightedDistrib: e.volumeQuality.weightedDistrib,
+      distressed: e.volumeQuality.distressed,
+      todayVolRatio: e.volumeQuality.todayVolRatio,
+      breakoutConfirmed: e.volumeQuality.breakoutConfirmed,
+      pocketPivot: e.volumeQuality.pocketPivot,
     } : null,
   };
 }
@@ -7340,6 +7516,11 @@ function computeScores(stocksData, spy, methodologyKey) {
     pct[f] = (val) => percentileRank(arr, val);
   }
 
+  // IBD-style Relative Strength Rating — universe-wide percentile (1-99).
+  // Feeds SEPA's Trend Template point 8 regardless of which methodology is
+  // active, so the gate is consistent across "Momentum", "Quality", etc.
+  const rsRatings = computeIBDRelativeStrength(raw, symbols);
+
   const results = [];
   for (const sym of symbols) {
     const m = raw[sym];
@@ -7352,10 +7533,11 @@ function computeScores(stocksData, spy, methodologyKey) {
       name: SYM_NAME[sym] || sym,
       sector: SYM_SECTOR[sym] || '—',
       sectorName: SECTOR_NAMES[SYM_SECTOR[sym]] || '—',
-      subInd: SYM_SUBIND[sym] || null,            // GICS sub-industry code
-      subIndName: getSubIndHe(sym),                // Hebrew sub-industry label; null if unmapped
+      subInd: SYM_SUBIND[sym] || null,
+      subIndName: getSubIndHe(sym),
       score: Math.round(score),
       scores: roundedFactors,
+      rsRating: rsRatings[sym],            // IBD RS Rating, 1-99
       metrics: m,
       price: m.price,
       y1: m.ret12m != null ? m.ret12m * 100 : null,
@@ -7422,8 +7604,8 @@ async function runScanSilent() {
     scanData = {
       stocks: stocks.map(s => {
         const src = stocksData[s.sym];
-        const rsPct = s.scores?.REL ?? s.scores?.RS ?? null;
-        const entry = src ? computeEntrySignals(src, spyData, rsPct) : null;
+        const rsRating = s.rsRating ?? null;  // IBD RS Rating from computeScores
+        const entry = src ? computeEntrySignals(src, spyData, rsRating) : null;
         return {
           ...s,
           closes:           src?.closes,
@@ -7522,8 +7704,8 @@ async function runScan() {
       // SEPA entry-timing analysis — passes the raw chart data + SPY for
       // market context + RS rating (percentile already computed by
       // computeScores pct-rank infrastructure, store on s.scores).
-      const rsPct = s.scores?.REL ?? s.scores?.RS ?? null;
-      const entry = src ? computeEntrySignals(src, spyData, rsPct) : null;
+      const rsRating = s.rsRating ?? null;  // IBD RS Rating from computeScores
+      const entry = src ? computeEntrySignals(src, spyData, rsRating) : null;
       return {
         ...s,
         closes:           src?.closes,
@@ -7566,16 +7748,18 @@ async function runScan() {
         sym: s.sym, name: s.name, sector: s.sector, sectorName: s.sectorName,
         subInd: s.subInd, subIndName: s.subIndName,
         score: s.score, scores: s.scores, rank: s.rank,
+        rsRating: s.rsRating,             // IBD RS Rating 1-99 — preserved across refreshes
         price: s.price, y1: s.y1, m3: s.m3, m1: s.m1, fromHi: s.fromHi,
         refreshedAt: s.refreshedAt,
-        closes: sparkCloses,         // weekly series — used by legacy code paths
-        dailyCloses: leanDaily,      // daily series — powers the sparkline
+        closes: sparkCloses,
+        dailyCloses: leanDaily,
         metrics: {
           price: s.metrics.price,
           fromHi: s.metrics.fromHi,
           ret1m: s.metrics.ret1m,
           ret3m: s.metrics.ret3m,
           ret6m: s.metrics.ret6m,
+          ret9m: s.metrics.ret9m,
           ret12m: s.metrics.ret12m,
           ret12m_1m: s.metrics.ret12m_1m,
           rs12m: s.metrics.rs12m,
@@ -7584,7 +7768,7 @@ async function runScan() {
           sma40: s.metrics.sma40,
           sma10Slope: s.metrics.sma10Slope,
         },
-        entry: _leanEntry(s.entry),  // SEPA — display-essential fields only
+        entry: _leanEntry(s.entry),
       };
     });
     const lean = {
@@ -8459,6 +8643,19 @@ function renderExitSection(s) {
  * Implements Minervini's Specific Entry Point Analysis — Trend Template +
  * setup classification + pivot/buy-zone + volume quality + stop sizing.
  */
+
+/** Map internal stopReason keys → human-readable Hebrew labels */
+function _stopReasonLabel(reason) {
+  const map = {
+    'swing-low':   'מתחת ל-swing low',
+    'ATR×2':       '2×ATR',
+    'below-pivot': 'מתחת ל-pivot',
+    'ATR floor':   'רצפת ATR (מינימום)',
+    '8% cap':      'תקרת 8% (Minervini)',
+  };
+  return map[reason] || reason;
+}
+
 function renderEntrySection(s) {
   const e = s.entry;
   if (!e) return '';  // Stock from older cache without SEPA data — hide section
@@ -8485,12 +8682,28 @@ function renderEntrySection(s) {
   const ttPts = e.trendTemplate?.points ?? 0;
   const ttTotal = e.trendTemplate?.total ?? 8;
   const ttCls = ttPts >= 7 ? 'ok' : ttPts >= 5 ? 'warn' : 'bad';
+  const rsRating = e.ibdRsRating;
+  const rsCls = rsRating == null ? 'na' : rsRating >= 70 ? 'ok' : rsRating >= 50 ? 'warn' : 'bad';
 
-  // Volume quality summary
+  // Volume quality summary — now expresses weighted distribution + breakout confirmation
   const vq = e.volumeQuality;
   const vqNet = vq?.netQuality ?? null;
-  const vqCls = vqNet == null ? 'na' : vqNet > 0 ? 'ok' : vqNet < -1 ? 'bad' : 'warn';
-  const vqText = vq ? `${vq.accumDays} accumulation vs ${vq.distribDays} distribution (25 ימים)` : 'אין נתוני volume';
+  const vqCls = vq?.distressed ? 'bad' : vqNet == null ? 'na' : vqNet > 0 ? 'ok' : 'warn';
+  let vqText = 'אין נתוני volume';
+  let vqSub = '';
+  if (vq) {
+    // Main text: accum/distrib counts (with weighted values in parens)
+    vqText = `${vq.accumDays} accum · ${vq.distribDays} distrib`;
+    if (vq.weightedDistrib != null) {
+      vqText += ` (משוקלל ${vq.weightedDistrib.toFixed(1)})`;
+    }
+    // Subtext: breakout confirmation on today + pocket pivot
+    const parts = [];
+    if (vq.breakoutConfirmed)     parts.push(`✓ Volume פריצה (${vq.todayVolRatio}×)`);
+    else if (vq.todayVolRatio != null) parts.push(`Volume היום: ${vq.todayVolRatio}× ממוצע`);
+    if (vq.pocketPivot)           parts.push('✓ Pocket Pivot');
+    vqSub = parts.join(' · ');
+  }
 
   // Buy zone text
   let buyZoneText = '—';
@@ -8577,12 +8790,15 @@ function renderEntrySection(s) {
         <div class="entry-cell">
           <div class="entry-cell-lbl">Setup</div>
           <div class="entry-cell-val">${e.setup?.label || '—'}</div>
-          ${e.setup?.narrative ? `<div class="entry-cell-sub">${e.setup.narrative}</div>` : ''}
+          ${e.setup?.narrative ? `<div class="entry-cell-sub">${e.setup.narrative}${e.setup?.vcpSummary?.windowWeeks ? ` · בסיס ${e.setup.vcpSummary.windowWeeks} שבועות` : ''}</div>` : ''}
         </div>
         <div class="entry-cell">
           <div class="entry-cell-lbl">Trend Template</div>
           <div class="entry-cell-val entry-${ttCls}">${ttPts}/${ttTotal} נקודות</div>
-          <div class="entry-cell-sub">${e.trendTemplate?.stage2 ? 'Stage 2 ✓' : 'לא Stage 2 ✗'}</div>
+          <div class="entry-cell-sub">
+            ${e.trendTemplate?.stage2 ? 'Stage 2 ✓' : 'לא Stage 2 ✗'}
+            ${rsRating != null ? ` · RS <span class="entry-${rsCls}">${rsRating}</span>` : ''}
+          </div>
         </div>
         <div class="entry-cell">
           <div class="entry-cell-lbl">Pivot</div>
@@ -8601,7 +8817,10 @@ function renderEntrySection(s) {
         <div class="entry-cell">
           <div class="entry-cell-lbl">Stop מוצע</div>
           <div class="entry-cell-val">${fmtUsd(e.structuralStop)}</div>
-          ${e.stopPct != null ? `<div class="entry-cell-sub">${(e.stopPct * 100).toFixed(1)}% מתחת</div>` : ''}
+          <div class="entry-cell-sub">
+            ${e.stopPct != null ? `${(e.stopPct * 100).toFixed(1)}% מתחת` : '—'}
+            ${e.stopReason ? ` · ${_stopReasonLabel(e.stopReason)}` : ''}
+          </div>
         </div>
         <div class="entry-cell">
           <div class="entry-cell-lbl">ATR (14)</div>
@@ -8611,7 +8830,7 @@ function renderEntrySection(s) {
         <div class="entry-cell entry-cell-wide">
           <div class="entry-cell-lbl">איכות Volume</div>
           <div class="entry-cell-val entry-${vqCls}">${vqText}</div>
-          <div class="entry-cell-sub">Minervini: ≤4 ימי distribution = בריא</div>
+          <div class="entry-cell-sub">${vqSub || 'Minervini: ≤4 ימי distribution משוקלל = בריא'}</div>
         </div>
         <div class="entry-cell entry-cell-wide">
           <div class="entry-cell-lbl">מרחק ממ"נ</div>
@@ -9069,7 +9288,7 @@ async function refreshWatchlist() {
       stock.dailyHighs = chartData.dailyHighs;
       stock.dailyLows = chartData.dailyLows;
       stock.dailyVolumes = chartData.dailyVolumes;
-      stock.entry = computeEntrySignals(chartData, spyData, stock.scores?.REL ?? stock.scores?.RS ?? null);
+      stock.entry = computeEntrySignals(chartData, spyData, stock.rsRating ?? null);
       stock.refreshedAt = now;
       refreshedCount++;
     }
