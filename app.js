@@ -6193,18 +6193,27 @@ function closeMobileMenu() {
 // ═══ DATA FETCHING ═══
 
 /**
- * Fetch 1 year of daily bars for a symbol. Returns both the raw daily series
- * (for the in-table sparkline — daily granularity is what users expect on
- * short-range views like 1M/3M) AND a derived weekly series (for the scoring
- * model, which indexes by week count and would break on daily data). The
- * weekly series is an every-5-trading-days sample from the end, which is a
- * close approximation of the Friday-close series Yahoo's `interval=1wk`
- * returns. Function name kept for backward compat with call sites.
+ * Fetch ~2 years of daily bars for a symbol, then expose two views to the rest
+ * of the app:
+ *   - `closes`/`timestamps` — weekly sampled, last 53 bars. Fed to the scoring
+ *     model (computeMetrics), which indexes by week count. r(52) needs n>=53.
+ *   - `dailyCloses`/`dailyTimestamps` — daily bars, last 252 (~1 year). Fed to
+ *     the in-table sparkline so short-range views (1M/3M) actually show daily
+ *     price movements instead of 4-13 blocky weekly points.
+ *
+ * Why range=2y and not 1y: Yahoo's 1y daily returns ~252 trading bars, which
+ * after weekly sampling yields only 52 weekly bars — one short of the 53 that
+ * r(52) requires, which silently nulls ret12m and craters MOM/RS scores for
+ * every stock. 2y gives comfortable buffer; we slice down to 53 weekly + 252
+ * daily so all downstream time-window math (hi52, lo52, rs12m) still spans
+ * exactly one year.
+ *
+ * Function name kept for backward compat with call sites.
  */
 async function fetchChartWeekly(sym) {
   const cleanSym = sym.replace('/', '-').replace('.', '-');
   const cb = Math.floor(Date.now() / 600000);
-  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${cleanSym}?range=1y&interval=1d&cb=${cb}`;
+  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${cleanSym}?range=2y&interval=1d&cb=${cb}`;
   const proxyUrl = `${PROXY}/?url=${encodeURIComponent(yahooUrl)}`;
   try {
     const r = await fetch(proxyUrl);
@@ -6216,20 +6225,35 @@ async function fetchChartWeekly(sym) {
     const rawTs = result.timestamp || [];
     // Drop null bars (weekends/holidays occasionally leak through), keep
     // closes and timestamps aligned.
-    const dailyCloses = [], dailyTimestamps = [];
+    const allCloses = [], allTs = [];
     for (let i = 0; i < rawCloses.length; i++) {
       if (rawCloses[i] != null) {
-        dailyCloses.push(rawCloses[i]);
-        dailyTimestamps.push(rawTs[i]);
+        allCloses.push(rawCloses[i]);
+        allTs.push(rawTs[i]);
       }
     }
     const meta = result.meta || {};
-    if (dailyCloses.length < 20) return null;
-    const weekly = _sampleWeekly(dailyCloses, dailyTimestamps);
+    if (allCloses.length < 60) return null;
+
+    // Weekly view for scoring — sample the full history by calendar week and
+    // keep the last 53 (one year's worth, matches legacy hi52/lo52 semantics).
+    const weeklyAll = _sampleWeekly(allCloses, allTs);
+    const weeklyCloses = weeklyAll.closes.slice(-53);
+    const weeklyTs     = weeklyAll.timestamps.slice(-53);
+
+    // Daily view for sparkline AND calendar-month return lookback. 280 bars
+    // ≈ 13 months of trading days ≈ 400 calendar days, giving ~35 days of
+    // buffer past the 12-month horizon. 252 bars (1 trading year exactly)
+    // would leave no buffer — month-boundary and DST quirks can push a 12M
+    // target 1-2 calendar days *before* the earliest bar, returning null.
+    const dailyCloses     = allCloses.slice(-280);
+    const dailyTimestamps = allTs.slice(-280);
+
+    if (weeklyCloses.length < 20) return null;
     return {
       sym,
-      closes: weekly.closes,          // weekly — consumed by computeMetrics (unchanged)
-      timestamps: weekly.timestamps,
+      closes: weeklyCloses,           // weekly — consumed by computeMetrics (unchanged)
+      timestamps: weeklyTs,
       dailyCloses,                    // daily — consumed by renderSparkline
       dailyTimestamps,
       meta
@@ -6240,17 +6264,28 @@ async function fetchChartWeekly(sym) {
 }
 
 /**
- * Every-5-trading-days sample from the end of a daily series. Approximates
- * Yahoo's `interval=1wk` Friday-close stream closely enough that computeMetrics'
- * weekly-index math still lands on the right time windows. Over 52 weeks the
- * maximum drift from holiday-short weeks is a few days — well within the
- * rounding error of multi-month return calculations.
+ * Bucket daily bars by calendar week (Yahoo timestamps are Unix epoch seconds,
+ * so floor(t / week_seconds) gives a stable week key), keeping the LAST bar of
+ * each week — that's the Friday close Yahoo's interval=1wk would have returned
+ * directly. More accurate than naive every-5-bars stepping, and deterministic
+ * about producing exactly one sample per calendar week regardless of holiday
+ * short-weeks.
  */
 function _sampleWeekly(dailyCloses, dailyTimestamps) {
+  const WEEK_SEC = 7 * 24 * 60 * 60;
+  const byWeek = new Map();
+  for (let i = 0; i < dailyCloses.length; i++) {
+    const t = dailyTimestamps[i], c = dailyCloses[i];
+    if (t == null || c == null) continue;
+    const weekKey = Math.floor(t / WEEK_SEC);
+    byWeek.set(weekKey, { t, c });   // forward iteration → last-of-week wins
+  }
   const closes = [], timestamps = [];
-  for (let i = dailyCloses.length - 1; i >= 0; i -= 5) {
-    closes.unshift(dailyCloses[i]);
-    timestamps.unshift(dailyTimestamps[i]);
+  const keys = [...byWeek.keys()].sort((a, b) => a - b);
+  for (const k of keys) {
+    const { t, c } = byWeek.get(k);
+    closes.push(c);
+    timestamps.push(t);
   }
   return { closes, timestamps };
 }
@@ -6273,30 +6308,79 @@ async function fetchUniverseInChunks(symbols, onProgress) {
 
 // ═══ SCORING ═══
 
-function computeMetrics(chartData, spyCloses) {
-  const { closes } = chartData;
+/**
+ * Find the close N calendar months ago — the latest daily bar on or before
+ * (lastDate with setMonth(-N)). Matches TradingView / Google Finance exactly:
+ * "1 month ago" from Apr 22 is Mar 22 (not 30 days ago = Mar 23), "6 months
+ * ago" from Apr 22 is Oct 22 (not 180 days ago = Oct 24). For highly volatile
+ * stocks those small date offsets translate into double-digit pp differences
+ * in return, so calendar-month semantics is what the user expects.
+ *
+ * If the target date falls on a weekend/holiday, returns the previous trading
+ * day's close (by iterating backward from the end until timestamp ≤ target).
+ */
+function _closeMonthsAgo(dailyCloses, dailyTimestamps, monthsAgo) {
+  if (!dailyCloses || !dailyTimestamps || dailyCloses.length < 2) return null;
+  const lastTs = dailyTimestamps[dailyTimestamps.length - 1];
+  const lastDate = new Date(lastTs * 1000);
+  const targetDate = new Date(lastDate);
+  targetDate.setMonth(targetDate.getMonth() - monthsAgo);
+  const targetTs = Math.floor(targetDate.getTime() / 1000);
+  for (let i = dailyTimestamps.length - 1; i >= 0; i--) {
+    if (dailyTimestamps[i] <= targetTs) return dailyCloses[i];
+  }
+  return null;
+}
+
+function computeMetrics(chartData, spy) {
+  const { closes, dailyCloses, dailyTimestamps } = chartData;
   const n = closes.length;
   if (n < 20) return null;
 
-  const price = closes[n - 1];
+  // Price = most recent daily close (more precise than Friday-sampled weekly).
+  const price = (dailyCloses && dailyCloses.length > 0)
+    ? dailyCloses[dailyCloses.length - 1]
+    : closes[n - 1];
+
+  // Calendar-month returns — matches TradingView / Google Finance exactly.
+  // If dailyCloses missing (legacy cache), fall back to weekly-index returns.
+  const m = (months) => {
+    const old = _closeMonthsAgo(dailyCloses, dailyTimestamps, months);
+    if (old == null || old === 0) return null;
+    return (price - old) / old;
+  };
   const r = (weeks) => {
     if (n - 1 - weeks < 0) return null;
     const old = closes[n - 1 - weeks];
     if (!old) return null;
     return (price - old) / old;
   };
-  const ret12m = r(52);
+  const hasDaily = dailyCloses && dailyCloses.length >= 20;
+  const ret12m = hasDaily ? m(12) : r(52);
+  const ret6m  = hasDaily ? m(6)  : r(26);
+  const ret3m  = hasDaily ? m(3)  : r(13);
+  const ret1m  = hasDaily ? m(1)  : r(4);
+
+  // ret12m_1m = classic Jegadeesh-Titman 12-1 momentum: return from t-12m to
+  // t-1m. Used instead of ret12m by some methodologies to skip the noisy
+  // most-recent month (reversal zone).
   const ret12m_1m = (() => {
+    if (hasDaily) {
+      const mo1  = _closeMonthsAgo(dailyCloses, dailyTimestamps, 1);
+      const mo12 = _closeMonthsAgo(dailyCloses, dailyTimestamps, 12);
+      if (mo1 == null || mo12 == null || !mo12) return null;
+      return (mo1 - mo12) / mo12;
+    }
     if (n < 53) return null;
     const recent = closes[n - 5];
     const year = closes[n - 52];
     if (!recent || !year) return null;
     return (recent - year) / year;
   })();
-  const ret6m = r(26);
-  const ret3m = r(13);
-  const ret1m = r(4);
 
+  // SMA stays on weekly — `sma10` ≈ 50-day and `sma40` ≈ 200-day. Used by
+  // internal TRD/TRG/INT factors, not shown as a standalone number to users,
+  // so no TradingView parity requirement here.
   const smaN = (N) => {
     if (n < N) return null;
     let s = 0; for (let i = n - N; i < n; i++) s += closes[i];
@@ -6323,20 +6407,39 @@ function computeMetrics(chartData, spyCloses) {
   }
   stickiness = stickiness / (windowEnd - windowStart);
 
-  const hi52 = Math.max(...closes);
-  const lo52 = Math.min(...closes);
+  // 52-week high/low from daily data (precise). Falls back to weekly for
+  // legacy stocks loaded from a pre-daily cache.
+  const range = hasDaily ? dailyCloses : closes;
+  const hi52 = Math.max(...range);
+  const lo52 = Math.min(...range);
   const fromHi = (price - hi52) / hi52;
   const rangePos = (price - lo52) / (hi52 - lo52 || 1);
 
+  // Relative strength vs SPY — calendar-based, matching the same horizons.
+  const spyHasDaily = spy?.dailyCloses && spy.dailyCloses.length >= 20;
   const spy12m_1m = (() => {
-    const sn = spyCloses.length;
+    if (spyHasDaily) {
+      const mo1  = _closeMonthsAgo(spy.dailyCloses, spy.dailyTimestamps, 1);
+      const mo12 = _closeMonthsAgo(spy.dailyCloses, spy.dailyTimestamps, 12);
+      if (mo1 == null || mo12 == null || !mo12) return null;
+      return (mo1 - mo12) / mo12;
+    }
+    const sc = spy?.closes || spy;       // legacy call with raw closes array
+    const sn = sc?.length || 0;
     if (sn < 53) return null;
-    return (spyCloses[sn - 5] - spyCloses[sn - 52]) / spyCloses[sn - 52];
+    return (sc[sn - 5] - sc[sn - 52]) / sc[sn - 52];
   })();
   const spy3m = (() => {
-    const sn = spyCloses.length;
+    if (spyHasDaily) {
+      const now = spy.dailyCloses[spy.dailyCloses.length - 1];
+      const mo3 = _closeMonthsAgo(spy.dailyCloses, spy.dailyTimestamps, 3);
+      if (mo3 == null || !mo3) return null;
+      return (now - mo3) / mo3;
+    }
+    const sc = spy?.closes || spy;
+    const sn = sc?.length || 0;
     if (sn < 14) return null;
-    return (spyCloses[sn - 1] - spyCloses[sn - 13]) / spyCloses[sn - 13];
+    return (sc[sn - 1] - sc[sn - 13]) / sc[sn - 13];
   })();
   const rs12m = (ret12m_1m != null && spy12m_1m != null) ? ret12m_1m - spy12m_1m : null;
   const rs3m = (ret3m != null && spy3m != null) ? ret3m - spy3m : null;
@@ -6648,12 +6751,12 @@ const METHODOLOGIES = {
   },
 };
 
-function computeScores(stocksData, spyCloses, methodologyKey) {
+function computeScores(stocksData, spy, methodologyKey) {
   const methodology = METHODOLOGIES[methodologyKey] || METHODOLOGIES.momentum;
 
   const raw = {};
   for (const [sym, data] of Object.entries(stocksData)) {
-    const m = computeMetrics(data, spyCloses);
+    const m = computeMetrics(data, spy);
     if (m) raw[sym] = m;
   }
   const symbols = Object.keys(raw);
@@ -6752,7 +6855,7 @@ async function runScanSilent() {
     });
 
     setBannerStatus('מחשב ציונים...');
-    const stocks = computeScores(stocksData, spyData.closes, currentMethodology);
+    const stocks = computeScores(stocksData, spyData, currentMethodology);
     if (stocks.length === 0) throw new Error('empty scores');
 
     scanData = {
@@ -6833,7 +6936,7 @@ async function runScan() {
 
   $('loading-msg').textContent = 'מחשב ציונים רב-פקטוריים...';
   await sleep(50);
-  const stocks = computeScores(stocksData, spyData.closes, currentMethodology);
+  const stocks = computeScores(stocksData, spyData, currentMethodology);
   if (stocks.length === 0) {
     $('adv-err-msg').textContent = 'לא נאספו מספיק נתונים. בדוק את ה-proxy.';
     showScreen('adv-screen-error');
@@ -6867,8 +6970,8 @@ async function runScan() {
     // (~1Y) slice of `dailyCloses` (powers the daily-granularity sparkline).
     // The full chart in the detail panel falls back to a placeholder on cache
     // load, but the sparkline stays functional across every range.
-    // Storage footprint: ~800KB for 500 stocks
-    //   52 weekly + 252 daily closes × 5 digits × 500 stocks
+    // Storage footprint: ~870KB for 500 stocks
+    //   52 weekly + 280 daily closes × 5 digits × 500 stocks
     // Well under the 5MB localStorage budget.
     const leanStocks = stocks.map(s => {
       const full = s.closes || s.metrics?.closes || null;
@@ -6877,7 +6980,7 @@ async function runScan() {
         : null;
       const dailySrc = s.dailyCloses || null;
       const leanDaily = dailySrc && dailySrc.length > 0
-        ? dailySrc.slice(-252).map(v => Math.round(v * 100) / 100)
+        ? dailySrc.slice(-280).map(v => Math.round(v * 100) / 100)
         : null;
       return {
         sym: s.sym, name: s.name, sector: s.sector, sectorName: s.sectorName,
@@ -7773,7 +7876,7 @@ async function scanWatchlistStandalone() {
     for (const sym of symbols) {
       const chartData = stocksData[sym];
       if (!chartData) continue;            // fetch failed for this symbol (bad ticker, 404, etc.)
-      const m = computeMetrics(chartData, spyData.closes);
+      const m = computeMetrics(chartData, spyData);
       if (!m) continue;
 
       // Look up sector info from the current universe holdings (if the stock
@@ -7941,14 +8044,13 @@ async function handleAddSymbol() {
     toggleWatchlist(sym);
 
     // Add a row to scanData so the table shows it immediately. If we have
-    // a scan already, grab SPY from one of its stocks; otherwise use the
-    // fresh fetch we did above. Either way, compute metrics for the new sym.
-    const spyCloses = spyData?.closes
-      || scanData?.stocks?.find(s => s.sym === 'SPY')?.closes
-      || (await fetchChartWeekly('SPY'))?.closes;
+    // a scan already, the parallel SPY fetch above was skipped — do a
+    // targeted fetch now. Pass the full object (with dailyCloses) so
+    // computeMetrics can do calendar-day lookback for ret1m/ret3m/ret12m.
+    const spy = spyData || await fetchChartWeekly('SPY');
 
-    if (spyCloses && scanData && scanData.stocks) {
-      const mm = computeMetrics(chartData, spyCloses);
+    if (spy && scanData && scanData.stocks) {
+      const mm = computeMetrics(chartData, spy);
       if (mm) {
         // Look up sector from any of our universes (may or may not find one)
         let sector = null, sectorName = null, name = sym;
@@ -8075,7 +8177,7 @@ async function refreshWatchlist() {
     for (const sym of symbolsToRefresh) {
       const chartData = stocksData[sym];
       if (!chartData) continue;
-      const m = computeMetrics(chartData, spyData.closes);
+      const m = computeMetrics(chartData, spyData);
       if (!m) continue;
 
       // Find existing entry or create a new one (for manually-added stocks)
@@ -8157,7 +8259,7 @@ function persistScanData() {
           : null;
         const dailySrc = s.dailyCloses || null;
         const leanDaily = dailySrc && dailySrc.length > 0
-          ? dailySrc.slice(-252).map(v => Math.round(v * 100) / 100)
+          ? dailySrc.slice(-280).map(v => Math.round(v * 100) / 100)
           : null;
         return {
           sym: s.sym, name: s.name, sector: s.sector, sectorName: s.sectorName,
