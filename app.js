@@ -1744,11 +1744,17 @@ async function openStockDetail(sym, name) {
     const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=1d&interval=5m&includePrePost=true`;
     const newsUrl  = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(sym)}&newsCount=5&quotesCount=0&enableFuzzyQuery=false`;
     const histUrl  = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=1mo&interval=1d`;
-    const [cRes, nRes, macroData, hRes] = await Promise.allSettled([
+    // v7/finance/quote returns fundamentals (marketCap, P/E, EPS, dividendYield,
+    // beta, 50d/200d MA, analyst targets, …) — the v8/chart endpoint's meta
+    // only has price/range/volume, which is why the sidebar used to show "–"
+    // for market cap, P/E, dividend yield, and EPS.
+    const quoteUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${sym}`;
+    const [cRes, nRes, macroData, hRes, qRes] = await Promise.allSettled([
       fetch(_proxyUrl+'/?url='+encodeURIComponent(chartUrl)),
       fetch(_proxyUrl+'/?url='+encodeURIComponent(newsUrl)),
       fetchMacroContext(sym),
       fetch(_proxyUrl+'/?url='+encodeURIComponent(histUrl)),
+      fetch(_proxyUrl+'/?url='+encodeURIComponent(quoteUrl)),
     ]);
     // --- meta + stats from 1d intraday ---
     let meta={}, news=[], macro={series:[],results:{},sector:null};
@@ -1756,6 +1762,25 @@ async function openStockDetail(sym, name) {
       const d = await cRes.value.json();
       const r = d.chart?.result?.[0];
       if (r) { meta=r.meta||{}; }
+    }
+    // --- fundamentals from v7/quote — merge first so chart-meta wins for
+    //     fields both endpoints return (currency, price, range, volume). ---
+    if (qRes.status==='fulfilled' && qRes.value.ok) {
+      try {
+        const qd = await qRes.value.json();
+        const q = qd.quoteResponse?.result?.[0];
+        if (q) {
+          // Normalize names: v7/quote uses epsTrailingTwelveMonths and
+          // trailingAnnualDividendYield; the renderer expects trailingEps
+          // and dividendYield. Populate the aliases only if the canonical
+          // field is missing so we don't clobber anything.
+          if (q.epsTrailingTwelveMonths != null && q.trailingEps == null)
+            q.trailingEps = q.epsTrailingTwelveMonths;
+          if (q.trailingAnnualDividendYield != null && q.dividendYield == null)
+            q.dividendYield = q.trailingAnnualDividendYield;
+          meta = {...q, ...meta};
+        }
+      } catch(e) { /* ignore parse errors — fields just stay as "–" */ }
     }
     // --- chart data: 1mo daily (reuse hRes) ---
     let chartTs=[], chartCl=[], chartVol=[];
@@ -1873,11 +1898,13 @@ function buildChartSvg(sym, meta, timestamps, closes, volumes, rangeKey) {
   }
 
   // Crosshair SVG elements (hidden initially) — Google Finance style:
-  // just a thin dashed vertical line + pinpoint dot. No horizontal line.
+  // just a thin dashed vertical line. The crosshair DOT is rendered as an
+  // HTML element outside the SVG (see sp-xh-dot below) because the SVG here
+  // uses preserveAspectRatio="none" — any <circle> inside would be stretched
+  // into an ellipse when the chart's pixel ratio differs from its viewBox.
   const xhairEl = `
     <line id="sp-xh-v" x1="0" y1="${PAD_T}" x2="0" y2="${PAD_T+cA}" stroke="rgba(160,170,190,.55)" stroke-width="1" stroke-dasharray="2 3" opacity="0" pointer-events="none"/>
     <line id="sp-xh-h" x1="0" y1="0" x2="${W}" y2="0" stroke="transparent" stroke-width="0" opacity="0" pointer-events="none"/>
-    <circle id="sp-xh-dot" cx="0" cy="0" r="3.5" fill="${col}" stroke="${col}" stroke-width="1" opacity="0" pointer-events="none" style="filter:drop-shadow(0 0 3px ${col})"/>
     <rect id="sp-xh-overlay" x="0" y="0" width="${W}" height="${CHART_H}" fill="transparent"
       onmousemove="_chartMove(event,this)" onmouseleave="_chartLeave()"/>`;
 
@@ -1947,6 +1974,12 @@ function buildChartSvg(sym, meta, timestamps, closes, volumes, rangeKey) {
         <polyline points="${linePts}" fill="none" stroke="${col}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
         ${xhairEl}
       </svg>
+      <!-- HTML dot overlay: matches the price SVG's 240px height exactly so
+           %-based positioning maps correctly onto the chart. Lives outside the
+           scaled SVG so it stays a true circle (not an ellipse). -->
+      <div class="sp-chart-dot-layer">
+        <div id="sp-xh-dot" class="sp-xh-dot" style="--dot-col:${col}"></div>
+      </div>
       <svg width="100%" viewBox="0 0 ${W} ${VOL_H}" preserveAspectRatio="none" style="display:block;height:40px">${volBars}</svg>
       ${priceLbls}${curBadge}${chgBadge}${prevBadgeEl}
       <div style="position:relative;height:22px;margin:4px 4px 0">${axLabels}</div>
@@ -1970,7 +2003,16 @@ function _chartMove(e, overlay) {
   const vl=$('sp-xh-v'), hl=$('sp-xh-h'), dt=$('sp-xh-dot');
   if (vl) { vl.setAttribute('x1',pt.svgX.toFixed(1)); vl.setAttribute('x2',pt.svgX.toFixed(1)); vl.setAttribute('opacity','1'); }
   if (hl) { hl.setAttribute('y1',pt.svgY.toFixed(1)); hl.setAttribute('y2',pt.svgY.toFixed(1)); hl.setAttribute('opacity','1'); }
-  if (dt) { dt.setAttribute('cx',pt.svgX.toFixed(1)); dt.setAttribute('cy',pt.svgY.toFixed(1)); dt.setAttribute('opacity','1'); }
+  // The dot is an HTML element (not SVG) so it stays a perfect circle.
+  // Position via % relative to the .sp-chart-dot-layer which exactly
+  // overlays the 240px price SVG.
+  if (dt) {
+    const xPct = (pt.svgX / m.W) * 100;
+    const yPct = (pt.svgY / m.CHART_H) * 100;
+    dt.style.left = xPct.toFixed(2) + '%';
+    dt.style.top  = yPct.toFixed(2) + '%';
+    dt.style.opacity = '1';
+  }
 
   // Instead of a floating tooltip that covers the chart, we update the
   // chart's own section header inline with the hover data. Must target
@@ -2002,7 +2044,10 @@ function _chartMove(e, overlay) {
   `;
 }
 function _chartLeave() {
-  ['sp-xh-v','sp-xh-h','sp-xh-dot'].forEach(id=>{ const el=$(id); if(el) el.setAttribute('opacity','0'); });
+  // SVG lines use attribute opacity; HTML dot uses style opacity
+  const vl = $('sp-xh-v'); if (vl) vl.setAttribute('opacity','0');
+  const hl = $('sp-xh-h'); if (hl) hl.setAttribute('opacity','0');
+  const dt = $('sp-xh-dot'); if (dt) dt.style.opacity = '0';
   // Reset the chart header back to just "גרף"
   const hdr = document.getElementById('sp-chart-hdr');
   if (hdr) {
@@ -2246,21 +2291,40 @@ function renderStockDetail(sym, name, meta, timestamps, closes, volumes, news, d
   const dayLo=meta.regularMarketDayLow, dayHi=meta.regularMarketDayHigh;
   const wLo=meta.fiftyTwoWeekLow, wHi=meta.fiftyTwoWeekHigh;
 
-  // ── Perplexity-style 3×3 stats grid ──────────────────
+  // ── Bloomberg-style 4×3 stats grid ───────────────────
   const divYield = meta.dividendYield
     ? (meta.dividendYield < 1 ? (meta.dividendYield*100).toFixed(2)+'%' : meta.dividendYield.toFixed(2)+'%')
     : '–';
 
+  // ── Extra metrics enabled by v7/quote ────────────────
+  const beta   = meta.beta != null ? fmt2(meta.beta) : '–';
+  const fwdPE  = meta.forwardPE ? fmt2(meta.forwardPE) : '–';
+  // Analyst target mean — show together with count of analysts as a sub-line
+  let analystVal = '–';
+  if (meta.targetMeanPrice) {
+    analystVal = '$'+fmt2(meta.targetMeanPrice);
+    if (meta.numberOfAnalystOpinions) {
+      analystVal += ` <span class="sp-stat-sub">(${meta.numberOfAnalystOpinions})</span>`;
+    }
+  }
+
   const statsData = [
+    // Row 1 — core price anchors
     { label:'סגירה קודמת', val: meta.chartPreviousClose ? '$'+fmt2(meta.chartPreviousClose) : '–' },
-    { label:'שווי שוק',    val: meta.marketCap ? fmtB(meta.marketCap) : '–' },
     { label:'פתיחה',       val: meta.regularMarketOpen ? '$'+fmt2(meta.regularMarketOpen) : '–' },
-    { label:'מכפיל (P/E)', val: meta.trailingPE ? fmt2(meta.trailingPE) : '–' },
+    { label:'שווי שוק',    val: meta.marketCap ? fmtB(meta.marketCap) : '–' },
+    // Row 2 — ranges & liquidity
     { label:'טווח יומי',   val: dayLo ? '$'+fmt2(dayLo)+'–$'+fmt2(dayHi) : '–' },
-    { label:'תשואת דיבידנד', val: divYield },
     { label:'טווח 52 ש׳',  val: wLo ? '$'+fmt2(wLo)+'–$'+fmt2(wHi) : '–' },
-    { label:'רווח למניה',  val: meta.trailingEps ? '$'+fmt2(meta.trailingEps) : '–' },
     { label:'נפח מסחר',    val: fmtV(meta.regularMarketVolume||dq.vol) },
+    // Row 3 — valuation
+    { label:'מכפיל (P/E)', val: meta.trailingPE ? fmt2(meta.trailingPE) : '–' },
+    { label:'מכפיל עתידי', val: fwdPE },
+    { label:'רווח למניה',  val: meta.trailingEps ? '$'+fmt2(meta.trailingEps) : '–' },
+    // Row 4 — risk & forward view
+    { label:'תשואת דיבידנד', val: divYield },
+    { label:'ביטא (3Y)',    val: beta },
+    { label:'יעד אנליסטים', val: analystVal },
   ];
 
   const statsHtml = `

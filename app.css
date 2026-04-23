@@ -734,6 +734,9 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 .chart-fs-overlay .sp-chart-hdr{flex-shrink:0}
 .chart-fs-overlay #sp-chart-container{flex:1;position:relative}
 .chart-fs-overlay #sp-chart-svg{height:100%!important}
+/* In fullscreen the price SVG stretches to the full container; the dot
+   layer has to follow or the hover dot gets stuck in the top 240px band. */
+.chart-fs-overlay .sp-chart-dot-layer{height:100%!important}
 .chart-fs-close{
   position:absolute;top:12px;right:12px;z-index:10;
   background:var(--bg3);border:1px solid var(--border);
@@ -838,7 +841,7 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 .sp-tab{flex:1;padding:9px 4px;font-size:11px;font-weight:700;font-family:var(--sans);background:none;border:none;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;margin-bottom:-1px}
 .sp-tab.active{color:var(--blue);border-bottom-color:var(--blue)}
 .sp-tab:hover:not(.active){color:var(--text);background:var(--bg3)}
-/* ── Stock detail: Perplexity-style stats grid ── */
+/* ── Stock detail: Bloomberg-style stats grid ── */
 .sp-stats-grid{
   display:grid;
   grid-template-columns:repeat(3,1fr);
@@ -849,13 +852,70 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 }
 .sp-stat-cell{
   background:var(--bg2);
-  padding:10px 12px;
+  padding:11px 13px;
   display:flex;
   flex-direction:column;
-  gap:4px;
+  gap:5px;
+  transition:background .15s ease;
 }
-.sp-stat-lbl{font-size:10px;color:var(--dim);font-weight:500;white-space:nowrap}
-.sp-stat-val{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sp-stat-cell:hover{background:var(--bg3)}
+.sp-stat-lbl{
+  font-size:9.5px;
+  color:var(--dim);
+  font-weight:600;
+  white-space:nowrap;
+  text-transform:uppercase;
+  letter-spacing:.4px;
+}
+.sp-stat-val{
+  font-family:var(--mono);
+  font-size:12.5px;
+  font-weight:700;
+  color:var(--text);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  letter-spacing:-.1px;
+}
+.sp-stat-sub{
+  font-size:10px;
+  font-weight:500;
+  color:var(--dim);
+  margin-inline-start:3px;
+}
+
+/* ── Chart crosshair dot (HTML, not SVG) ──
+   Lives inside .sp-chart-dot-layer which exactly overlays the 240px price
+   SVG. Positioned via %/top-left from _chartMove. Rendered as HTML so the
+   non-uniform SVG scaling (preserveAspectRatio="none") never stretches it
+   into an ellipse — the old implementation used a <circle> inside the SVG,
+   which is why the dot looked squashed on wide screens. */
+.sp-chart-dot-layer{
+  position:absolute;top:0;left:0;
+  width:100%;height:240px;
+  pointer-events:none;
+  overflow:visible;
+}
+.sp-xh-dot{
+  position:absolute;
+  width:10px;height:10px;
+  border-radius:50%;
+  background:var(--dot-col);
+  transform:translate(-50%,-50%);
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .12s ease;
+  z-index:3;
+}
+.sp-xh-dot::after{
+  content:'';
+  position:absolute;
+  inset:-4px;
+  border-radius:50%;
+  background:var(--dot-col);
+  opacity:.22;
+  z-index:-1;
+}
 
 /* ── Profile card (fundamentals tab) ── */
 .sp-profile-card{
