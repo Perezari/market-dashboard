@@ -6329,6 +6329,40 @@ async function fetchUniverseInChunks(symbols, onProgress) {
   return results;
 }
 
+/**
+ * Fetch upcoming earnings dates for a batch of symbols. Uses Yahoo's
+ * v7/finance/spark endpoint because its `meta.earningsTimestamp` is the same
+ * field the app already consumes elsewhere (authenticated-free, no CORS).
+ *
+ * Designed to run IN PARALLEL with fetchUniverseInChunks — typical universe
+ * of 500 stocks = 10 parallel batches of 50 symbols each = ~1 second total
+ * (vs ~20s for the chart fetch), so it adds near-zero perceived latency.
+ *
+ * Returns: { [sym]: earningsTimestampSeconds }  (only symbols that have one)
+ */
+async function fetchEarningsBatch(symbols) {
+  const results = {};
+  const chunkSize = 50;
+  const chunks = [];
+  for (let i = 0; i < symbols.length; i += chunkSize) {
+    chunks.push(symbols.slice(i, i + chunkSize));
+  }
+  await Promise.all(chunks.map(async chunk => {
+    try {
+      const cb = Math.floor(Date.now() / 10000);
+      const url = `https://query1.finance.yahoo.com/v7/finance/spark?symbols=${chunk.join(',')}&range=1d&interval=1d&cb=${cb}`;
+      const r = await fetch(`${PROXY}/?url=${encodeURIComponent(url)}`);
+      if (!r.ok) return;
+      const d = await r.json();
+      (d.spark?.result || []).forEach(res => {
+        const ts = res.response?.[0]?.meta?.earningsTimestamp;
+        if (ts) results[res.symbol] = ts;
+      });
+    } catch(e) { /* silent — earnings are non-critical, fallback is null */ }
+  }));
+  return results;
+}
+
 // ═══ SCORING ═══
 
 /**
@@ -6944,13 +6978,16 @@ function _volumeQuality(closes, volumes) {
 }
 
 /** MAIN ENTRY SIGNAL COMPUTATION — synthesizes all the above into a verdict.
- * @param chartData      - { dailyCloses, dailyHighs, dailyLows, dailyVolumes }
- * @param spyData        - SPY chart data for market context check
- * @param ibdRsRating    - IBD-style Relative Strength Rating (1-99) computed
- *                         universe-wide. Feeds Trend Template point 8.
- *                         Pass null if not yet computed (e.g., add-symbol
- *                         path); TT8 will auto-pass in that case. */
-function computeEntrySignals(chartData, spyData, ibdRsRating) {
+ * @param chartData          - { dailyCloses, dailyHighs, dailyLows, dailyVolumes }
+ * @param spyData            - SPY chart data for market context check
+ * @param ibdRsRating        - IBD-style Relative Strength Rating (1-99) computed
+ *                             universe-wide. Feeds Trend Template point 8.
+ *                             Pass null if not yet computed (e.g., add-symbol
+ *                             path); TT8 will auto-pass in that case.
+ * @param earningsTimestamp  - Unix timestamp (seconds) of next earnings report,
+ *                             or null if unknown. Entries within 5 days are
+ *                             downgraded to 'wait' per Minervini's rule. */
+function computeEntrySignals(chartData, spyData, ibdRsRating, earningsTimestamp) {
   const { dailyCloses, dailyHighs, dailyLows, dailyVolumes } = chartData;
   if (!dailyCloses || dailyCloses.length < 100) {
     return { verdict: 'unknown', label: 'נתונים לא מספיקים (פחות מ-5 חודשי מסחר)', details: null };
@@ -7120,6 +7157,32 @@ function computeEntrySignals(chartData, spyData, ibdRsRating) {
     reasons.push('SPY לא ב-Stage 2 — סיכון מערכתי מוגבר');
   }
 
+  /* ── EARNINGS AWARENESS (C2) ──
+     Minervini explicit rule: "Never enter within 3-5 days of earnings."
+     A stock can gap 20-25% overnight on earnings regardless of setup quality,
+     making pre-earnings entries a systematic coin-flip (not a SEPA setup).
+     We use 5 calendar days as the cutoff — conservative side of his range.
+     5-10 days is informational (setup may still be valid but you'll need to
+     exit before the report or ride through it deliberately). */
+  let daysToEarnings = null;
+  if (earningsTimestamp) {
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (earningsTimestamp > nowSec) {
+      // Convert to calendar days (not trading days — gap risk is calendar-based)
+      daysToEarnings = Math.ceil((earningsTimestamp - nowSec) / 86400);
+      if (daysToEarnings <= 5 && (verdict === 'attractive' || verdict === 'prebreakout')) {
+        // Hard downgrade — earnings risk overrides setup
+        const dayStr = daysToEarnings === 1 ? 'יום' : 'ימים';
+        verdict = 'wait';
+        label = `המתן — דוח רווחים ב-${daysToEarnings} ${dayStr}`;
+        reasons.unshift(`⚠ דוח רווחים ב-${daysToEarnings} ${dayStr} (Minervini: אסור להיכנס בתוך 5 ימים מדוח)`);
+      } else if (daysToEarnings > 5 && daysToEarnings <= 10) {
+        // Soft informational note — setup OK but be aware of upcoming report
+        reasons.push(`ℹ דוח רווחים בעוד ${daysToEarnings} ימים — שקול לסגור לפניו`);
+      }
+    }
+  }
+
   return {
     verdict, label, reasons,
     trendTemplate: tt,
@@ -7131,6 +7194,8 @@ function computeEntrySignals(chartData, spyData, ibdRsRating) {
     inBuyZone, buyZoneLow, buyZoneHigh, distFromPivotPct,
     structuralStop, stopPct, stopReason,
     ibdRsRating,
+    earningsTimestamp,                 // C2 — raw timestamp for date formatting
+    daysToEarnings,                    // C2 — days remaining (null if unknown)
     volumeQuality: vq,
     spyStage2,
     price,
@@ -7154,6 +7219,8 @@ function _leanEntry(e) {
     stopPct: rd(e.stopPct),
     stopReason: e.stopReason,
     ibdRsRating: e.ibdRsRating,
+    earningsTimestamp: e.earningsTimestamp,
+    daysToEarnings: e.daysToEarnings,
     atrPct: rd(e.atrPct),
     distSma20: rd(e.distSma20),
     distSma50: rd(e.distSma50),
@@ -7593,9 +7660,14 @@ async function runScanSilent() {
     const spyData = await fetchChartWeekly('SPY');
     if (!spyData) throw new Error('SPY fetch failed');
 
+    // Kick off earnings fetch in parallel with chart fetches — it completes
+    // in ~1s for 500 stocks while charts take ~20s, so effectively free.
+    const earningsPromise = fetchEarningsBatch(symbols);
+
     const stocksData = await fetchUniverseInChunks(symbols, (done, tot) => {
       setBannerStatus(`סורק השוק... ${done}/${tot}`);
     });
+    const earningsMap = await earningsPromise;
 
     setBannerStatus('מחשב ציונים...');
     const stocks = computeScores(stocksData, spyData, currentMethodology);
@@ -7605,7 +7677,8 @@ async function runScanSilent() {
       stocks: stocks.map(s => {
         const src = stocksData[s.sym];
         const rsRating = s.rsRating ?? null;  // IBD RS Rating from computeScores
-        const entry = src ? computeEntrySignals(src, spyData, rsRating) : null;
+        const earnTs = earningsMap[s.sym] || null;
+        const entry = src ? computeEntrySignals(src, spyData, rsRating, earnTs) : null;
         return {
           ...s,
           closes:           src?.closes,
@@ -7614,6 +7687,7 @@ async function runScanSilent() {
           dailyHighs:       src?.dailyHighs,
           dailyLows:        src?.dailyLows,
           dailyVolumes:     src?.dailyVolumes,
+          earningsTimestamp: earnTs,
           entry,
           refreshedAt:      Date.now(),
         };
@@ -7678,10 +7752,13 @@ async function runScan() {
 
   // Progress now reflects only stock fetches so the loading text ("185 מניות")
   // matches the denominator the user sees on-screen.
+  // Kick off earnings fetch in parallel — completes in ~1s vs 20s for charts.
+  const earningsPromise = fetchEarningsBatch(symbols);
   const stocksData = await fetchUniverseInChunks(symbols, (done, tot) => {
     $('prog-txt').textContent = `${done} / ${tot}`;
     $('prog-fill').style.width = ((done/tot)*100) + '%';
   });
+  const earningsMap = await earningsPromise;
 
   $('loading-msg').textContent = 'מחשב ציונים רב-פקטוריים...';
   await sleep(50);
@@ -7701,11 +7778,9 @@ async function runScan() {
     // sparkline needs these, and SEPA entry analysis needs highs/lows/volumes.
     stocks: stocks.map(s => {
       const src = stocksData[s.sym];
-      // SEPA entry-timing analysis — passes the raw chart data + SPY for
-      // market context + RS rating (percentile already computed by
-      // computeScores pct-rank infrastructure, store on s.scores).
-      const rsRating = s.rsRating ?? null;  // IBD RS Rating from computeScores
-      const entry = src ? computeEntrySignals(src, spyData, rsRating) : null;
+      const rsRating = s.rsRating ?? null;
+      const earnTs = earningsMap[s.sym] || null;
+      const entry = src ? computeEntrySignals(src, spyData, rsRating, earnTs) : null;
       return {
         ...s,
         closes:           src?.closes,
@@ -7714,6 +7789,7 @@ async function runScan() {
         dailyHighs:       src?.dailyHighs,
         dailyLows:        src?.dailyLows,
         dailyVolumes:     src?.dailyVolumes,
+        earningsTimestamp: earnTs,
         entry,
         refreshedAt:      Date.now(),
       };
@@ -7748,7 +7824,8 @@ async function runScan() {
         sym: s.sym, name: s.name, sector: s.sector, sectorName: s.sectorName,
         subInd: s.subInd, subIndName: s.subIndName,
         score: s.score, scores: s.scores, rank: s.rank,
-        rsRating: s.rsRating,             // IBD RS Rating 1-99 — preserved across refreshes
+        rsRating: s.rsRating,
+        earningsTimestamp: s.earningsTimestamp,    // C2: cached so refresh doesn't lose it
         price: s.price, y1: s.y1, m3: s.m3, m1: s.m1, fromHi: s.fromHi,
         refreshedAt: s.refreshedAt,
         closes: sparkCloses,
@@ -7783,15 +7860,27 @@ async function runScan() {
     try {
       localStorage.setItem(key, payload);
     } catch(quota) {
-      // Quota exceeded — free space by clearing OTHER methodology caches for
-      // this universe (keeping most-recent implicit by writing current one last),
-      // then retry. If it still fails, give up gracefully.
-      console.warn('cache quota hit, purging stale scan caches…');
-      Object.keys(localStorage)
-        .filter(k => k.startsWith('advisor_scan_cache_') && k !== key)
-        .forEach(k => localStorage.removeItem(k));
-      try { localStorage.setItem(key, payload); }
-      catch(e2) { console.warn('cache still too large, skipping save'); }
+      if (!_isQuotaError(quota)) { console.warn('cache save failed:', quota); showResults(); return; }
+      // Quota exceeded — evict OTHER scans one-by-one (oldest first) until
+      // the new payload fits. Does NOT wipe all siblings (the old behavior
+      // nuked entire universe/methodology combos unnecessarily).
+      const candidates = _evictOldestScans(key);
+      let saved = false;
+      for (const c of candidates) {
+        localStorage.removeItem(c.key);
+        try {
+          localStorage.setItem(key, payload);
+          saved = true;
+          console.info(`cache save: evicted ${c.key} to fit new save`);
+          break;
+        } catch(e2) {
+          if (!_isQuotaError(e2)) break;
+        }
+      }
+      if (!saved) {
+        console.warn('cache save: quota exceeded even after eviction');
+        _toast('⚠ Cache מלא — הסריקה הזו לא נשמרה. מחק היסטוריית דפדפן או הפעל ניקוי.', 'error');
+      }
     }
   } catch(e) { console.warn('cache save failed', e); }
   showResults();
@@ -8277,9 +8366,18 @@ function getFilteredStocks() {
     // so desc direction surfaces "קנייה" at the top (what the user wants by
     // default when they click the column).
     if (k === 'entry') {
-      const ar = ENTRY_VERDICT_RANK[a.entry?.verdict] ?? 99;
-      const br = ENTRY_VERDICT_RANK[b.entry?.verdict] ?? 99;
-      // Invert dir so desc = most-attractive first
+      // Primary: verdict rank (attractive=0, prebreakout=1, ...).
+      // Secondary: quality tier — ⭐ perfect beats ✓ good beats plain within
+      // the same verdict. Use a single composite score with verdict*10 +
+      // quality-inverse so "⭐ attractive" (0) < "✓ attractive" (1) <
+      // "plain attractive" (2) < "⭐ prebreakout" (10) < ... etc.
+      const qRank = (s) => {
+        const q = evaluateEntryQuality(s);
+        return q.tier === 'perfect' ? 0 : q.tier === 'good' ? 1 : 2;
+      };
+      const ar = (ENTRY_VERDICT_RANK[a.entry?.verdict] ?? 99) * 10 + qRank(a);
+      const br = (ENTRY_VERDICT_RANK[b.entry?.verdict] ?? 99) * 10 + qRank(b);
+      // Invert dir so desc = best-first (⭐ perfect attractive at top)
       return (ar - br) * -dir;
     }
     const av = a[k], bv = b[k];
@@ -8327,16 +8425,113 @@ const ENTRY_VERDICT_RANK = {
   broken: 7, unknown: 8,
 };
 
+/**
+ * Evaluate a stock's entry against the "Perfect Setup" checklist — 6 stringent
+ * criteria that Minervini considers textbook-quality entry. Applied only to
+ * actionable verdicts (attractive, prebreakout); other verdicts never earn
+ * a quality star (a "perfect distribution" makes no sense).
+ *
+ * Criteria:
+ *   1. TT = 8/8        — perfect Trend Template (not just 7/8)
+ *   2. RS ≥ 80         — high relative strength (not just 70)
+ *   3. Volume confirmed — today ≥ 1.4× 50-day avg
+ *   4. R:R ≥ 3:1       — generous reward-to-risk (not minimum 2:1)
+ *   5. Distrib ≤ 2     — low institutional distribution pressure (weighted)
+ *   6. Pocket Pivot    — O'Neil's institutional accumulation signal
+ *
+ * Tiers:
+ *   - 'perfect' → all 6 pass  → ⭐ in pill
+ *   - 'good'    → 4-5 pass    → ✓ in pill
+ *   - 'none'    → <4 or non-actionable → plain pill
+ */
+function evaluateEntryQuality(s) {
+  const e = s.entry;
+  if (!e) return { tier: 'none', count: 0, total: 6, checks: {} };
+  if (e.verdict !== 'attractive' && e.verdict !== 'prebreakout') {
+    return { tier: 'none', count: 0, total: 6, checks: {} };
+  }
+
+  const checks = {
+    tt:     e.trendTemplate?.points >= 8,
+    rs:     (e.ibdRsRating ?? 0) >= 80,
+    volume: e.volumeQuality?.breakoutConfirmed === true,
+    rr:     (() => {
+      if (!e.price || !e.structuralStop || !e.pivot || !e.stopPct) return false;
+      const entry = e.verdict === 'attractive' ? e.price : e.pivot;
+      const risk = entry - e.structuralStop;
+      if (risk <= 0) return false;
+      const reward1 = (e.pivot * 1.20) - entry;
+      if (reward1 <= 0) return false;
+      return (reward1 / risk) >= 3;
+    })(),
+    distrib:     (e.volumeQuality?.weightedDistrib ?? 99) <= 2
+              && (e.volumeQuality?.distribDays    ?? 99) <= 3,
+    pocketPivot: e.volumeQuality?.pocketPivot === true,
+  };
+  const count = Object.values(checks).filter(Boolean).length;
+  const tier = count === 6 ? 'perfect' : count >= 4 ? 'good' : 'none';
+  return { tier, count, total: 6, checks };
+}
+
 function renderEntryPill(s) {
   const v = s.entry?.verdict || 'unknown';
   const m = ENTRY_PILL_META[v] || ENTRY_PILL_META.unknown;
+  const quality = evaluateEntryQuality(s);
+
+  // Tooltip — base info + quality breakdown when a badge is shown
   const tipParts = [];
   if (s.entry?.label) tipParts.push(s.entry.label);
   if (s.entry?.setup?.label) tipParts.push(`Setup: ${s.entry.setup.label}`);
   if (s.entry?.trendTemplate) tipParts.push(`TT: ${s.entry.trendTemplate.points}/8`);
-  const tip = tipParts.join(' · ');
+  if (quality.tier !== 'none') {
+    tipParts.push('');  // spacer
+    tipParts.push(`איכות Setup: ${quality.count}/${quality.total} תנאים`);
+    const labels = {
+      tt:          'TT מושלם 8/8',
+      rs:          'RS ≥ 80',
+      volume:      'Volume מאשר (1.4×+)',
+      rr:          'R:R ≥ 3:1',
+      distrib:     'distribution ≤ 3 ימים',
+      pocketPivot: 'Pocket Pivot',
+    };
+    for (const [k, pass] of Object.entries(quality.checks)) {
+      tipParts.push(`${pass ? '✓' : '✗'} ${labels[k]}`);
+    }
+  }
+  const tip = tipParts.join('\n');
   const tipAttr = tip ? ` title="${tip.replace(/"/g, '&quot;')}"` : '';
-  return `<span class="epl ${m.cls}"${tipAttr}>${m.label}</span>`;
+
+  // Quality prefix inside the pill
+  let prefix = '';
+  let pillExtraCls = '';
+  if (quality.tier === 'perfect') {
+    prefix = '<span class="epl-star">⭐</span>';
+    pillExtraCls = ' epl-perfect';
+  } else if (quality.tier === 'good') {
+    prefix = '<span class="epl-check">✓</span>';
+    pillExtraCls = ' epl-good';
+  }
+
+  return `<span class="epl ${m.cls}${pillExtraCls}"${tipAttr}>${prefix}${m.label}</span>`;
+}
+
+/**
+ * Compact earnings badge for the picks table — appears next to the entry pill
+ * when a stock's earnings report is within 10 days. Hovering shows the exact
+ * date. Colored red (urgent) for ≤5 days, amber (approaching) for 6-10 days.
+ */
+function renderEarningsBadge(s) {
+  const d = s.entry?.daysToEarnings;
+  if (d == null || d > 10) return '';
+  const cls = d <= 5 ? 'earnings-badge-urgent' : 'earnings-badge-approaching';
+  const ts = s.earningsTimestamp || s.entry?.earningsTimestamp;
+  let tip = `דוח רווחים ב-${d} ${d === 1 ? 'יום' : 'ימים'}`;
+  if (ts) {
+    const date = new Date(ts * 1000);
+    const dateStr = date.toLocaleDateString('he-IL', { weekday: 'short', month: 'short', day: 'numeric' });
+    tip += ` · ${dateStr}`;
+  }
+  return `<span class="earnings-badge ${cls}" title="${tip.replace(/"/g, '&quot;')}">📅 ${d}d</span>`;
 }
 
 function renderTable() {
@@ -8423,7 +8618,7 @@ function renderTable() {
         <td class="subsec hide-m">${s.subIndName || '—'}</td>
         <td><span class="score ${scoreClassStr}">${scoreDisplay}</span></td>
         <td class="hide-m">${s.scores ? renderFactorBars(s.scores) : '<span style="color:var(--dimmer);font-size:10px">—</span>'}</td>
-        <td class="hide-m entry-cell-td">${renderEntryPill(s)}</td>
+        <td class="hide-m entry-cell-td">${renderEntryPill(s)}${renderEarningsBadge(s)}</td>
         <td class="num hide-m">$${fmt(s.price)}</td>
         <td class="num pct ${pctCls(s.y1)}">${fmtPct(s.y1)}</td>
         <td class="num pct hide-m ${pctCls(s.m3)}">${fmtPct(s.m3)}</td>
@@ -8958,6 +9153,17 @@ function renderEntrySection(s) {
     <div class="dt-section">
       <div class="dt-section-title">ניתוח כניסה · SEPA (Minervini)</div>
 
+      ${e.daysToEarnings != null && e.daysToEarnings <= 10 ? `
+        <div class="entry-earnings-banner entry-earnings-${e.daysToEarnings <= 5 ? 'urgent' : 'approaching'}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <div class="entry-earnings-text">
+            ${e.daysToEarnings <= 5
+              ? `<b>דוח רווחים ב-${e.daysToEarnings} ${e.daysToEarnings === 1 ? 'יום' : 'ימים'}</b> — Minervini: אסור להיכנס בתוך 5 ימים מדוח. גאפ של 20%+ overnight אפשרי בלי קשר ל-setup.`
+              : `דוח רווחים בעוד ${e.daysToEarnings} ימים. אם נכנסים עכשיו, צפה להחליט האם לסגור לפני הדוח או לרכוב דרכו.`}
+          </div>
+        </div>
+      ` : ''}
+
       <div class="entry-verdict ${meta.cls}">
         <div class="entry-verdict-icon">${meta.icon}</div>
         <div class="entry-verdict-text">
@@ -9057,6 +9263,14 @@ function renderEntrySection(s) {
               כמה דולר פוטנציאל רווח על כל דולר בסיכון.
             </p>
 
+            <h4>למי מיועד התכנון הזה?</h4>
+            <p>
+              <b>קניית מניות רגילות (long equity)</b> — לא אופציות, לא short, לא futures.
+              Minervini SEPA היא מתודולוגיית <b>swing trading</b> של 4-8 שבועות על מניות
+              אמריקאיות בודדות ב-Stage 2. כל החישובים (stop מתחת למחיר, יעדים מעל,
+              1% position sizing) מניחים את ההקשר הזה.
+            </p>
+
             <h4>1. מחיר כניסה</h4>
             <p>תלוי במצב ה-verdict של SEPA:</p>
             <ul>
@@ -9118,6 +9332,73 @@ Risk   = $102 − $93 = $9  (8.8%)
 יעד 2  = $100 × 1.50 = $150  → Reward $48  → R:R 5.3:1</pre>
           </div>
         </details>
+
+        <details class="entry-plan-explain">
+          <summary>מה עושים אחרי הקנייה? (אסטרטגיית יציאה)</summary>
+          <div class="entry-plan-explain-body">
+            <p>
+              Minervini <b>לא מוכר את כל הפוזיציה</b> ביעד 1 או יעד 2 — זו טעות
+              נפוצה. הגישה שלו היא <b>progressive profit-taking</b>: נעילת
+              רווחים בדרך, עם שמירה על חלק "runner" שיכול לתפוס זנב גדול.
+            </p>
+
+            <h4>ביעד 1 (+20%)</h4>
+            <ul>
+              <li>מוכרים <b>1/3 עד 1/2</b> מהפוזיציה — נעילת רווח ראשונית</li>
+              <li>מעלים את ה-stop ל-<b>breakeven</b> (מחיר הכניסה) על השאר —
+                  מכאן העסקה ללא סיכון, לא יתכן שתפסיד</li>
+              <li>שאר הפוזיציה ממשיכה לרוץ</li>
+            </ul>
+
+            <h4>ביעד 2 (+50%)</h4>
+            <ul>
+              <li>מוכרים חלק נוסף (עוד 1/3 בערך)</li>
+              <li>מעלים trailing stop מתחת ל-swing low האחרון</li>
+              <li>חלק קטן נשאר לרוץ לזנב ארוך</li>
+            </ul>
+
+            <h4>יציאה מלאה — כשהמבנה נשבר</h4>
+            <p>
+              ה-"runner" שנשאר לא יוצא ביעד מחיר קבוע — הוא יוצא כשהטרנד נשבר
+              בפועל. המערכת מנטרת אותו דרך ה-<b>סקשן "אותות יציאה"</b> (מוצג
+              רק למניות ברשימה שלך). הסקשן בודק 4 תנאים:
+            </p>
+            <ol>
+              <li><b>Swing low אחרון</b> — נשבר → structural breakdown, יציאה מיידית
+                  (הכי מוקדם — לא מחכה שה-MA נשבר)</li>
+              <li><b>מעל SMA40</b> — נשבר → Stage 4 מתחיל לפי Weinstein</li>
+              <li><b>עדיין בטופ 50 של הסריקה</b> — נפל → מומנטום התרוקן</li>
+              <li><b>תשואת 12 חודשים חיובית</b> — שלילית → חולשה ארוכת טווח (Antonacci)</li>
+            </ol>
+            <p>
+              <b>4/4 = חזק</b> (החזק), <b>3/4 = זהירות</b>,
+              <b>≤2/4 = יציאה</b> (סגור הכל).
+            </p>
+
+            <h4>תרחיש שלם לדוגמה</h4>
+            <p>קנית 100 מניות ב-$100 עם stop $93 (Risk: $700).</p>
+            <pre>$120 (יעד 1):  מכור 50 → נעל $1,000 רווח
+               stop → $100 (breakeven) על 50 שנותרו
+$150 (יעד 2):  מכור 30 → נעל עוד $1,500
+               trailing stop מתחת ל-swing low אחרון
+$180 (runner): 20 מניות ממשיכות לרוץ...
+$162:          swing low נשבר → מוכרים הכל
+               סה"כ: $1,000 + $1,500 + 20×($162−$100)
+                    = $3,740 רווח (535% ROI על $700 סיכון)</pre>
+
+            <h4>ההבדל בין "תכנון עסקה" ל-"אותות יציאה"</h4>
+            <ul>
+              <li><b>תכנון עסקה</b> — <i>לפני</i> הכניסה. עוזר להחליט אם להיכנס
+                  (R:R, stop, יעדים).</li>
+              <li><b>אותות יציאה</b> — <i>אחרי</i> הכניסה. עוזר להחליט מתי לצאת
+                  מה-runner שנשאר (מבנה, MA, מומנטום).</li>
+            </ul>
+            <p>
+              שניהם משלימים: תכנון נותן לך כניסה ויעדים חלקיים, אותות יציאה
+              אומרים לך מתי הטרנד כבר לא תקף.
+            </p>
+          </div>
+        </details>
       </div>
       ` : ''}
 
@@ -9125,7 +9406,7 @@ Risk   = $102 − $93 = $9  (8.8%)
       ${marketNote ? `<div class="entry-market">${marketNote}</div>` : ''}
 
       <div class="entry-disclaimer">
-        SEPA היא מתודולוגיה סטטיסטית — אין כאן הבטחה. Stops הדוקים והקטנת חשיפה בזמן broad markets weakness הם חלק בלתי נפרד מהמסגרת.
+        <b>SEPA היא מתודולוגיה של קניית מניות long ב-swing trading</b> (4-8 שבועות) — לא אופציות, לא shorts. כל החישובים (stop מתחת למחיר, יעדים מעל, position sizing לפי 1% risk) מניחים את זה. המתודולוגיה סטטיסטית — אין כאן הבטחה. Stops הדוקים והקטנת חשיפה בזמן broad markets weakness הם חלק בלתי נפרד מהמסגרת.
       </div>
     </div>`;
 }
@@ -9179,10 +9460,11 @@ async function scanWatchlistStandalone() {
   console.info(`standalone watchlist scan: ${symbols.length} symbols`);
 
   try {
-    // SPY is the benchmark. Parallel with the watchlist fetches.
-    const [spyData, stocksData] = await Promise.all([
+    // SPY is the benchmark. Parallel with the watchlist fetches + earnings.
+    const [spyData, stocksData, earningsMap] = await Promise.all([
       fetchChartWeekly('SPY'),
       fetchUniverseInChunks(symbols, () => {}),
+      fetchEarningsBatch(symbols),
     ]);
     if (!spyData) throw new Error('SPY fetch failed');
 
@@ -9246,7 +9528,8 @@ async function scanWatchlistStandalone() {
         dailyHighs: chartData.dailyHighs,
         dailyLows: chartData.dailyLows,
         dailyVolumes: chartData.dailyVolumes,
-        entry: computeEntrySignals(chartData, spyData, null),
+        earningsTimestamp: earningsMap[sym] || null,
+        entry: computeEntrySignals(chartData, spyData, null, earningsMap[sym] || null),
         refreshedAt: now,
       });
     }
@@ -9351,10 +9634,13 @@ async function handleAddSymbol() {
 
   try {
     // Validate by fetching a weekly chart. No data → bad ticker.
-    const [chartData, spyData] = await Promise.all([
+    // Also fetch earnings for this one symbol (single-item batch — fast).
+    const [chartData, spyData, earnMap] = await Promise.all([
       fetchChartWeekly(sym),
-      scanData ? null : fetchChartWeekly('SPY'),   // only fetch SPY if we don't have a scan
+      scanData ? null : fetchChartWeekly('SPY'),
+      fetchEarningsBatch([sym]),
     ]);
+    const earnTs = earnMap[sym] || null;
 
     if (!chartData || !chartData.closes || chartData.closes.length < 10) {
       msgEl.className = 'auth-msg auth-msg-err';
@@ -9417,7 +9703,8 @@ async function handleAddSymbol() {
           existing.dailyHighs = chartData.dailyHighs;
           existing.dailyLows = chartData.dailyLows;
           existing.dailyVolumes = chartData.dailyVolumes;
-          existing.entry = computeEntrySignals(chartData, spy, null);
+          existing.earningsTimestamp = earnTs;
+          existing.entry = computeEntrySignals(chartData, spy, null, earnTs);
           existing.refreshedAt = Date.now();
         } else {
           scanData.stocks.push({
@@ -9444,7 +9731,8 @@ async function handleAddSymbol() {
             dailyHighs: chartData.dailyHighs,
             dailyLows: chartData.dailyLows,
             dailyVolumes: chartData.dailyVolumes,
-            entry: computeEntrySignals(chartData, spy, null),
+            earningsTimestamp: earnTs,
+            entry: computeEntrySignals(chartData, spy, null, earnTs),
             refreshedAt: Date.now(),
           });
         }
@@ -9504,9 +9792,10 @@ async function refreshWatchlist() {
   if (bannerText) bannerText.textContent = `מרענן ${symbolsToRefresh.length} מניות...`;
 
   try {
-    const [spyData, stocksData] = await Promise.all([
+    const [spyData, stocksData, earningsMap] = await Promise.all([
       fetchChartWeekly('SPY'),
       fetchUniverseInChunks(symbolsToRefresh, () => {}),
+      fetchEarningsBatch(symbolsToRefresh),
     ]);
 
     if (!spyData) throw new Error('SPY fetch failed');
@@ -9567,7 +9856,8 @@ async function refreshWatchlist() {
       stock.dailyHighs = chartData.dailyHighs;
       stock.dailyLows = chartData.dailyLows;
       stock.dailyVolumes = chartData.dailyVolumes;
-      stock.entry = computeEntrySignals(chartData, spyData, stock.rsRating ?? null);
+      stock.earningsTimestamp = earningsMap[sym] || null;
+      stock.entry = computeEntrySignals(chartData, spyData, stock.rsRating ?? null, stock.earningsTimestamp);
       stock.refreshedAt = now;
       refreshedCount++;
     }
@@ -9592,38 +9882,135 @@ async function refreshWatchlist() {
 /** Write the current scanData to localStorage. Centralized so handleAddSymbol
     and refreshWatchlist write exactly the same shape, preventing divergent
     cache formats. */
+/** Build the persistent scan payload — shared by save + eviction retry. */
+function _buildScanPayload() {
+  return JSON.stringify({
+    timestamp: scanData.timestamp,
+    universeSize: scanData.universeSize,
+    methodology: scanData.methodology,
+    universe: scanData.universe,
+    watchlistOnly: scanData.watchlistOnly,
+    stocks: scanData.stocks.map(s => {
+      const full = s.closes || null;
+      const sparkCloses = full && full.length > 0
+        ? full.slice(-52).map(v => Math.round(v * 100) / 100)
+        : null;
+      const dailySrc = s.dailyCloses || null;
+      const leanDaily = dailySrc && dailySrc.length > 0
+        ? dailySrc.slice(-280).map(v => Math.round(v * 100) / 100)
+        : null;
+      return {
+        sym: s.sym, name: s.name, sector: s.sector, sectorName: s.sectorName,
+        subInd: s.subInd, subIndName: s.subIndName,
+        score: s.score, scores: s.scores, rank: s.rank,
+        rsRating: s.rsRating,
+        earningsTimestamp: s.earningsTimestamp,
+        price: s.price, y1: s.y1, m3: s.m3, m1: s.m1, fromHi: s.fromHi,
+        refreshedAt: s.refreshedAt,
+        closes: sparkCloses,
+        dailyCloses: leanDaily,
+        metrics: s.metrics,
+        entry: _leanEntry(s.entry),
+      };
+    }),
+  });
+}
+
+/** Evict the oldest OTHER scan caches (different universe/methodology combos)
+    to make room for a new save. Returns the number of caches removed.
+    Called only when localStorage.setItem throws QuotaExceededError. */
+function _evictOldestScans(currentKey) {
+  const mine = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !k.startsWith(CACHE_KEY_BASE + '_') || k === currentKey) continue;
+    try {
+      const v = JSON.parse(localStorage.getItem(k));
+      if (v && typeof v.timestamp === 'number') {
+        mine.push({ key: k, ts: v.timestamp });
+      }
+    } catch(e) { mine.push({ key: k, ts: 0 }); }  // unparsable → evict first
+  }
+  // Sort oldest first, then evict one at a time (caller retries after each)
+  mine.sort((a, b) => a.ts - b.ts);
+  return mine;
+}
+
+/** Save the scan payload to localStorage. On quota-exceeded, evict oldest
+    caches of OTHER universes one-by-one and retry. If eviction runs out of
+    candidates and save still fails, warn the user via a toast so they know
+    why previously-scanned universes may appear empty. */
 function persistScanData() {
   if (!scanData) return;
+  const key = getCacheKey();
+  const payload = _buildScanPayload();
+
+  // First try — fast path
   try {
-    localStorage.setItem(getCacheKey(), JSON.stringify({
-      timestamp: scanData.timestamp,
-      universeSize: scanData.universeSize,
-      methodology: scanData.methodology,
-      universe: scanData.universe,
-      watchlistOnly: scanData.watchlistOnly,
-      stocks: scanData.stocks.map(s => {
-        const full = s.closes || null;
-        const sparkCloses = full && full.length > 0
-          ? full.slice(-52).map(v => Math.round(v * 100) / 100)  // matches the full-scan cache retention
-          : null;
-        const dailySrc = s.dailyCloses || null;
-        const leanDaily = dailySrc && dailySrc.length > 0
-          ? dailySrc.slice(-280).map(v => Math.round(v * 100) / 100)
-          : null;
-        return {
-          sym: s.sym, name: s.name, sector: s.sector, sectorName: s.sectorName,
-          subInd: s.subInd, subIndName: s.subIndName,
-          score: s.score, scores: s.scores, rank: s.rank,
-          price: s.price, y1: s.y1, m3: s.m3, m1: s.m1, fromHi: s.fromHi,
-          refreshedAt: s.refreshedAt,
-          closes: sparkCloses,
-          dailyCloses: leanDaily,
-          metrics: s.metrics,
-          entry: _leanEntry(s.entry),
-        };
-      }),
-    }));
-  } catch(e) { console.warn('persistScanData failed:', e); }
+    localStorage.setItem(key, payload);
+    return;
+  } catch(e) {
+    if (!_isQuotaError(e)) {
+      console.warn('persistScanData failed (non-quota):', e);
+      return;
+    }
+  }
+
+  // Quota hit — evict oldest scans from other universes until we fit
+  const candidates = _evictOldestScans(key);
+  let evicted = 0;
+  for (const c of candidates) {
+    localStorage.removeItem(c.key);
+    evicted++;
+    try {
+      localStorage.setItem(key, payload);
+      console.info(`persistScanData: evicted ${evicted} old scan(s) to fit new save`);
+      return;
+    } catch(e) {
+      if (!_isQuotaError(e)) { console.warn('persistScanData retry failed:', e); return; }
+    }
+  }
+
+  // Final failure — user has a scan that won't persist. Tell them.
+  console.warn('persistScanData: quota exceeded even after evicting all old scans');
+  _toast('⚠ Cache מלא — הסריקה הנוכחית לא נשמרה. מחק היסטוריית דפדפן או נקה קבצים זמניים.', 'error');
+}
+
+/** Detect QuotaExceededError across browsers — name/code vary by engine. */
+function _isQuotaError(e) {
+  return e && (
+    e.name === 'QuotaExceededError' ||
+    e.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+    e.code === 22 || e.code === 1014
+  );
+}
+
+/** Light-weight transient toast — bottom-right, 5s auto-dismiss. */
+function _toast(msg, kind) {
+  let container = document.getElementById('_toast_container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = '_toast_container';
+    container.style.cssText = 'position:fixed;bottom:20px;left:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;max-width:360px;pointer-events:none';
+    document.body.appendChild(container);
+  }
+  const t = document.createElement('div');
+  t.style.cssText = `
+    pointer-events:auto;padding:10px 14px;border-radius:7px;
+    background:${kind==='error'?'rgba(228,108,108,.15)':'var(--bg3)'};
+    color:${kind==='error'?'var(--red)':'var(--text)'};
+    border:1px solid ${kind==='error'?'rgba(228,108,108,.35)':'var(--border)'};
+    font-size:12px;line-height:1.5;
+    box-shadow:0 4px 12px rgba(0,0,0,.3);
+    animation:toast-in .25s ease-out;
+  `;
+  t.textContent = msg;
+  container.appendChild(t);
+  setTimeout(() => {
+    t.style.transition = 'opacity .3s';
+    t.style.opacity = '0';
+    setTimeout(() => t.remove(), 300);
+  }, 5000);
 }
 
 /** Render the small status-bar banner that appears ABOVE the table when the
@@ -9771,6 +10158,18 @@ function openDetail(sym) {
         <div class="dt-score-desc">${s.sectorName || '—'} · $${fmt(s.price)} · ${fmtPct(s.y1)} שנתי</div>
         ${s.subIndName ? `<div class="dt-score-subind">${s.subIndName}</div>` : ''}
       </div>
+      <details class="hero-info" ontoggle="loadCompanyInfoInline('${s.sym}', this)">
+        <summary>
+          <svg class="hero-info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span>אודות החברה</span>
+        </summary>
+        <div class="hero-info-body" data-loaded="0">
+          <div class="hero-info-loading">
+            <div class="mini-ring" style="margin:0 auto 8px"></div>
+            <div>טוען...</div>
+          </div>
+        </div>
+      </details>
     </div>
 
     ${hasScores ? `
@@ -9805,6 +10204,62 @@ function openDetail(sym) {
           `;
         }).join('')}
       </div>
+
+      <details class="entry-plan-explain" style="margin-top:10px">
+        <summary>מה זה הציון ${s.score ?? ''}? ומה הוא אומר?</summary>
+        <div class="entry-plan-explain-body">
+          <p>
+            הציון <b>${s.score ?? '—'}/100</b> הוא <b>דירוג פרצנטילי יחסי</b>
+            — דירוג של המניה הזו ביחס לשאר ${scanData.universeSize ?? '—'} המניות
+            ביקום הנסרק (${currentUniverse}), לפי מודל <b>${METHODOLOGIES[currentMethodology].label}</b>.
+          </p>
+
+          <h4>איך לקרוא את המספר</h4>
+          <ul>
+            <li><b>${s.score ?? 0}/100</b> = המניה ב-<b>${s.score != null ? (100 - s.score) : '?'}%</b> העליונים של היקום לפי הקריטריונים של המודל.</li>
+            <li>${s.rank != null ? `מיקום #${s.rank} מתוך ${scanData.universeSize ?? '?'}` : 'אין דירוג (מניה שנוספה ידנית ללא סריקה מלאה)'}</li>
+            <li>הציון מורכב מ-${METHODOLOGIES[currentMethodology].factors.length} פקטורים משוקללים (ראה "פירוט פקטורים" מעל).</li>
+          </ul>
+
+          <h4>⚠️ מה הציון <u>לא</u> אומר</h4>
+          <ul>
+            <li><b>לא "קנה"</b> — מניה עם ציון 100 יכולה להיות מתוחה מדי לכניסה.
+                עמודת "כניסה" (SEPA) היא שמכריעה "האם לקנות עכשיו?".</li>
+            <li><b>לא אבסולוטי</b> — ב-Bear Market יכולה להיות מניה עם ציון 95 שעלתה רק 5%.
+                הציון משקף "הכי טובה מבין החלשות", לא "מניה מעולה".</li>
+            <li><b>תלוי מודל</b> — אותה מניה תקבל ציון שונה ב-Momentum מול Reversion
+                מול Weinstein. החלפת מודל משנה את כל הציונים.</li>
+            <li><b>תלוי יקום</b> — במעבר מ-S&P 500 ל-NASDAQ 100, המיקום היחסי של
+                המניה משתנה (NDX הוא universe של חזקים).</li>
+          </ul>
+
+          <h4>איך להשתמש בציון בצורה נכונה</h4>
+          <ol>
+            <li><b>שלב 1 — סינון ראשוני:</b> הציון הוא "איזה סיכוי יש שהמניה הזו
+                עובדת עם הסגנון שלי כרגע". ציון 70+ = יש תנאים בסיסיים טובים.</li>
+            <li><b>שלב 2 — בדיקת כניסה:</b> הציון לא מספיק. תסתכל ב-"כניסה" (SEPA)
+                — האם היא באמת בנקודת כניסה טובה? 🟢 קנייה / 🔵 בבסיס = אטרקטיבי.</li>
+            <li><b>שלב 3 — חישוב R:R:</b> פתח את "תכנון עסקה" ובדוק שה-R:R ≥ 2:1
+                לפחות. עדיף 3:1+.</li>
+            <li><b>שלב 4 — מצב שוק:</b> ודא שה-market context ב-SEPA תקין (SPY ב-Stage 2).</li>
+          </ol>
+
+          <h4>דוגמה להמחשה</h4>
+          <p>
+            נניח שתי מניות בחיפוש שלך:
+          </p>
+          <ul>
+            <li><b>מניה A:</b> ציון 100, verdict 🟠 <b>מתוח</b> — עלתה 250% בשנה,
+                אין setup קלאסי כרגע. <b>אל תקנה.</b></li>
+            <li><b>מניה B:</b> ציון 72, verdict 🟢 <b>קנייה</b> — בתוך VCP 8-שבועות,
+                ב-buy zone, R:R 3.5:1. <b>הכניסה הנכונה.</b></li>
+          </ul>
+          <p>
+            למרות שמניה A "מנצחת" בציון, מניה B היא העסקה הטובה יותר — כי הציון לבד
+            לא מכיל את המימד הטיימינג.
+          </p>
+        </div>
+      </details>
     </div>
     ` : ''}
 
@@ -9883,6 +10338,228 @@ function closeDetail(e) {
 }
 function closeDetailDirect() {
   $('dt-overlay').classList.remove('open');
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   COMPANY INFO MODAL
+   Fetches company info from multiple sources in parallel:
+     1. Wikipedia (Hebrew, then English fallback) — for the narrative summary
+     2. Yahoo v7/quote — for structured metadata (industry, sector, employees)
+
+   We use Wikipedia's REST API because Yahoo's quoteSummary endpoint — which
+   would be the natural source for business descriptions — requires a
+   crumb/cookie authentication that our proxy doesn't implement. Wikipedia
+   has no auth, no CORS issues, and often has Hebrew content for the larger
+   companies. Its summaries are also *more readable* than Yahoo's marketing
+   copy — 2-3 sentences that answer "what does this company do?" directly.
+
+   Caching strategy: 7-day localStorage TTL. Descriptions rarely change.
+   ══════════════════════════════════════════════════════════════════════════ */
+const INFO_CACHE_KEY = 'company_info_cache_v3';     // bumped: name-variant search
+const INFO_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;  // 7 days
+
+function _loadInfoCache() {
+  try { return JSON.parse(localStorage.getItem(INFO_CACHE_KEY)) || {}; }
+  catch { return {}; }
+}
+function _saveInfoCache(cache) {
+  try { localStorage.setItem(INFO_CACHE_KEY, JSON.stringify(cache)); }
+  catch(e) { /* quota — keep in-memory copy for the session */ }
+}
+
+/** Generate a list of name variants to try against Wikipedia, most-specific
+    first. Stops at the first successful match. Handles common cases:
+      - "Alphabet Inc. (Class C)" → strip parenthetical suffix
+      - "Meta Platforms, Inc." → strip commas + legal suffix
+      - "JPMorgan Chase & Co." → strip legal suffix
+      - Plain ticker as last resort */
+function _nameVariants(name, sym) {
+  const variants = new Set();
+  if (name && name !== sym && name !== '—') {
+    variants.add(name);
+    // Strip parenthetical suffix: "Alphabet Inc. (Class C)" → "Alphabet Inc."
+    const noParen = name.replace(/\s*\([^)]*\)\s*$/, '').trim();
+    if (noParen && noParen !== name) variants.add(noParen);
+    // Strip legal suffixes: "Alphabet Inc." → "Alphabet"; "Meta Platforms, Inc." → "Meta Platforms"
+    const legalSuffixRegex = /,?\s*(Inc\.?|Corp\.?|Corporation|Co\.?|Company|Ltd\.?|Limited|LLC|plc|PLC|SA|AG|NV|Holdings|Group|Trust|Partners|LP)\.?\s*$/i;
+    let stripped = noParen || name;
+    let prev;
+    do {
+      prev = stripped;
+      stripped = stripped.replace(legalSuffixRegex, '').trim();
+    } while (stripped !== prev);
+    // Also strip trailing "& Co", "& Sons", etc.
+    stripped = stripped.replace(/\s*&\s*(Co|Sons|Company)\.?\s*$/i, '').trim();
+    if (stripped && stripped !== noParen && stripped !== name) variants.add(stripped);
+  }
+  return Array.from(variants);
+}
+
+/** Fetch a Wikipedia summary by exact title. Returns { extract, url, lang }
+    on success, null if the article doesn't exist. Unauthenticated — no CORS
+    issues (Wikipedia sets proper headers).
+    @param {string} title  - Page title (or query). Spaces OK — will be encoded.
+    @param {string} lang   - 'he' or 'en' */
+async function _fetchWikipediaSummary(title, lang) {
+  try {
+    const url = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const d = await r.json();
+    // Disambiguation pages and "no content" entries don't have an extract.
+    // Also filter out REDIRECT responses with no actual content.
+    if (!d.extract || d.type === 'disambiguation') return null;
+    return {
+      extract: d.extract,
+      url: d.content_urls?.desktop?.page || `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(title)}`,
+      lang,
+      thumbnail: d.thumbnail?.source || null,
+    };
+  } catch(e) { return null; }
+}
+
+/** Try a sequence of Wikipedia queries across languages and name variants,
+    return the first successful match. Hebrew is preferred (first tier),
+    English is fallback. */
+async function _wikipediaMultiQuery(variants) {
+  // First pass: all variants in Hebrew
+  for (const v of variants) {
+    const res = await _fetchWikipediaSummary(v, 'he');
+    if (res) return res;
+  }
+  // Second pass: all variants in English
+  for (const v of variants) {
+    const res = await _fetchWikipediaSummary(v, 'en');
+    if (res) return res;
+  }
+  return null;
+}
+
+/** Fetch Yahoo v7/quote — works without auth (unlike v10/quoteSummary). Used
+    for the structured metadata in the info modal (industry, sector, employees). */
+async function _fetchYahooQuoteMeta(sym) {
+  try {
+    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${sym}`;
+    const r = await fetch(`${PROXY}/?url=${encodeURIComponent(url)}`);
+    if (!r.ok) return null;
+    const d = await r.json();
+    const q = d.quoteResponse?.result?.[0];
+    if (!q) return null;
+    return {
+      longName: q.longName || q.shortName || null,
+      quoteType: q.quoteType || null,
+      sector: q.sector || null,      // may or may not be present — varies by symbol
+      industry: q.industry || null,
+    };
+  } catch(e) { return null; }
+}
+
+async function fetchCompanyInfo(sym, displayName) {
+  const cache = _loadInfoCache();
+  const entry = cache[sym];
+  if (entry && (Date.now() - entry.fetchedAt) < INFO_CACHE_TTL) {
+    return entry.data;
+  }
+
+  // Kick off Yahoo metadata in parallel — we use it both for the info panel
+  // AND (if needed) as an alternate name source for Wikipedia.
+  const yahooPromise = _fetchYahooQuoteMeta(sym);
+
+  // First-pass name variants derived from the display name ("Alphabet Inc.
+  // (Class C)" → ["Alphabet Inc. (Class C)", "Alphabet Inc.", "Alphabet"])
+  const firstPassVariants = _nameVariants(displayName, sym);
+  let wiki = await _wikipediaMultiQuery(firstPassVariants);
+
+  // Second-pass: if nothing matched, try Yahoo's longName (which may differ —
+  // e.g. "Alphabet Inc." vs the display "Alphabet Inc. (Class C)")
+  const yahooMeta = await yahooPromise;
+  if (!wiki && yahooMeta?.longName) {
+    const secondPassVariants = _nameVariants(yahooMeta.longName, sym)
+      .filter(v => !firstPassVariants.includes(v));    // skip already-tried
+    if (secondPassVariants.length) {
+      wiki = await _wikipediaMultiQuery(secondPassVariants);
+    }
+  }
+
+  const data = {
+    description: wiki?.extract || null,
+    descriptionLang: wiki?.lang || null,
+    descriptionUrl: wiki?.url || null,
+    longName: yahooMeta?.longName || null,
+    sector: yahooMeta?.sector || null,
+    industry: yahooMeta?.industry || null,
+    quoteType: yahooMeta?.quoteType || null,
+  };
+
+  // Only cache if we got SOMETHING useful (else we'd cache empty results
+  // and users couldn't retry by refreshing)
+  if (data.description || data.sector || data.industry) {
+    cache[sym] = { data, fetchedAt: Date.now() };
+    _saveInfoCache(cache);
+  }
+  return data;
+}
+
+/** Lazy loader for the inline "אודות החברה" collapsible inside the score-hero.
+    Triggered by the <details> element's ontoggle event. Fetches once, caches
+    by marking data-loaded=1 on the body div. Subsequent toggles just show/hide
+    the already-loaded content. */
+async function loadCompanyInfoInline(sym, detailsEl) {
+  if (!detailsEl.open) return;                    // only load on expand
+  const bodyDiv = detailsEl.querySelector('.hero-info-body');
+  if (!bodyDiv || bodyDiv.dataset.loaded === '1') return;
+
+  // Find the stock's display name — we need it for Wikipedia queries
+  const stock = scanData?.stocks?.find(s => s.sym === sym);
+  const name = stock?.name || sym;
+
+  const info = await fetchCompanyInfo(sym, name);
+  bodyDiv.dataset.loaded = '1';
+
+  if (!info || (!info.description && !info.sector && !info.industry)) {
+    bodyDiv.innerHTML = `
+      <div class="hero-info-empty">
+        לא נמצאו פרטי חברה עבור <b>${sym}</b>.
+        <br><a href="https://finance.yahoo.com/quote/${sym}/profile" target="_blank" rel="noopener">
+          בדוק ב-Yahoo Finance ↗
+        </a>
+      </div>`;
+    return;
+  }
+  bodyDiv.innerHTML = renderCompanyInfoInline(sym, name, info);
+}
+
+/** Inline version of the company info render — adapted for the narrow
+    score-hero context (no section titles, tighter spacing). */
+function renderCompanyInfoInline(sym, name, info) {
+  const isHebrew = info.descriptionLang === 'he';
+  const metaChips = [];
+  if (info.sector)   metaChips.push(info.sector);
+  if (info.industry) metaChips.push(info.industry);
+
+  return `
+    ${info.longName && info.longName !== name ? `
+      <div class="hero-info-longname">${info.longName}</div>
+    ` : ''}
+    ${metaChips.length ? `
+      <div class="hero-info-chips">
+        ${metaChips.map(c => `<span class="hero-info-chip">${c}</span>`).join('')}
+      </div>
+    ` : ''}
+    ${info.description ? `
+      <p class="hero-info-desc ${isHebrew ? 'hero-info-desc-he' : 'hero-info-desc-en'}">${info.description}</p>
+    ` : ''}
+    <div class="hero-info-links">
+      ${info.descriptionUrl ? `
+        <a href="${info.descriptionUrl}" target="_blank" rel="noopener" class="hero-info-link">
+          ${isHebrew ? 'Wikipedia (עברית)' : 'Wikipedia (English)'} ↗
+        </a>
+      ` : ''}
+      <a href="https://finance.yahoo.com/quote/${sym}/profile" target="_blank" rel="noopener" class="hero-info-link">
+        Yahoo Finance ↗
+      </a>
+    </div>
+  `;
 }
 
 function renderMiniChart(closes) {
@@ -10781,6 +11458,7 @@ document.addEventListener('keydown', e => {
     toggleCdd, selectSector, sortBy, applyFilters,
     openMethodology, closeMethodology, closeMethodologyDirect,
     openDetail, closeDetail, closeDetailDirect,
+    loadCompanyInfoInline,
     toggleWatchlist, refreshWatchlist,
     openAuthModal, closeAuthModal, closeAuthModalDirect,
     handleSignIn, handleSignOut, handleGoogleSignIn,

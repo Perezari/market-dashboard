@@ -818,16 +818,16 @@
             <tr>
               <th style="width:34px">#</th>
               <th onclick="sortBy('sym')">מניה</th>
-              <th class="hide-m" style="width:100px">מגמה</th>
+              <th class="hide-m" style="width:100px" title="מגמה חזותית של 6 חודשים אחרונים (ברירת מחדל). ניתן לשנות את הטווח דרך 'טווח גרף' ברצועה העליונה.">מגמה</th>
               <th class="h-sec" onclick="sortBy('sector')">סקטור</th>
               <th class="hide-m" onclick="sortBy('subIndName')">תת-סקטור</th>
-              <th onclick="sortBy('score')" class="sorted num">ציון</th>
-              <th class="hide-m">פקטורים</th>
-              <th onclick="sortBy('entry')" class="hide-m">כניסה</th>
+              <th onclick="sortBy('score')" class="sorted num th-tip" title="ציון 0-100: דירוג פרצנטילי של המניה ביחס לשאר המניות ביקום הנסרק, לפי המודל שנבחר.&#10;&#10;לדוגמה, 95 = המניה ב-5% העליונים של היקום לפי הקריטריונים של המודל.&#10;&#10;⚠ לא אומר 'קנה' — מניה עם ציון 100 שעלתה 1500% יכולה להיות 'מתוח מדי' לכניסה. בדוק את עמודת 'כניסה' (SEPA) לקבלת המלצת כניסה בפועל.&#10;&#10;הציון משתנה בהחלפת מודל או יקום.">ציון</th>
+              <th class="hide-m th-tip" title="פירוט 3-4 הפקטורים שמרכיבים את הציון הכולל (לפי המודל הנוכחי). כל עמודה קטנה = ציון הפקטור הזה (0-100). העברת העכבר על עמודה בתוך השורה מראה את הפרטים של הפקטור למניה הזו.">פקטורים</th>
+              <th onclick="sortBy('entry')" class="hide-m th-tip" title="המלצת כניסה לפי SEPA (Minervini): 🟢 קנייה · 🔵 בבסיס · 🟡 סיכון · 🟠 מאוחר/מתוח/חולשה · ⚪ המתן · 🔴 לא לקנות. זו ההמלצה הפרקטית — 'האם לקנות את המניה הזו עכשיו?'. לחיצה על השורה מציגה פרטים מלאים.">כניסה</th>
               <th onclick="sortBy('price')" class="hide-m num">מחיר</th>
               <th onclick="sortBy('y1')" class="num">1Y</th>
               <th onclick="sortBy('m3')" class="hide-m num">3M</th>
-              <th onclick="sortBy('fromHi')" class="hide-m num">מ-52שי</th>
+              <th onclick="sortBy('fromHi')" class="hide-m num" title="מרחק באחוזים מהשיא של 52 השבועות האחרונים. 'בשיא' = המחיר הנוכחי הוא השיא של השנה (או פחות מ-0.5% ממנו).">מ-52שי</th>
               <th style="width:20px"></th>
             </tr>
           </thead>

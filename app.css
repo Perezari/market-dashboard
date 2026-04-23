@@ -4440,6 +4440,7 @@ td.pct.flat{color:var(--dim)}
   background:var(--bg2);
   font-size:11.5px;line-height:1.6;
 }
+.entry-plan-explain + .entry-plan-explain{margin-top:6px}
 .entry-plan-explain > summary{
   padding:9px 14px 9px 34px;cursor:pointer;
   font-weight:600;font-size:11.5px;color:var(--text);
@@ -4504,6 +4505,40 @@ td.pct.flat{color:var(--dim)}
   text-align:center;
 }
 
+/* ────────── Earnings proximity banner (C2) ──────────
+   Shown above the verdict in SEPA section when earnings are within 10 days.
+   'urgent' (≤5 days) is red — Minervini's hard don't-enter zone.
+   'approaching' (6-10 days) is amber — informational. */
+.entry-earnings-banner{
+  display:flex;align-items:flex-start;gap:9px;
+  padding:10px 12px;border-radius:7px;
+  margin-bottom:12px;
+  font-size:12px;line-height:1.55;
+}
+.entry-earnings-banner svg{flex-shrink:0;margin-top:2px}
+.entry-earnings-text{flex:1;min-width:0}
+.entry-earnings-text b{font-weight:700}
+.entry-earnings-urgent{
+  background:rgba(228,108,108,.1);color:var(--red);
+  border:1px solid rgba(228,108,108,.3);
+}
+.entry-earnings-approaching{
+  background:var(--amber-soft);color:var(--amber);
+  border:1px solid rgba(240,181,106,.3);
+}
+
+/* Small earnings badge in the picks table — shown next to the entry pill
+   when earnings are within 10 days. Compact (1 char + days) so it fits. */
+.earnings-badge{
+  display:inline-block;margin-inline-start:4px;
+  padding:1px 5px;border-radius:3px;
+  font-size:9.5px;font-weight:700;font-family:var(--mono);
+  line-height:1.4;letter-spacing:.2px;
+  cursor:help;vertical-align:middle;
+}
+.earnings-badge-urgent{background:rgba(228,108,108,.15);color:var(--red)}
+.earnings-badge-approaching{background:var(--amber-soft);color:var(--amber)}
+
 /* Mobile: collapse 4-column grid to 2 columns */
 @media (max-width:480px){
   .entry-grid{grid-template-columns:repeat(2,1fr)}
@@ -4535,9 +4570,36 @@ td.pct.flat{color:var(--dim)}
 .epl-broken      {background:rgba(228,108,108,.08);color:var(--red);border-color:rgba(228,108,108,.3)}
 .epl-unknown     {background:transparent;color:var(--dimmer);border-color:transparent;font-weight:500}
 
+/* Quality prefix — emoji sits snug inside the pill before the verdict text */
+.epl-star{
+  display:inline-block;margin-inline-end:3px;
+  font-size:10px;line-height:1;transform:translateY(-0.5px);
+  filter:drop-shadow(0 0 2px rgba(255,215,0,.5));
+}
+.epl-check{
+  display:inline-block;margin-inline-end:3px;
+  font-size:11px;font-weight:800;line-height:1;color:var(--green);
+  transform:translateY(-0.5px);
+}
+
+/* Perfect (⭐): stronger ring + subtle golden glow for attractive/prebreakout */
+.epl-perfect{
+  box-shadow:0 0 0 1px rgba(255,215,0,.4), 0 0 8px rgba(255,215,0,.15);
+  font-weight:700;
+}
+/* Good (✓): just a slightly emphasized border */
+.epl-good{
+  font-weight:700;
+}
+
 /* Entry-cell td-level tweak — tighter vertical padding so the pill
    centers in the narrower cell height. */
 table.picks tbody td.entry-cell-td{padding:6px 4px}
+
+@keyframes toast-in{
+  from{transform:translateX(-8px);opacity:0}
+  to{transform:translateX(0);opacity:1}
+}
 
 /* ═══ WATCHLIST BANNER (appears above table in "רשימה שלי" view) ═══ */
 .wl-banner{
@@ -5205,10 +5267,74 @@ body.overlay-scroll-locked {
 }
 .dt-close:hover{background:var(--bg4);color:var(--text)}
 
+/* ────────── Inline "אודות החברה" collapsible inside the score hero ──────────
+   Lives inside .dt-score-hero, styled to feel integrated (soft border, matching
+   background, no visual "pop"). Expands on click, lazy-loads content. */
+.hero-info{
+  flex-basis:100%;
+  margin-top:12px;padding-top:12px;
+  border-top:1px solid var(--border);
+  font-size:11.5px;
+}
+.hero-info > summary{
+  display:flex;align-items:center;gap:6px;
+  cursor:pointer;user-select:none;
+  font-size:11.5px;font-weight:600;color:var(--dim);
+  padding:4px 0;
+  list-style:none;
+  transition:color .15s;
+}
+.hero-info > summary:hover{color:var(--text)}
+.hero-info > summary::-webkit-details-marker{display:none}
+.hero-info[open] > summary{color:var(--text);margin-bottom:10px}
+.hero-info-icon{opacity:.8;flex-shrink:0}
+.hero-info[open] .hero-info-icon{color:#7fb2ff;opacity:1}
+
+.hero-info-body{
+  font-size:12px;line-height:1.6;color:var(--text);
+}
+.hero-info-loading{
+  padding:20px 0;text-align:center;color:var(--dim);font-size:11px;
+}
+.hero-info-empty{
+  padding:12px 0;text-align:center;color:var(--dim);line-height:1.7;
+}
+.hero-info-empty a{color:var(--green);font-size:11px}
+
+.hero-info-longname{
+  font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px;
+}
+.hero-info-chips{
+  display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;
+}
+.hero-info-chip{
+  padding:3px 9px;border-radius:4px;
+  background:var(--bg3);color:var(--dim);
+  font-size:10.5px;font-weight:600;letter-spacing:.1px;
+  border:1px solid var(--border);
+}
+.hero-info-desc{
+  margin:0 0 10px;color:var(--text);opacity:.92;
+  font-size:12.5px;line-height:1.65;
+}
+.hero-info-desc-en{direction:ltr;text-align:left}
+.hero-info-desc-he{direction:rtl;text-align:right}
+
+.hero-info-links{
+  display:flex;flex-wrap:wrap;gap:8px;
+  padding-top:8px;border-top:1px dashed var(--border);
+}
+.hero-info-link{
+  font-size:10.5px;color:#7fb2ff;text-decoration:none;
+  padding:3px 9px;background:rgba(100,161,255,.08);border-radius:4px;
+  transition:background .15s;font-family:var(--mono);direction:ltr;
+}
+.hero-info-link:hover{background:rgba(100,161,255,.18)}
+
 .dt-body{padding:16px}
 
 .dt-score-hero{
-  display:flex;align-items:center;gap:16px;
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
   padding:16px;margin-bottom:14px;
   background:var(--bg2);
   border:1px solid var(--border2);border-radius:10px;
@@ -6266,6 +6392,16 @@ table.picks{table-layout:fixed}
 
 /* Explicit widths for the remaining columns.
    th:nth-child(2) (מניה) stays auto → flexes to fill leftover space. */
+/* Column-headers with rich tooltips get a subtle cursor:help hint.
+   On sortable columns (.sorted / onclick sortBy) the cursor stays default to
+   prioritize click-to-sort — only non-sortable ones get the help cursor. */
+table.picks th.th-tip{
+  /* Very subtle dashed underline to hint interactivity */
+  border-bottom:1px dashed transparent;
+  transition:border-color .15s;
+}
+table.picks th.th-tip:hover{border-bottom-color:var(--dim)}
+
 table.picks th:nth-child(3){width:110px}   /* סקטור    */
 table.picks th:nth-child(4){width:130px}   /* תת-סקטור */
 table.picks th:nth-child(5){width:72px}    /* ציון     */
