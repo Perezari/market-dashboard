@@ -2,6 +2,15 @@
    app.css — consolidated stylesheet
    Order: base app → dashboard → advisor → macro
    ═══════════════════════════════════════════════════════════ */
+
+/* Reserve space for the vertical scrollbar at all times. This prevents
+   horizontal layout shift when modals/loaders lock scroll (which would
+   otherwise remove the scrollbar and free up its width). The slot is
+   always reserved, so the page layout stays rock-steady. */
+html{
+  scrollbar-gutter:stable;
+}
+
 /* ──────────── [1] BASE app.css (components, modals, stock detail) ──────────── */
 :root{
   /* ── Perplexity exact tokens (odin / shiva / garuda / ifrit) ── */
@@ -14,6 +23,11 @@
   --shadow:rgba(0,0,0,.6);
   --sans: 'Rubik', sans-serif !important;
   --mono: 'JetBrains Mono', monospace !important;
+  /* Google Finance chart palette — bright on dark backgrounds for contrast */
+  --chart-up:#4caf50;
+  --chart-down:#ea4335;
+  --chart-up-dim:rgba(76,175,80,.13);
+  --chart-down-dim:rgba(234,67,53,.13);
 }
 
 body, button, input, select, div, span, td, th {
@@ -81,6 +95,11 @@ body.light{
   --red:#cc1a3a;--rd:#fde0e6;
   --blue:#0070c0;
   --shadow:rgba(0,30,60,.12);
+  /* Google Finance darker chart palette on light bg */
+  --chart-up:#137333;
+  --chart-down:#c5221f;
+  --chart-up-dim:rgba(19,115,51,.12);
+  --chart-down-dim:rgba(197,34,31,.12);
 }
 body.light .tag-src {
   background: #eaf0f8 !important;
@@ -737,6 +756,48 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
   text-transform:uppercase;letter-spacing:0.8px;
   border-bottom:1px solid var(--border);
   background:var(--bg3);
+  /* Transitions make the label→live-readout swap feel polished */
+  transition:background .15s, color .15s;
+}
+/* Live readout when hovering the chart — header becomes a flex container
+   with all the data inline. Numbers stay LTR (mono), labels stay RTL. */
+.sp-section-hdr.sp-hdr-hovering{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  text-transform:none;letter-spacing:normal;
+  background:var(--bg4);
+  color:var(--text);
+  padding-block:7px;
+}
+.sp-section-hdr.sp-hdr-hovering .sp-hdr-label{
+  font-size:10px;font-weight:700;color:var(--dim);
+  letter-spacing:0.8px;text-transform:uppercase;
+}
+.sp-section-hdr.sp-hdr-hovering .sp-hdr-sep{
+  color:var(--dimmer);font-weight:400;
+}
+.sp-section-hdr.sp-hdr-hovering .sp-hdr-date{
+  font-family:var(--mono);font-size:10px;font-weight:500;color:var(--dim);
+  letter-spacing:.3px;direction:ltr;
+}
+.sp-section-hdr.sp-hdr-hovering .sp-hdr-price{
+  font-family:var(--mono);font-size:13px;font-weight:800;color:var(--text);
+  direction:ltr;
+}
+.sp-section-hdr.sp-hdr-hovering .sp-hdr-chg{
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  direction:ltr;
+}
+.sp-section-hdr.sp-hdr-hovering .sp-hdr-vol{
+  font-family:var(--mono);font-size:10px;font-weight:500;color:var(--dim);
+  margin-inline-start:auto;direction:ltr;
+}
+@media(max-width:600px){
+  /* On mobile, keep the readout compact — drop volume, use smaller text */
+  .sp-section-hdr.sp-hdr-hovering .sp-hdr-vol{display:none}
+  .sp-section-hdr.sp-hdr-hovering{gap:7px}
+  .sp-section-hdr.sp-hdr-hovering .sp-hdr-date{font-size:9px}
+  .sp-section-hdr.sp-hdr-hovering .sp-hdr-price{font-size:12px}
+  .sp-section-hdr.sp-hdr-hovering .sp-hdr-chg{font-size:10px}
 }
 /* Override chart/stats margins inside section cards */
 .sp-section-card .sp-chart-wrap{border-bottom:none}
@@ -1513,7 +1574,7 @@ body.light .macro-chg.down{background:rgba(204,26,58,.1)}
 .econ-impact-lbl{font-size:9px;font-weight:700;letter-spacing:.4px}
 .econ-dot.high+.econ-impact-lbl{color:#ef4444}.econ-dot.medium+.econ-impact-lbl{color:#f59e0b}.econ-dot.low+.econ-impact-lbl{color:var(--dim)}
 .econ-time{flex-shrink:0;font-family:var(--mono);font-size:9px;color:var(--dim);text-align:right}
-.econ-today-row{background:rgba(0,180,255,.05)!important;border-right:3px solid var(--blue)}
+.econ-today-row{background:rgba(0,180,255,.05)!important}
 .econ-soon-row{background:rgba(245,158,11,.04)!important}
 .econ-past{opacity:.4}
 
@@ -3493,6 +3554,92 @@ body.light .col.main .sectors-card .t tbody tr.avgrow td.sec-cell{background:var
   #login-overlay .lo-brand h1{font-size:22px}
 }
 
+/* ══════════════════════════════════════════════════════════════
+   LIGHT-MODE OVERRIDES for the login screen
+   Everything about the login (window gradient, titlebar, input shell,
+   button, pills, text colors) was hardcoded for the dark theme. In
+   light mode we invert to a clean white-card aesthetic with navy-blue
+   accents matching the existing light dashboard. Using body.light
+   + specific selectors to outweigh the base #login-overlay rules.
+   ══════════════════════════════════════════════════════════════ */
+body.light #login-overlay{
+  background:#f5f7fa;
+}
+body.light #login-overlay .lo-window{
+  background:#ffffff;
+  border:1px solid #e2e8f0;
+  box-shadow:
+    0 0 0 1px rgba(30,64,112,.04),
+    0 24px 80px rgba(15,23,42,.12),
+    0 10px 30px rgba(15,23,42,.06),
+    inset 0 1px 0 rgba(255,255,255,.6);
+}
+body.light #login-overlay .lo-titlebar{
+  background:#f8fafc;
+  border-bottom:1px solid #e2e8f0;
+}
+body.light #login-overlay .lo-title-txt{color:#64748b}
+body.light #login-overlay .lo-title-txt .lo-scheme{color:#94a3b8}
+body.light #login-overlay .lo-version{
+  color:#1e4070;
+  border-color:rgba(30,64,112,.25);
+  background:rgba(30,64,112,.08);
+}
+/* Brand */
+body.light #login-overlay .lo-brand h1{color:#1a2332}
+body.light #login-overlay .lo-brand-icon{
+  background:rgba(30,64,112,.1);
+  border:1px solid rgba(30,64,112,.25);
+  color:#1e4070;
+}
+/* Tagline dots + text */
+body.light #login-overlay .lo-tagline{color:#64748b}
+body.light #login-overlay .lo-tagline .lo-dot{background:#1e4070;opacity:.5}
+/* Title + subtitle */
+body.light #login-overlay .lo-h-title{color:#1a2332}
+body.light #login-overlay .lo-h-sub{color:#64748b}
+/* Labels above input */
+body.light #login-overlay .lo-il-left{color:#1e4070}
+body.light #login-overlay .lo-il-right{color:#94a3b8}
+/* Input shell */
+body.light #login-overlay .lo-input-shell{
+  background:#f8fafc;
+  border:1px solid #cbd5e1;
+}
+body.light #login-overlay .lo-input-shell:focus-within{
+  border-color:#1e4070;
+  box-shadow:
+    0 0 0 3px rgba(30,64,112,.12),
+    inset 0 0 0 1px rgba(30,64,112,.08);
+}
+body.light #login-overlay .lo-input{color:#1a2332}
+body.light #login-overlay .lo-input::placeholder{color:#94a3b8}
+body.light #login-overlay .lo-input-shell::after{background:#cbd5e1}
+body.light #login-overlay .lo-input-shell:focus-within::after{
+  background:#1e4070;box-shadow:0 0 8px rgba(30,64,112,.5);
+}
+/* Submit button — navy-blue gradient instead of green */
+body.light #login-overlay .lo-btn{
+  background:linear-gradient(180deg,#2a5590 0%,#1e4070 100%);
+  color:#ffffff;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.2) inset,
+    0 -1px 0 rgba(0,0,0,.1) inset,
+    0 4px 14px rgba(30,64,112,.25),
+    0 1px 3px rgba(15,23,42,.15);
+}
+body.light #login-overlay .lo-err{color:#c3394a}
+/* Feature pills footer */
+body.light #login-overlay .lo-pills{
+  border-top:1px solid #e2e8f0;
+}
+body.light #login-overlay .lo-pill{
+  border:1px solid #cbd5e1;
+  color:#64748b;
+  background:#f8fafc;
+}
+body.light #login-overlay .lo-pill-dot{background:#1e4070;opacity:.6}
+
 
 /* ──────────── [3] ADVISOR (stock advisor page) ──────────── */
 
@@ -4127,6 +4274,19 @@ td.pct.flat{color:var(--dim)}
    overflow on body — fixed-position is the only cross-browser reliable way
    to stop background scroll. The JS-set top offset preserves scroll position
    visually; on close it gets restored via window.scrollTo. */
+/* Scrollbar-compensation for modal opens is handled by installOverlayScrollLock
+   (see app.js) — it measures the actual scrollbar width and adds matching
+   padding to html when a modal opens, so the layout stays put. */
+
+/* Block scrolling while the initial page loader is visible. scrollbar-gutter
+   reserves space so there's no layout shift when the loader disappears and
+   the scrollbar re-appears — the scrollbar slot was already held for it. */
+html.loading-active,
+html.modal-scroll-locked{
+  overflow:hidden;
+  scrollbar-gutter:stable;
+}
+
 body.overlay-scroll-locked {
   position: fixed;
   left: 0;

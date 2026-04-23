@@ -1841,8 +1841,11 @@ function buildChartSvg(sym, meta, timestamps, closes, volumes, rangeKey) {
   const lastC  = pts[pts.length-1].c;
   const firstC = pts[0].c;
   const isUp = lastC >= (prev||firstC);
-  const col    = isUp ? '#00e87a' : '#ff3a5c';
-  const colDim = isUp ? 'rgba(0,232,122,.13)' : 'rgba(255,58,92,.13)';
+  // Google Finance exact palette, via CSS custom properties so dark/light
+  // modes can each pick an appropriate shade without hardcoding. Defined
+  // in app.css under :root (dark) and body.light (inverted).
+  const col    = isUp ? 'var(--chart-up)' : 'var(--chart-down)';
+  const colDim = isUp ? 'var(--chart-up-dim)' : 'var(--chart-down-dim)';
 
   const tx = i => (i/(pts.length-1))*W;
   const ty = v => PAD_T + cA - ((v-lo)/vRng)*cA;
@@ -1854,26 +1857,27 @@ function buildChartSvg(sym, meta, timestamps, closes, volumes, rangeKey) {
   const maxVol  = Math.max(...pts.map(p=>p.v),1);
   const volBars = pts.map((p,i)=>{
     const bw=Math.max(2,(W/pts.length)*0.68), bh=Math.max(1,(p.v/maxVol)*VOL_H);
-    return `<rect x="${(tx(i)-bw/2).toFixed(1)}" y="${(VOL_H-bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" fill="${col}" opacity=".28"/>`;
+    return `<rect x="${(tx(i)-bw/2).toFixed(1)}" y="${(VOL_H-bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" fill="${col}" opacity=".18"/>`;
   }).join('');
 
-  // Grid lines
-  const gridSvg = [0,0.33,0.66,1].map(f=>`<line x1="0" y1="${(PAD_T+cA*(1-f)).toFixed(1)}" x2="${W}" y2="${(PAD_T+cA*(1-f)).toFixed(1)}" stroke="rgba(255,255,255,.04)" stroke-width="1"/>`).join('');
+  // Grid lines — Google Finance style: horizontal only, very subtle
+  const gridSvg = [0,0.33,0.66,1].map(f=>`<line x1="0" y1="${(PAD_T+cA*(1-f)).toFixed(1)}" x2="${W}" y2="${(PAD_T+cA*(1-f)).toFixed(1)}" stroke="rgba(180,190,210,.08)" stroke-width="1"/>`).join('');
 
-  // Prev close dashed reference line
+  // Prev close dashed reference line — Google Finance style: soft gray dash
   let prevLineEl = '', prevBadgeEl = '';
   if (prev != null) {
     const py = ty(prev).toFixed(1);
-    prevLineEl = `<line x1="0" y1="${py}" x2="${W}" y2="${py}" stroke="rgba(200,200,200,.35)" stroke-dasharray="4 3" stroke-width="0.8"/>`;
+    prevLineEl = `<line x1="0" y1="${py}" x2="${W}" y2="${py}" stroke="rgba(160,170,185,.28)" stroke-dasharray="2 3" stroke-width="1"/>`;
     const tyPct2 = ((+py)/(CHART_H+VOL_H)*100).toFixed(1);
-    prevBadgeEl = `<div style="position:absolute;top:${tyPct2}%;left:8px;transform:translateY(-50%);font-size:8px;color:rgba(200,200,200,.55);font-family:var(--mono);line-height:1;pointer-events:none;white-space:nowrap">Prev close: $${prev.toFixed(2)}</div>`;
+    prevBadgeEl = `<div style="position:absolute;top:${tyPct2}%;left:8px;transform:translateY(-50%);font-size:8.5px;color:rgba(180,190,205,.65);font-family:var(--mono);line-height:1;pointer-events:none;white-space:nowrap">Prev close: $${prev.toFixed(2)}</div>`;
   }
 
-  // Crosshair SVG elements (hidden initially)
+  // Crosshair SVG elements (hidden initially) — Google Finance style:
+  // just a thin dashed vertical line + pinpoint dot. No horizontal line.
   const xhairEl = `
-    <line id="sp-xh-v" x1="0" y1="${PAD_T}" x2="0" y2="${PAD_T+cA}" stroke="rgba(200,216,234,.5)" stroke-width="1" stroke-dasharray="3 2" opacity="0" pointer-events="none"/>
-    <line id="sp-xh-h" x1="0" y1="0" x2="${W}" y2="0" stroke="rgba(200,216,234,.3)" stroke-width="1" stroke-dasharray="3 2" opacity="0" pointer-events="none"/>
-    <circle id="sp-xh-dot" cx="0" cy="0" r="4" fill="${col}" stroke="#0e1a2a" stroke-width="1.5" opacity="0" pointer-events="none"/>
+    <line id="sp-xh-v" x1="0" y1="${PAD_T}" x2="0" y2="${PAD_T+cA}" stroke="rgba(160,170,190,.55)" stroke-width="1" stroke-dasharray="2 3" opacity="0" pointer-events="none"/>
+    <line id="sp-xh-h" x1="0" y1="0" x2="${W}" y2="0" stroke="transparent" stroke-width="0" opacity="0" pointer-events="none"/>
+    <circle id="sp-xh-dot" cx="0" cy="0" r="3.5" fill="${col}" stroke="${col}" stroke-width="1" opacity="0" pointer-events="none" style="filter:drop-shadow(0 0 3px ${col})"/>
     <rect id="sp-xh-overlay" x="0" y="0" width="${W}" height="${CHART_H}" fill="transparent"
       onmousemove="_chartMove(event,this)" onmouseleave="_chartLeave()"/>`;
 
@@ -1888,11 +1892,11 @@ function buildChartSvg(sym, meta, timestamps, closes, volumes, rangeKey) {
   // Price labels (right side)
   const tyPct = v => (ty(v)/(CHART_H+VOL_H)*100).toFixed(1);
   const priceLbls = [maxC,(maxC+minC)/2,minC].map(v=>
-    `<div style="position:absolute;top:${tyPct(v)}%;right:4px;transform:translateY(-50%);font-size:8px;color:rgba(204,216,234,.32);font-family:var(--mono);line-height:1;pointer-events:none">${v.toFixed(2)}</div>`
+    `<div style="position:absolute;top:${tyPct(v)}%;right:4px;transform:translateY(-50%);font-size:9px;color:rgba(180,190,210,.45);font-family:var(--mono);line-height:1;pointer-events:none">${v.toFixed(2)}</div>`
   ).join('');
-  const curBadge = `<div style="position:absolute;top:${tyPct(lastC)}%;right:0;transform:translateY(-50%);background:${col};color:#000;font-size:8px;font-weight:800;font-family:var(--mono);padding:2px 5px;border-radius:2px 0 0 2px;line-height:1.4;pointer-events:none">${lastC.toFixed(2)}</div>`;
+  const curBadge = `<div style="position:absolute;top:${tyPct(lastC)}%;right:0;transform:translateY(-50%);background:${col};color:#fff;font-size:9px;font-weight:700;font-family:var(--mono);padding:2px 6px;border-radius:3px;line-height:1.4;pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.15)">${lastC.toFixed(2)}</div>`;
   const chgPct = ((lastC-(prev||firstC))/(prev||firstC)*100);
-  const chgBadge = `<div style="position:absolute;top:7px;left:8px;font-size:9px;font-weight:700;font-family:var(--mono);color:${col};background:${colDim};padding:2px 7px;border-radius:3px;line-height:1.4;pointer-events:none">${chgPct>=0?'+':''}${chgPct.toFixed(2)}%</div>`;
+  const chgBadge = `<div style="position:absolute;top:8px;left:8px;font-size:11px;font-weight:600;font-family:var(--mono);color:${col};line-height:1.4;pointer-events:none;letter-spacing:.2px">${chgPct>=0?'+':''}${chgPct.toFixed(2)}%</div>`;
 
   // Axis labels
   const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -1905,7 +1909,7 @@ function buildChartSvg(sym, meta, timestamps, closes, volumes, rangeKey) {
     else{lbl=`${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;}
     const pct=(i/(pts.length-1)*100).toFixed(1);
     const xf=j===0?'translateX(0)':j===axPts.length-1?'translateX(-100%)':'translateX(-50%)';
-    return `<span style="position:absolute;left:${pct}%;transform:${xf};font-size:8px;color:rgba(204,216,234,.32);font-family:var(--sans);white-space:nowrap">${lbl}</span>`;
+    return `<span style="position:absolute;left:${pct}%;transform:${xf};font-size:10px;color:var(--dim);font-family:var(--sans);white-space:nowrap;font-weight:500">${lbl}</span>`;
   }).join('');
 
   // Range buttons + tool buttons
@@ -1923,8 +1927,7 @@ function buildChartSvg(sym, meta, timestamps, closes, volumes, rangeKey) {
     </div>
   </div>`;
 
-  // Dot grid background pattern (Perplexity style)
-  const dotPat = `<pattern id="spd${sym}" patternUnits="userSpaceOnUse" width="6" height="6"><circle cx="3" cy="3" r="0.55" fill="rgba(200,210,230,.2)"/></pattern>`;
+  // (Dot grid pattern removed — Google Finance-style plain background)
 
   // Store chart data for crosshair JS
   window._chartPts = pts.map((p,i)=>({c:p.c, t:p.t, v:p.v, svgY:ty(p.c), svgX:tx(i)}));
@@ -1934,22 +1937,19 @@ function buildChartSvg(sym, meta, timestamps, closes, volumes, rangeKey) {
   return `<div class="sp-chart-wrap">
     ${rangeBar}
     <div style="position:relative" id="sp-chart-container">
-      <div id="sp-chart-tooltip" class="sp-chart-tooltip" style="display:none"></div>
-      <svg id="sp-chart-svg" width="100%" viewBox="0 0 ${W} ${CHART_H}" preserveAspectRatio="none" style="display:block;height:128px;overflow:visible">
+      <svg id="sp-chart-svg" width="100%" viewBox="0 0 ${W} ${CHART_H}" preserveAspectRatio="none" style="display:block;height:240px;overflow:visible">
         <defs>
-          <linearGradient id="spg${sym}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${col}" stop-opacity=".22"/><stop offset="90%" stop-color="${col}" stop-opacity="0"/></linearGradient>
-          ${dotPat}
+          <linearGradient id="spg${sym}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${col}" stop-opacity=".28"/><stop offset="100%" stop-color="${col}" stop-opacity="0"/></linearGradient>
         </defs>
-        <rect width="${W}" height="${CHART_H}" fill="url(#spd${sym})"/>
         ${gridSvg}
         ${prevLineEl}
         <path d="${areaD}" fill="url(#spg${sym})"/>
-        <polyline points="${linePts}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="${linePts}" fill="none" stroke="${col}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
         ${xhairEl}
       </svg>
-      <svg width="100%" viewBox="0 0 ${W} ${VOL_H}" preserveAspectRatio="none" style="display:block;height:26px">${volBars}</svg>
+      <svg width="100%" viewBox="0 0 ${W} ${VOL_H}" preserveAspectRatio="none" style="display:block;height:40px">${volBars}</svg>
       ${priceLbls}${curBadge}${chgBadge}${prevBadgeEl}
-      <div style="position:relative;height:18px;margin:2px 4px 0">${axLabels}</div>
+      <div style="position:relative;height:22px;margin:4px 4px 0">${axLabels}</div>
     </div>
   </div>`;
 }
@@ -1972,7 +1972,12 @@ function _chartMove(e, overlay) {
   if (hl) { hl.setAttribute('y1',pt.svgY.toFixed(1)); hl.setAttribute('y2',pt.svgY.toFixed(1)); hl.setAttribute('opacity','1'); }
   if (dt) { dt.setAttribute('cx',pt.svgX.toFixed(1)); dt.setAttribute('cy',pt.svgY.toFixed(1)); dt.setAttribute('opacity','1'); }
 
-  const tip = $('sp-chart-tooltip'); if (!tip) return;
+  // Instead of a floating tooltip that covers the chart, we update the
+  // chart's own section header inline with the hover data. Must target
+  // by specific ID — there are multiple sp-section-hdr elements (profile,
+  // market data, news) and the first match differs between layouts.
+  const hdr = document.getElementById('sp-chart-hdr');
+  if (!hdr) return;
   const d = new Date(pt.t*1000);
   const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   let dateLbl;
@@ -1983,21 +1988,27 @@ function _chartMove(e, overlay) {
     dateLbl=`${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
   }
   const chg = m.prev ? ((pt.c - m.prev)/m.prev*100) : 0;
-  const chgCol = chg >= 0 ? '#00e87a' : '#ff3a5c';
+  const chgCol = chg >= 0 ? 'var(--green)' : 'var(--red)';
+  const chgSym = chg >= 0 ? '▲' : '▼';
   const fmtV = v => v>=1e9?(v/1e9).toFixed(2)+'B':v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(0)+'K':v;
-  tip.innerHTML = `<div class="sp-tip-date">${dateLbl}</div><div class="sp-tip-price">$${pt.c.toFixed(2)}</div><div class="sp-tip-chg" style="color:${chgCol}">${chg>=0?'+':''}${chg.toFixed(2)}%</div>${pt.v?`<div class="sp-tip-vol">Vol: ${fmtV(pt.v)}</div>`:''}`;
-  tip.style.display = 'block';
-  // Clamp tooltip horizontally
-  const tipW = 100; // approx px
-  const containerRect = tip.parentElement.getBoundingClientRect();
-  let leftPx = (clientX - containerRect.left) - tipW/2;
-  leftPx = Math.max(4, Math.min(containerRect.width - tipW - 4, leftPx));
-  tip.style.left = leftPx+'px';
-  tip.style.top = '6px';
+  hdr.classList.add('sp-hdr-hovering');
+  hdr.innerHTML = `
+    <span class="sp-hdr-label">גרף</span>
+    <span class="sp-hdr-sep">·</span>
+    <span class="sp-hdr-date">${dateLbl}</span>
+    <span class="sp-hdr-price">$${pt.c.toFixed(2)}</span>
+    <span class="sp-hdr-chg" style="color:${chgCol}">${chgSym} ${chg>=0?'+':''}${chg.toFixed(2)}%</span>
+    ${pt.v?`<span class="sp-hdr-vol">Vol: ${fmtV(pt.v)}</span>`:''}
+  `;
 }
 function _chartLeave() {
   ['sp-xh-v','sp-xh-h','sp-xh-dot'].forEach(id=>{ const el=$(id); if(el) el.setAttribute('opacity','0'); });
-  const tip=$('sp-chart-tooltip'); if(tip) tip.style.display='none';
+  // Reset the chart header back to just "גרף"
+  const hdr = document.getElementById('sp-chart-hdr');
+  if (hdr) {
+    hdr.classList.remove('sp-hdr-hovering');
+    hdr.innerHTML = 'גרף';
+  }
 }
 
 /* ── Helper: rebuild sp-body (center: chart only on desktop, all on mobile) ── */
@@ -2026,7 +2037,7 @@ function _rebuildSpBody(newChartHtml) {
 
   const bodyHtml = `
     <div class="sp-section-card" style="margin:12px">
-      <div class="sp-section-hdr">גרף</div>
+      <div class="sp-section-hdr" id="sp-chart-hdr">גרף</div>
       ${newChartHtml}
     </div>
     ${mobileExtra}
@@ -2241,15 +2252,15 @@ function renderStockDetail(sym, name, meta, timestamps, closes, volumes, news, d
     : '–';
 
   const statsData = [
-    { label:'Prev Close', val: meta.chartPreviousClose ? '$'+fmt2(meta.chartPreviousClose) : '–' },
-    { label:'Market Cap',  val: meta.marketCap ? fmtB(meta.marketCap) : '–' },
-    { label:'Open',        val: meta.regularMarketOpen ? '$'+fmt2(meta.regularMarketOpen) : '–' },
-    { label:'P/E Ratio',   val: meta.trailingPE ? fmt2(meta.trailingPE) : '–' },
-    { label:'Day Range',   val: dayLo ? '$'+fmt2(dayLo)+'–$'+fmt2(dayHi) : '–' },
-    { label:'Div. Yield',  val: divYield },
-    { label:'52W Range',   val: wLo ? '$'+fmt2(wLo)+'–$'+fmt2(wHi) : '–' },
-    { label:'EPS',         val: meta.trailingEps ? '$'+fmt2(meta.trailingEps) : '–' },
-    { label:'Volume',      val: fmtV(meta.regularMarketVolume||dq.vol) },
+    { label:'סגירה קודמת', val: meta.chartPreviousClose ? '$'+fmt2(meta.chartPreviousClose) : '–' },
+    { label:'שווי שוק',    val: meta.marketCap ? fmtB(meta.marketCap) : '–' },
+    { label:'פתיחה',       val: meta.regularMarketOpen ? '$'+fmt2(meta.regularMarketOpen) : '–' },
+    { label:'מכפיל (P/E)', val: meta.trailingPE ? fmt2(meta.trailingPE) : '–' },
+    { label:'טווח יומי',   val: dayLo ? '$'+fmt2(dayLo)+'–$'+fmt2(dayHi) : '–' },
+    { label:'תשואת דיבידנד', val: divYield },
+    { label:'טווח 52 ש׳',  val: wLo ? '$'+fmt2(wLo)+'–$'+fmt2(wHi) : '–' },
+    { label:'רווח למניה',  val: meta.trailingEps ? '$'+fmt2(meta.trailingEps) : '–' },
+    { label:'נפח מסחר',    val: fmtV(meta.regularMarketVolume||dq.vol) },
   ];
 
   const statsHtml = `
@@ -2268,18 +2279,18 @@ function renderStockDetail(sym, name, meta, timestamps, closes, volumes, news, d
   const macroHtml = renderMacroContext(macro);
   const exch = meta.exchangeName || meta.fullExchangeName || '–';
   const profileRows = [
-    { label:'Symbol',    val: sym },
-    { label:'Exchange',  val: exch },
-    { label:'Currency',  val: meta.currency || 'USD' },
-    ...(meta.sector    ? [{ label:'Sector',    val: meta.sector }] : []),
-    ...(meta.industry  ? [{ label:'Industry',  val: meta.industry }] : []),
-    ...(meta.location  ? [{ label:'Location',  val: meta.location }] : []),
-    ...(meta.fullTimeEmployees ? [{ label:'Employees', val: Number(meta.fullTimeEmployees).toLocaleString() }] : []),
-    { label:'Market Cap',val: meta.marketCap ? fmtB(meta.marketCap) : '–' },
-    { label:'P/E',       val: meta.trailingPE ? fmt2(meta.trailingPE) : '–' },
-    { label:'EPS',       val: meta.trailingEps ? '$'+fmt2(meta.trailingEps) : '–' },
-    { label:'Div. Yield',val: divYield },
-    { label:'Avg Volume',val: fmtV(meta.averageDailyVolume3Month||dq.avgVol) },
+    { label:'סימול',    val: sym },
+    { label:'בורסה',     val: exch },
+    { label:'מטבע',      val: meta.currency || 'USD' },
+    ...(meta.sector    ? [{ label:'סקטור',    val: meta.sector }] : []),
+    ...(meta.industry  ? [{ label:'ענף',      val: meta.industry }] : []),
+    ...(meta.location  ? [{ label:'מיקום',    val: meta.location }] : []),
+    ...(meta.fullTimeEmployees ? [{ label:'עובדים', val: Number(meta.fullTimeEmployees).toLocaleString() }] : []),
+    { label:'שווי שוק', val: meta.marketCap ? fmtB(meta.marketCap) : '–' },
+    { label:'מכפיל (P/E)', val: meta.trailingPE ? fmt2(meta.trailingPE) : '–' },
+    { label:'רווח למניה', val: meta.trailingEps ? '$'+fmt2(meta.trailingEps) : '–' },
+    { label:'תשואת דיבידנד', val: divYield },
+    { label:'נפח ממוצע', val: fmtV(meta.averageDailyVolume3Month||dq.avgVol) },
   ];
   // ── Profile card HTML (shared by sidebar and mobile) ──
   const profileCardHtml = `
@@ -2394,7 +2405,7 @@ function renderStockDetail(sym, name, meta, timestamps, closes, volumes, news, d
   // ── Build body: section cards ────────────────────────
   const bodyHtml = `
     <div class="sp-section-card" style="margin:12px">
-      <div class="sp-section-hdr">גרף</div>
+      <div class="sp-section-hdr" id="sp-chart-hdr">גרף</div>
       ${chartHtml}
     </div>
     <div class="sp-mobile-section">
@@ -4445,6 +4456,9 @@ function hidePageLoader() {
   if (_loaderHidden) return;
   _loaderHidden = true;
   if (_loaderTextInterval) { clearInterval(_loaderTextInterval); _loaderTextInterval = null; }
+  // Unlock scroll now that the loader is going away. Matches the lock we
+  // set at DOM-ready below (via .loading-active class).
+  document.documentElement.classList.remove('loading-active');
   // Set .page-loaded first so content fades in while the overlay fades out.
   document.body.classList.add('page-loaded');
   const overlay = document.getElementById('page-loading');
@@ -9275,16 +9289,32 @@ document.addEventListener('keydown', e => {
       return false;
     }
 
+    /** Measure the current scrollbar width — the difference between the full
+     *  viewport width and what the document's root element actually gets.
+     *  Returns 0 on devices without a persistent scrollbar (mobile, overlay
+     *  scrollbars). Accurate for any custom ::-webkit-scrollbar width. */
+    function getScrollbarWidth() {
+      return window.innerWidth - document.documentElement.clientWidth;
+    }
+
     function applyLock(locked) {
       const body = document.body;
+      const html = document.documentElement;
       const alreadyLocked = body.classList.contains('overlay-scroll-locked');
       if (locked && !alreadyLocked) {
         lockedScrollY = window.scrollY;
+        // Lock scroll by adding a class to <html> rather than inline styles.
+        // The class combines `overflow:hidden` + `scrollbar-gutter:stable`,
+        // which is exactly what fixed the page-loader case — the CSS-level
+        // gutter reservation keeps the layout in place without needing to
+        // measure the scrollbar width at runtime.
+        html.classList.add('modal-scroll-locked');
         body.style.top = `-${lockedScrollY}px`;
         body.classList.add('overlay-scroll-locked');
       } else if (!locked && alreadyLocked) {
         body.classList.remove('overlay-scroll-locked');
         body.style.top = '';
+        html.classList.remove('modal-scroll-locked');
         window.scrollTo(0, lockedScrollY);
       }
     }
