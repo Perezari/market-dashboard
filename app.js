@@ -6052,6 +6052,7 @@ let displayState = {
   sortKey: 'score',
   sortDesc: true,
   searchQuery: '',     // live filter from the search box above the table
+  sparkRange: '6M',    // trend-sparkline window; one of SPARK_RANGE_OPTS keys
 };
 let watchlist = [];
 try { watchlist = JSON.parse(localStorage.getItem(WL_KEY)) || []; } catch(e){}
@@ -6072,13 +6073,14 @@ async function advisorBoot() {
   // Validate saved methodology against the live METHODOLOGIES dictionary
   // (we couldn't do this at the `let currentMethodology = ...` site because of TDZ)
   if (!METHODOLOGIES[currentMethodology]) currentMethodology = 'momentum';
-  // Build custom dropdowns (universe + sector + methodology + min-score + view)
+  // Build custom dropdowns (universe + sector + methodology + min-score + view + spark-range)
   // and reflect current state
   populateUniverseDropdown();
   populateSectorDropdown();
   populateMethodologyDropdown();
   populateMinScoreDropdown();
   populateViewDropdown();
+  populateSparkRangeDropdown();
   syncUniverseUI();
   syncMethodologyUI();
   // Kick off cloud sync in the background — if user has a session it pulls
@@ -6190,10 +6192,19 @@ function closeMobileMenu() {
 
 // ═══ DATA FETCHING ═══
 
+/**
+ * Fetch 1 year of daily bars for a symbol. Returns both the raw daily series
+ * (for the in-table sparkline — daily granularity is what users expect on
+ * short-range views like 1M/3M) AND a derived weekly series (for the scoring
+ * model, which indexes by week count and would break on daily data). The
+ * weekly series is an every-5-trading-days sample from the end, which is a
+ * close approximation of the Friday-close series Yahoo's `interval=1wk`
+ * returns. Function name kept for backward compat with call sites.
+ */
 async function fetchChartWeekly(sym) {
   const cleanSym = sym.replace('/', '-').replace('.', '-');
   const cb = Math.floor(Date.now() / 600000);
-  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${cleanSym}?range=1y&interval=1wk&cb=${cb}`;
+  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${cleanSym}?range=1y&interval=1d&cb=${cb}`;
   const proxyUrl = `${PROXY}/?url=${encodeURIComponent(yahooUrl)}`;
   try {
     const r = await fetch(proxyUrl);
@@ -6201,14 +6212,47 @@ async function fetchChartWeekly(sym) {
     const d = await r.json();
     const result = d.chart?.result?.[0];
     if (!result) return null;
-    const closes = (result.indicators?.quote?.[0]?.close || []).filter(x => x != null);
-    const timestamps = result.timestamp || [];
+    const rawCloses = result.indicators?.quote?.[0]?.close || [];
+    const rawTs = result.timestamp || [];
+    // Drop null bars (weekends/holidays occasionally leak through), keep
+    // closes and timestamps aligned.
+    const dailyCloses = [], dailyTimestamps = [];
+    for (let i = 0; i < rawCloses.length; i++) {
+      if (rawCloses[i] != null) {
+        dailyCloses.push(rawCloses[i]);
+        dailyTimestamps.push(rawTs[i]);
+      }
+    }
     const meta = result.meta || {};
-    if (closes.length < 20) return null;
-    return { sym, closes, timestamps, meta };
+    if (dailyCloses.length < 20) return null;
+    const weekly = _sampleWeekly(dailyCloses, dailyTimestamps);
+    return {
+      sym,
+      closes: weekly.closes,          // weekly — consumed by computeMetrics (unchanged)
+      timestamps: weekly.timestamps,
+      dailyCloses,                    // daily — consumed by renderSparkline
+      dailyTimestamps,
+      meta
+    };
   } catch (e) {
     return null;
   }
+}
+
+/**
+ * Every-5-trading-days sample from the end of a daily series. Approximates
+ * Yahoo's `interval=1wk` Friday-close stream closely enough that computeMetrics'
+ * weekly-index math still lands on the right time windows. Over 52 weeks the
+ * maximum drift from holiday-short weeks is a few days — well within the
+ * rounding error of multi-month return calculations.
+ */
+function _sampleWeekly(dailyCloses, dailyTimestamps) {
+  const closes = [], timestamps = [];
+  for (let i = dailyCloses.length - 1; i >= 0; i -= 5) {
+    closes.unshift(dailyCloses[i]);
+    timestamps.unshift(dailyTimestamps[i]);
+  }
+  return { closes, timestamps };
 }
 
 async function fetchUniverseInChunks(symbols, onProgress) {
@@ -6712,7 +6756,16 @@ async function runScanSilent() {
     if (stocks.length === 0) throw new Error('empty scores');
 
     scanData = {
-      stocks: stocks.map(s => ({ ...s, refreshedAt: Date.now() })),
+      stocks: stocks.map(s => {
+        const src = stocksData[s.sym];
+        return {
+          ...s,
+          closes:           src?.closes,
+          dailyCloses:      src?.dailyCloses,
+          dailyTimestamps:  src?.dailyTimestamps,
+          refreshedAt:      Date.now(),
+        };
+      }),
       timestamp: Date.now(),
       universeSize: stocks.length,
       methodology: currentMethodology,
@@ -6791,22 +6844,40 @@ async function runScan() {
     // Per-stock `refreshedAt` = initial scan timestamp. Partial watchlist
     // refreshes update this field for the affected stocks only, so the stale
     // check in computeExitSignal stays accurate per-stock rather than per-scan.
-    stocks: stocks.map(s => ({ ...s, refreshedAt: Date.now() })),
+    // `computeScores` trims each stock down to score/metrics, so we merge back
+    // the daily series (+ weekly closes) from the raw fetched data — the
+    // sparkline needs these.
+    stocks: stocks.map(s => {
+      const src = stocksData[s.sym];
+      return {
+        ...s,
+        closes:           src?.closes,
+        dailyCloses:      src?.dailyCloses,
+        dailyTimestamps:  src?.dailyTimestamps,
+        refreshedAt:      Date.now(),
+      };
+    }),
     timestamp: Date.now(),
     universeSize: stocks.length,
     methodology: currentMethodology,
     universe: currentUniverse,
   };
   try {
-    // Lean cache payload — keep a 26-week downsample of `closes` (enough for
-    // the table's trend sparkline) instead of the full weekly series. The full
-    // chart in the detail panel now falls back to a placeholder on cache load,
-    // but the sparkline stays functional. Storage footprint: ~100KB for 500
-    // stocks (26 closes × 5 digits × 500), well under the 5MB budget.
+    // Lean cache payload — keep a 52-week downsample of `closes` plus a 252-day
+    // (~1Y) slice of `dailyCloses` (powers the daily-granularity sparkline).
+    // The full chart in the detail panel falls back to a placeholder on cache
+    // load, but the sparkline stays functional across every range.
+    // Storage footprint: ~800KB for 500 stocks
+    //   52 weekly + 252 daily closes × 5 digits × 500 stocks
+    // Well under the 5MB localStorage budget.
     const leanStocks = stocks.map(s => {
       const full = s.closes || s.metrics?.closes || null;
       const sparkCloses = full && full.length > 0
-        ? full.slice(-26).map(v => Math.round(v * 100) / 100)  // 2 decimals is enough for a trend line
+        ? full.slice(-52).map(v => Math.round(v * 100) / 100)  // 2 decimals is enough for a trend line
+        : null;
+      const dailySrc = s.dailyCloses || null;
+      const leanDaily = dailySrc && dailySrc.length > 0
+        ? dailySrc.slice(-252).map(v => Math.round(v * 100) / 100)
         : null;
       return {
         sym: s.sym, name: s.name, sector: s.sector, sectorName: s.sectorName,
@@ -6814,7 +6885,8 @@ async function runScan() {
         score: s.score, scores: s.scores, rank: s.rank,
         price: s.price, y1: s.y1, m3: s.m3, m1: s.m1, fromHi: s.fromHi,
         refreshedAt: s.refreshedAt,
-        closes: sparkCloses,  // ← compact series for the trend sparkline
+        closes: sparkCloses,         // weekly series — used by legacy code paths
+        dailyCloses: leanDaily,      // daily series — powers the sparkline
         metrics: {
           price: s.metrics.price,
           fromHi: s.metrics.fromHi,
@@ -6964,6 +7036,60 @@ function setView(v, label) {
   const panel = $('cdd-view-panel');
   if (panel) panel.querySelectorAll('.cdd-option').forEach(b =>
     b.classList.toggle('active', b.dataset.value === v)
+  );
+  closeAllCdd();
+  renderTable();
+}
+
+/* ────────────── SPARKLINE RANGE DROPDOWN ──────────────
+   Controls the trend-sparkline window shown in the picks table. The scan
+   caches daily closes (range=1y&interval=1d), so each option maps to a
+   trading-day slice from the end. YTD is derived from today's date.
+
+   1D / 1W are deliberately NOT offered — we only have end-of-day bars in
+   the cache, so 1D would be a single point and 1W 5 points. Adding them
+   would need a parallel intraday fetch per row (order-of-magnitude API
+   cost increase) — out of scope here. */
+const SPARK_RANGE_OPTS = [
+  { val: '1M',  label: '1 חודש',   days: 22 },
+  { val: '3M',  label: '3 חודשים', days: 65 },
+  { val: '6M',  label: '6 חודשים', days: 130 },
+  { val: 'YTD', label: 'YTD',     days: null },   // computed at render time
+  { val: '1Y',  label: '1 שנה',    days: 252 },
+];
+function barsForSparkRange(val) {
+  if (val === 'YTD') {
+    const now = new Date();
+    const jan1 = new Date(now.getFullYear(), 0, 1);
+    const calDays = Math.max(2, Math.ceil((now - jan1) / (24 * 60 * 60 * 1000)));
+    // ~252 trading days per 365 calendar days
+    return Math.max(5, Math.ceil(calDays * (252 / 365)));
+  }
+  const opt = SPARK_RANGE_OPTS.find(o => o.val === val);
+  return opt ? opt.days : 130;
+}
+function populateSparkRangeDropdown() {
+  const panel = $('cdd-sparkrange-panel');
+  if (!panel) return;
+  panel.innerHTML = '';
+  SPARK_RANGE_OPTS.forEach(o => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cdd-option';
+    if (o.val === displayState.sparkRange) btn.classList.add('active');
+    btn.dataset.value = o.val;
+    btn.innerHTML = `<div class="cdd-option-title">${o.label}</div>`;
+    btn.onclick = (e) => { e.stopPropagation(); setSparkRange(o.val, o.label); };
+    panel.appendChild(btn);
+  });
+}
+function setSparkRange(val, label) {
+  displayState.sparkRange = val;
+  const cur = $('cdd-sparkrange-current');
+  if (cur) cur.textContent = label != null ? label : ((SPARK_RANGE_OPTS.find(o => o.val === val) || {}).label || '6 חודשים');
+  const panel = $('cdd-sparkrange-panel');
+  if (panel) panel.querySelectorAll('.cdd-option').forEach(b =>
+    b.classList.toggle('active', b.dataset.value === val)
   );
   closeAllCdd();
   renderTable();
@@ -7351,7 +7477,7 @@ function renderTable() {
       <tr onclick="openDetail('${s.sym}')">
         <td class="rk ${rkCls}">${rankDisplay}</td>
         <td class="sym"><img class="sym-logo" src="https://financialmodelingprep.com/image-stock/${s.sym}.png" alt="" loading="lazy" onerror="this.classList.add('sym-logo-err')"><b>${s.sym}</b>${badges.join('')}<span class="name">${s.name}</span></td>
-        <td class="spark hide-m">${renderSparkline(s.closes || s.metrics?.closes)}</td>
+        <td class="spark hide-m">${renderSparkline(s.dailyCloses, s.closes || s.metrics?.closes)}</td>
         <td class="sec">${sectorDisplay}</td>
         <td class="subsec hide-m">${s.subIndName || '—'}</td>
         <td><span class="score ${scoreClassStr}">${scoreDisplay}</span></td>
@@ -7368,25 +7494,43 @@ function renderTable() {
 
 /**
  * Compact sparkline for the picks table — single line, no labels, no
- * fills (keeps the row light). Renders last 26 weekly closes at 56×20 px.
- * Color follows the direction: green when last >= first, red otherwise.
- * Returns an em-dash when closes aren't available (cache restore drops them).
+ * fills (keeps the row light). Color follows the direction: green when
+ * last >= first, red otherwise. Range is one of the SPARK_RANGE_OPTS
+ * keys (1M / 3M / 6M / YTD / 1Y); the window is sliced from the END of
+ * the closes array. Prefers daily closes (finer-grained sparkline — e.g.
+ * a 1M view shows ~22 daily movements instead of 4 weekly blocks); falls
+ * back to the legacy weekly series for scans cached before the daily
+ * upgrade. Returns an em-dash when closes aren't available.
  */
-function renderSparkline(closes) {
-  if (!closes || closes.length < 4) {
+function renderSparkline(dailyCloses, weeklyCloses, range) {
+  const series = (dailyCloses && dailyCloses.length >= 4)
+    ? { data: dailyCloses, granularity: 'daily' }
+    : (weeklyCloses && weeklyCloses.length >= 4)
+      ? { data: weeklyCloses, granularity: 'weekly' }
+      : null;
+  if (!series) {
     return '<span style="color:var(--dimmer);font-size:10px">—</span>';
   }
-  const last26 = closes.slice(-26);
-  const min = Math.min(...last26);
-  const max = Math.max(...last26);
+  const rangeKey = range || displayState.sparkRange || '6M';
+  // For cached weekly data, convert the day-based range to a week count.
+  const barCount = series.granularity === 'daily'
+    ? barsForSparkRange(rangeKey)
+    : Math.max(2, Math.ceil(barsForSparkRange(rangeKey) / 5));
+  const windowSize = Math.min(barCount, series.data.length);
+  const sliced = series.data.slice(-windowSize);
+  if (sliced.length < 2) {
+    return '<span style="color:var(--dimmer);font-size:10px">—</span>';
+  }
+  const min = Math.min(...sliced);
+  const max = Math.max(...sliced);
   const w = 96, h = 28;
-  const range = max - min || 1;
-  const xs = last26.map((c, i) => (i / (last26.length - 1)) * w);
-  const ys = last26.map(c => h - ((c - min) / range) * h);
+  const r = max - min || 1;
+  const xs = sliced.map((c, i) => (i / (sliced.length - 1)) * w);
+  const ys = sliced.map(c => h - ((c - min) / r) * h);
   const linePts = xs.map((x, i) => `${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
   // Closed path for the fill — down to the bottom-right, along the bottom, up to origin
   const areaPath = `M0,${h} L${linePts.split(' ').join(' L')} L${w},${h} Z`;
-  const isUp = last26[last26.length - 1] >= last26[0];
+  const isUp = sliced[sliced.length - 1] >= sliced[0];
   const color = isUp ? 'var(--green)' : 'var(--red)';
   const fill  = isUp ? 'rgba(79,199,138,.15)' : 'rgba(228,108,108,.15)';
   return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" preserveAspectRatio="none" style="display:block">
@@ -7673,6 +7817,8 @@ async function scanWatchlistStandalone() {
           sma10Slope: m.sma10Slope,
         },
         closes: chartData.closes,
+        dailyCloses: chartData.dailyCloses,
+        dailyTimestamps: chartData.dailyTimestamps,
         refreshedAt: now,
       });
     }
@@ -7836,6 +7982,8 @@ async function handleAddSymbol() {
             sma10: mm.sma10, sma40: mm.sma40, sma10Slope: mm.sma10Slope,
           };
           existing.closes = chartData.closes;
+          existing.dailyCloses = chartData.dailyCloses;
+          existing.dailyTimestamps = chartData.dailyTimestamps;
           existing.refreshedAt = Date.now();
         } else {
           scanData.stocks.push({
@@ -7854,6 +8002,8 @@ async function handleAddSymbol() {
               sma10: mm.sma10, sma40: mm.sma40, sma10Slope: mm.sma10Slope,
             },
             closes: chartData.closes,
+            dailyCloses: chartData.dailyCloses,
+            dailyTimestamps: chartData.dailyTimestamps,
             refreshedAt: Date.now(),
           });
         }
@@ -7965,6 +8115,8 @@ async function refreshWatchlist() {
         sma10Slope: m.sma10Slope,
       };
       stock.closes = chartData.closes;
+      stock.dailyCloses = chartData.dailyCloses;
+      stock.dailyTimestamps = chartData.dailyTimestamps;
       stock.refreshedAt = now;
       refreshedCount++;
     }
@@ -8001,7 +8153,11 @@ function persistScanData() {
       stocks: scanData.stocks.map(s => {
         const full = s.closes || null;
         const sparkCloses = full && full.length > 0
-          ? full.slice(-26).map(v => Math.round(v * 100) / 100)
+          ? full.slice(-52).map(v => Math.round(v * 100) / 100)  // matches the full-scan cache retention
+          : null;
+        const dailySrc = s.dailyCloses || null;
+        const leanDaily = dailySrc && dailySrc.length > 0
+          ? dailySrc.slice(-252).map(v => Math.round(v * 100) / 100)
           : null;
         return {
           sym: s.sym, name: s.name, sector: s.sector, sectorName: s.sectorName,
@@ -8010,6 +8166,7 @@ function persistScanData() {
           price: s.price, y1: s.y1, m3: s.m3, m1: s.m1, fromHi: s.fromHi,
           refreshedAt: s.refreshedAt,
           closes: sparkCloses,
+          dailyCloses: leanDaily,
           metrics: s.metrics,
         };
       }),
@@ -9151,7 +9308,7 @@ document.addEventListener('keydown', e => {
   // toggleMobileMenu, closeMobileMenu — these already exist as
   // globals in app.js and we must NOT overwrite those.
   Object.assign(window, {
-    runScan, setMinScore, setView, setUniverse, setMethodology, previewMethodology,
+    runScan, setMinScore, setView, setSparkRange, setUniverse, setMethodology, previewMethodology,
     toggleCdd, selectSector, sortBy, applyFilters,
     openMethodology, closeMethodology, closeMethodologyDirect,
     openDetail, closeDetail, closeDetailDirect,
