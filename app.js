@@ -6221,7 +6221,15 @@ async function fetchChartWeekly(sym) {
     const d = await r.json();
     const result = d.chart?.result?.[0];
     if (!result) return null;
-    const rawCloses = result.indicators?.quote?.[0]?.close || [];
+    // Prefer adjusted closes (split + dividend adjusted) to match what every
+    // other financial platform displays. Yahoo's `quote[0].close` is the raw
+    // print price, which diverges from `adjclose[0].adjclose` any time a
+    // stock splits or pays a dividend. Fallback to raw close if adjclose
+    // array is somehow missing.
+    const adjCloses = result.indicators?.adjclose?.[0]?.adjclose;
+    const rawCloses = (adjCloses && adjCloses.length > 0)
+      ? adjCloses
+      : (result.indicators?.quote?.[0]?.close || []);
     const rawTs = result.timestamp || [];
     // Drop null bars (weekends/holidays occasionally leak through), keep
     // closes and timestamps aligned.
@@ -6994,6 +7002,12 @@ async function runScan() {
           price: s.metrics.price,
           fromHi: s.metrics.fromHi,
           ret1m: s.metrics.ret1m,
+          ret3m: s.metrics.ret3m,
+          ret6m: s.metrics.ret6m,
+          ret12m: s.metrics.ret12m,
+          ret12m_1m: s.metrics.ret12m_1m,
+          rs12m: s.metrics.rs12m,
+          rs3m: s.metrics.rs3m,
           sma10: s.metrics.sma10,
           sma40: s.metrics.sma40,
           sma10Slope: s.metrics.sma10Slope,
@@ -8212,6 +8226,12 @@ async function refreshWatchlist() {
         price:      m.price,
         fromHi:     m.fromHi,
         ret1m:      m.ret1m,
+        ret3m:      m.ret3m,
+        ret6m:      m.ret6m,
+        ret12m:     m.ret12m,
+        ret12m_1m:  m.ret12m_1m,
+        rs12m:      m.rs12m,
+        rs3m:       m.rs3m,
         sma10:      m.sma10,
         sma40:      m.sma40,
         sma10Slope: m.sma10Slope,
