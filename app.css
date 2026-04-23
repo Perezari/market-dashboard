@@ -4308,6 +4308,143 @@ td.pct.flat{color:var(--dim)}
   font-family:var(--mono);letter-spacing:.3px;
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   SEPA Entry Signal section — Minervini-style buy-timing analysis.
+   Design goals:
+     - Feels like a sibling of the Exit section (same idioms: soft-tinted
+       verdict banner, 1px-gap grid, mono numbers).
+     - Rich enough to convey 8 data points at a glance without visual noise.
+     - Color palette maps to semantic meaning (green=go, blue=base forming,
+       amber=caution, orange=bad timing, red=no, gray=unknown).
+   ══════════════════════════════════════════════════════════════════════ */
+
+.entry-verdict{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:12px 14px;border-radius:8px;
+  margin-bottom:12px;
+}
+.entry-verdict-icon{
+  font-size:24px;line-height:1;flex-shrink:0;
+  filter:saturate(.85);
+}
+.entry-verdict-text{flex:1;min-width:0}
+.entry-verdict-label{
+  font-size:13.5px;font-weight:700;
+  margin-bottom:4px;line-height:1.3;
+}
+.entry-verdict-reasons{
+  font-size:11.5px;line-height:1.55;
+  font-weight:500;opacity:.88;
+}
+.entry-verdict-reasons > div{margin-top:1px}
+
+/* Verdict state colors — soft-tinted backgrounds, semantic hues */
+.entry-attractive  {background:var(--green-soft);color:var(--green);border:1px solid var(--green-dim)}
+.entry-speculative {background:var(--amber-soft);color:var(--amber);border:1px solid rgba(240,181,106,.3)}
+.entry-prebreakout {background:rgba(100,161,255,.1);color:#7fb2ff;border:1px solid rgba(100,161,255,.3)}
+.entry-chasing     {background:rgba(255,148,84,.09);color:#ff9c58;border:1px solid rgba(255,148,84,.3)}
+.entry-extended    {background:rgba(255,148,84,.09);color:#ff9c58;border:1px solid rgba(255,148,84,.3)}
+.entry-distribution{background:rgba(255,148,84,.09);color:#ff9c58;border:1px solid rgba(255,148,84,.3)}
+.entry-wait        {background:var(--bg3);color:var(--text);border:1px solid var(--border)}
+.entry-broken      {background:rgba(228,108,108,.08);color:var(--red);border:1px solid rgba(228,108,108,.3)}
+.entry-unknown     {background:var(--bg3);color:var(--dim);border:1px solid var(--border)}
+
+/* Grid of 8 data cells — 4 columns × 2 rows; "wide" cells span 2 columns.
+   Uses 1px gap on a --border background for clean dividing lines. */
+.entry-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:1px;background:var(--border);
+  border-radius:7px;overflow:hidden;
+  margin-bottom:10px;
+}
+.entry-cell{
+  padding:10px 11px;background:var(--bg2);
+  display:flex;flex-direction:column;gap:3px;min-width:0;
+}
+.entry-cell-wide{grid-column:span 2}
+.entry-cell-lbl{
+  font-size:10px;color:var(--dim);font-weight:600;
+  letter-spacing:.4px;text-transform:uppercase;
+}
+.entry-cell-val{
+  font-size:13px;color:var(--text);font-weight:600;
+  font-family:var(--mono);line-height:1.35;
+  word-break:break-word;
+}
+.entry-cell-sub{
+  font-size:10.5px;color:var(--dim);line-height:1.3;
+  font-weight:500;
+}
+
+/* Value state modifiers — tint the cell-val text */
+.entry-ok  {color:var(--green)!important}
+.entry-warn{color:var(--amber)!important}
+.entry-bad {color:var(--red)!important}
+.entry-na  {color:var(--dim)!important}
+.entry-info{color:#7fb2ff!important}
+
+/* Position sizing row — soft callout box above disclaimer */
+.entry-sizing{
+  margin-top:4px;padding:9px 12px;
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:6px;
+  font-size:11.5px;line-height:1.5;color:var(--text);
+  font-weight:500;
+}
+.entry-sizing-warn{
+  margin-top:6px;padding-top:6px;
+  border-top:1px dashed rgba(240,181,106,.3);
+  color:var(--amber);font-size:10.5px;font-weight:500;
+}
+.entry-market{
+  margin-top:6px;padding:7px 10px;
+  background:var(--bg3);border-radius:6px;
+  font-size:11px;text-align:center;
+}
+.entry-market .ok {color:var(--green)}
+.entry-market .bad{color:var(--red)}
+
+.entry-disclaimer{
+  margin-top:10px;padding-top:9px;border-top:1px solid var(--border);
+  font-size:10px;color:var(--dimmer);line-height:1.5;
+  text-align:center;
+}
+
+/* Mobile: collapse 4-column grid to 2 columns */
+@media (max-width:480px){
+  .entry-grid{grid-template-columns:repeat(2,1fr)}
+  .entry-cell-wide{grid-column:span 2}
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   .epl — Entry Pill for the picks-table "כניסה" column.
+   Compact (fits 78px column cell), color-coded per SEPA verdict. Mirrors
+   the detail-panel verdict palette so users can build intuition across both
+   surfaces. Hover tooltip reveals full verdict label + setup.
+   ══════════════════════════════════════════════════════════════════════ */
+.epl{
+  display:inline-block;
+  min-width:54px;padding:3px 8px;
+  border-radius:4px;
+  font-size:10.5px;font-weight:600;letter-spacing:.1px;
+  border:1px solid transparent;
+  line-height:1.3;cursor:help;
+  white-space:nowrap;
+}
+.epl-attractive  {background:var(--green-soft);color:var(--green);border-color:var(--green-dim)}
+.epl-prebreakout {background:rgba(100,161,255,.1);color:#7fb2ff;border-color:rgba(100,161,255,.3)}
+.epl-speculative {background:var(--amber-soft);color:var(--amber);border-color:rgba(240,181,106,.3)}
+.epl-chasing     {background:rgba(255,148,84,.09);color:#ff9c58;border-color:rgba(255,148,84,.3)}
+.epl-extended    {background:rgba(255,148,84,.09);color:#ff9c58;border-color:rgba(255,148,84,.3)}
+.epl-distribution{background:rgba(255,148,84,.09);color:#ff9c58;border-color:rgba(255,148,84,.3)}
+.epl-wait        {background:var(--bg3);color:var(--dim);border-color:var(--border)}
+.epl-broken      {background:rgba(228,108,108,.08);color:var(--red);border-color:rgba(228,108,108,.3)}
+.epl-unknown     {background:transparent;color:var(--dimmer);border-color:transparent;font-weight:500}
+
+/* Entry-cell td-level tweak — tighter vertical padding so the pill
+   centers in the narrower cell height. */
+table.picks tbody td.entry-cell-td{padding:6px 4px}
+
 /* ═══ WATCHLIST BANNER (appears above table in "רשימה שלי" view) ═══ */
 .wl-banner{
   display:flex;align-items:center;justify-content:space-between;gap:12px;
@@ -6036,20 +6173,20 @@ table.picks th:nth-child(3){width:110px}   /* סקטור    */
 table.picks th:nth-child(4){width:130px}   /* תת-סקטור */
 table.picks th:nth-child(5){width:72px}    /* ציון     */
 table.picks th:nth-child(6){width:72px}    /* פקטורים  */
-table.picks th:nth-child(7){width:88px}    /* מחיר     */
-table.picks th:nth-child(8){width:76px}    /* 1Y       */
-table.picks th:nth-child(9){width:76px}    /* 3M       */
-table.picks th:nth-child(10){width:82px}   /* מ-52שי   */
+table.picks th:nth-child(7){width:78px}    /* כניסה    */
+table.picks th:nth-child(8){width:88px}    /* מחיר     */
+table.picks th:nth-child(9){width:76px}    /* 1Y       */
+table.picks th:nth-child(10){width:76px}   /* 3M       */
+table.picks th:nth-child(11){width:82px}   /* מ-52שי   */
 
-/* Center the ציון (badge) and פקטורים (mini-bars) columns so the
-   header caption lines up directly above the visual element.
-   Columns shifted by +1 after adding תת-סקטור. */
-/* Center-align the score + factor bars columns. Column indices shifted by 1
-   when the trend sparkline was added at position 3. */
+/* Center the ציון (badge), פקטורים (mini-bars), and כניסה (pill) columns so the
+   header caption lines up directly above the visual element. */
 table.picks thead th:nth-child(6),
 table.picks tbody td:nth-child(6),
 table.picks thead th:nth-child(7),
-table.picks tbody td:nth-child(7){text-align:center}
+table.picks tbody td:nth-child(7),
+table.picks thead th:nth-child(8),
+table.picks tbody td:nth-child(8){text-align:center}
 
 /* Ellipsis for name/sector/sub-industry when content is long. */
 table.picks tbody td.sym,
