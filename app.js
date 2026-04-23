@@ -6048,7 +6048,7 @@ let scanData = null;
 let displayState = {
   minScore: 50,
   sector: '',
-  view: 'all',
+  view: 'watchlist',
   sortKey: 'score',
   sortDesc: true,
   searchQuery: '',     // live filter from the search box above the table
@@ -6072,10 +6072,13 @@ async function advisorBoot() {
   // Validate saved methodology against the live METHODOLOGIES dictionary
   // (we couldn't do this at the `let currentMethodology = ...` site because of TDZ)
   if (!METHODOLOGIES[currentMethodology]) currentMethodology = 'momentum';
-  // Build custom dropdowns (universe + sector + methodology) and reflect current state
+  // Build custom dropdowns (universe + sector + methodology + min-score + view)
+  // and reflect current state
   populateUniverseDropdown();
   populateSectorDropdown();
   populateMethodologyDropdown();
+  populateMinScoreDropdown();
+  populateViewDropdown();
   syncUniverseUI();
   syncMethodologyUI();
   // Kick off cloud sync in the background — if user has a session it pulls
@@ -6898,14 +6901,71 @@ function renderKPIs() {
 }
 
 function applyFilters() { renderTable(); }
-function setMinScore(v, btn) {
+
+/* ────────────── MIN-SCORE DROPDOWN ────────────── */
+const MIN_SCORE_OPTS = [
+  { val: 0,  label: 'הכל' },
+  { val: 50, label: '50+' },
+  { val: 70, label: '70+' },
+  { val: 85, label: '85+' },
+];
+function populateMinScoreDropdown() {
+  const panel = $('cdd-minscore-panel');
+  if (!panel) return;
+  panel.innerHTML = '';
+  MIN_SCORE_OPTS.forEach(o => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cdd-option';
+    if (o.val === displayState.minScore) btn.classList.add('active');
+    btn.dataset.value = String(o.val);
+    btn.innerHTML = `<div class="cdd-option-title">${o.label}</div>`;
+    btn.onclick = (e) => { e.stopPropagation(); setMinScore(o.val, o.label); };
+    panel.appendChild(btn);
+  });
+}
+function setMinScore(v, label) {
   displayState.minScore = v;
-  document.querySelectorAll('[data-min]').forEach(b => b.classList.toggle('active', b === btn));
+  const cur = $('cdd-minscore-current');
+  if (cur) cur.textContent = label != null ? label : ((MIN_SCORE_OPTS.find(o => o.val === v) || {}).label || 'הכל');
+  const panel = $('cdd-minscore-panel');
+  if (panel) panel.querySelectorAll('.cdd-option').forEach(b =>
+    b.classList.toggle('active', Number(b.dataset.value) === v)
+  );
+  closeAllCdd();
   renderTable();
 }
-function setView(v, btn) {
+
+/* ────────────── VIEW DROPDOWN ────────────── */
+const VIEW_OPTS = [
+  { val: 'watchlist', label: 'רשימה שלי' },
+  { val: 'top20',     label: 'Top 20' },
+  { val: 'all',       label: 'הכל' },
+];
+function populateViewDropdown() {
+  const panel = $('cdd-view-panel');
+  if (!panel) return;
+  panel.innerHTML = '';
+  VIEW_OPTS.forEach(o => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cdd-option';
+    if (o.val === displayState.view) btn.classList.add('active');
+    btn.dataset.value = o.val;
+    btn.innerHTML = `<div class="cdd-option-title">${o.label}</div>`;
+    btn.onclick = (e) => { e.stopPropagation(); setView(o.val, o.label); };
+    panel.appendChild(btn);
+  });
+}
+function setView(v, label) {
   displayState.view = v;
-  document.querySelectorAll('.chip[data-view]').forEach(b => b.classList.toggle('active', b === btn));
+  const cur = $('cdd-view-current');
+  if (cur) cur.textContent = label != null ? label : ((VIEW_OPTS.find(o => o.val === v) || {}).label || 'הכל');
+  const panel = $('cdd-view-panel');
+  if (panel) panel.querySelectorAll('.cdd-option').forEach(b =>
+    b.classList.toggle('active', b.dataset.value === v)
+  );
+  closeAllCdd();
   renderTable();
 }
 

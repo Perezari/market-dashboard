@@ -712,16 +712,23 @@
     </div>
     <div class="ctl-group">
       <span class="ctl-label">ציון מינ׳</span>
-      <button class="chip" data-min="0" onclick="setMinScore(0, this)">הכל</button>
-      <button class="chip active" data-min="50" onclick="setMinScore(50, this)">50+</button>
-      <button class="chip" data-min="70" onclick="setMinScore(70, this)">70+</button>
-      <button class="chip" data-min="85" onclick="setMinScore(85, this)">85+</button>
+      <div class="cdd cdd-simple" id="cdd-minscore">
+        <button class="cdd-trigger" type="button" onclick="toggleCdd('minscore')">
+          <span class="cdd-current" id="cdd-minscore-current">50+</span>
+          <svg class="cdd-chevron" viewBox="0 0 12 8" fill="none"><path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="cdd-panel" id="cdd-minscore-panel"></div>
+      </div>
     </div>
     <div class="ctl-group">
       <span class="ctl-label">תצוגה</span>
-      <button class="chip active" data-view="all" onclick="setView('all', this)">הכל</button>
-      <button class="chip" data-view="top20" onclick="setView('top20', this)">Top 20</button>
-      <button class="chip" data-view="watchlist" onclick="setView('watchlist', this)">רשימה שלי</button>
+      <div class="cdd cdd-simple" id="cdd-view">
+        <button class="cdd-trigger" type="button" onclick="toggleCdd('view')">
+          <span class="cdd-current" id="cdd-view-current">רשימה שלי</span>
+          <svg class="cdd-chevron" viewBox="0 0 12 8" fill="none"><path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="cdd-panel" id="cdd-view-panel"></div>
+      </div>
     </div>
     <div class="ctl-spacer"></div>
     <div class="ctl-group">
