@@ -718,32 +718,74 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
   .sp-sidebar-right .sp-stats-grid{grid-template-columns:repeat(2,1fr)}
   .sp-body{background:var(--bg2)}
 }
-/* Chart fullscreen overlay */
+/* Chart fullscreen overlay — centers the chart on a dark canvas with
+   sensible proportions, rather than forcing height:100% (which distorted
+   the line and pushed the volume + axis off-screen). The wrap is MOVED
+   into this overlay (not cloned), so all event listeners keep working. */
 .chart-fs-overlay{
   position:fixed;inset:0;z-index:20000;
   background:var(--bg);
-  display:flex;flex-direction:column;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:72px 28px 28px;
   animation:fadeIn .15s ease;
 }
-.chart-fs-overlay .chart-fs-inner{
-  flex:1;display:flex;flex-direction:column;overflow:hidden;
+.chart-fs-inner{
+  width:100%;
+  max-width:1500px;
+  display:flex;
 }
 .chart-fs-overlay .sp-chart-wrap{
-  flex:1;display:flex;flex-direction:column;border-bottom:none;
+  flex:1;min-width:0;
+  border:1px solid var(--border);
+  border-radius:12px;
+  overflow:hidden;
+  background:var(--bg2);
+  box-shadow:0 10px 40px rgba(0,0,0,.25);
 }
-.chart-fs-overlay .sp-chart-hdr{flex-shrink:0}
-.chart-fs-overlay #sp-chart-container{flex:1;position:relative}
-.chart-fs-overlay #sp-chart-svg{height:100%!important}
-/* In fullscreen the price SVG stretches to the full container; the dot
-   layer has to follow or the hover dot gets stuck in the top 240px band. */
-.chart-fs-overlay .sp-chart-dot-layer{height:100%!important}
+/* ~1.6x the normal 240px — preserves a good line stroke and keeps the
+   volume bars + axis labels visible. */
+.chart-fs-overlay #sp-chart-svg{height:380px!important}
+.chart-fs-overlay .sp-chart-dot-layer{height:380px!important}
+/* Live readout in the overlay — the scoped query in _chartMove prefers
+   .sp-chart-hdr-live inside the active panel/overlay, so the crosshair
+   tooltip surfaces here while in fullscreen. */
+.chart-fs-readout{
+  position:absolute;top:20px;left:50%;
+  transform:translateX(-50%);
+  z-index:5;
+  font-family:var(--mono);font-size:10px;color:var(--dim);
+  letter-spacing:0.8px;text-transform:uppercase;font-weight:700;
+  padding:8px 16px;
+  border-radius:999px;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  min-width:80px;text-align:center;
+  white-space:nowrap;
+}
+/* When the hover-readout class kicks in, keep our centered position but
+   let the global hover styles (flex layout, larger gap) take effect. */
+.chart-fs-readout.sp-hdr-hovering{
+  transform:translateX(-50%);
+  background:var(--bg3);
+  border-color:var(--border2);
+}
 .chart-fs-close{
-  position:absolute;top:12px;right:12px;z-index:10;
-  background:var(--bg3);border:1px solid var(--border);
-  color:var(--dim);width:30px;height:30px;border-radius:50%;
-  cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;
+  position:absolute;top:18px;right:18px;z-index:10;
+  background:var(--bg2);border:1px solid var(--border);
+  color:var(--dim);width:34px;height:34px;border-radius:50%;
+  cursor:pointer;font-size:20px;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s;
 }
-.chart-fs-close:hover{background:var(--bg4);color:var(--text)}
+.chart-fs-close:hover{background:var(--bg3);color:var(--text);border-color:var(--border2)}
+@media(max-width:700px){
+  .chart-fs-overlay{padding:60px 12px 12px}
+  .chart-fs-overlay #sp-chart-svg{height:260px!important}
+  .chart-fs-overlay .sp-chart-dot-layer{height:260px!important}
+  .chart-fs-readout{font-size:9px;padding:6px 12px}
+}
 /* Desktop section cards */
 .sp-section-card{
   margin:12px;
@@ -763,44 +805,49 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
   transition:background .15s, color .15s;
 }
 /* Live readout when hovering the chart — header becomes a flex container
-   with all the data inline. Numbers stay LTR (mono), labels stay RTL. */
-.sp-section-hdr.sp-hdr-hovering{
+   with all the data inline. Numbers stay LTR (mono), labels stay RTL.
+   Targets the shared .sp-chart-hdr-live class so BOTH the stock-detail's
+   .sp-section-hdr and the advisor's .dt-section-title render correctly. */
+.sp-chart-hdr-live.sp-hdr-hovering{
   display:flex;align-items:center;gap:10px;flex-wrap:wrap;
   text-transform:none;letter-spacing:normal;
   background:var(--bg4);
   color:var(--text);
   padding-block:7px;
 }
-.sp-section-hdr.sp-hdr-hovering .sp-hdr-label{
+/* Advisor titles carry a green ::before bullet — hide it when the hdr has
+   turned into the crosshair readout, otherwise it crowds the live data. */
+.sp-chart-hdr-live.sp-hdr-hovering::before{display:none}
+.sp-chart-hdr-live.sp-hdr-hovering .sp-hdr-label{
   font-size:10px;font-weight:700;color:var(--dim);
   letter-spacing:0.8px;text-transform:uppercase;
 }
-.sp-section-hdr.sp-hdr-hovering .sp-hdr-sep{
+.sp-chart-hdr-live.sp-hdr-hovering .sp-hdr-sep{
   color:var(--dimmer);font-weight:400;
 }
-.sp-section-hdr.sp-hdr-hovering .sp-hdr-date{
+.sp-chart-hdr-live.sp-hdr-hovering .sp-hdr-date{
   font-family:var(--mono);font-size:10px;font-weight:500;color:var(--dim);
   letter-spacing:.3px;direction:ltr;
 }
-.sp-section-hdr.sp-hdr-hovering .sp-hdr-price{
+.sp-chart-hdr-live.sp-hdr-hovering .sp-hdr-price{
   font-family:var(--mono);font-size:13px;font-weight:800;color:var(--text);
   direction:ltr;
 }
-.sp-section-hdr.sp-hdr-hovering .sp-hdr-chg{
+.sp-chart-hdr-live.sp-hdr-hovering .sp-hdr-chg{
   font-family:var(--mono);font-size:11px;font-weight:700;
   direction:ltr;
 }
-.sp-section-hdr.sp-hdr-hovering .sp-hdr-vol{
+.sp-chart-hdr-live.sp-hdr-hovering .sp-hdr-vol{
   font-family:var(--mono);font-size:10px;font-weight:500;color:var(--dim);
   margin-inline-start:auto;direction:ltr;
 }
 @media(max-width:600px){
   /* On mobile, keep the readout compact — drop volume, use smaller text */
-  .sp-section-hdr.sp-hdr-hovering .sp-hdr-vol{display:none}
-  .sp-section-hdr.sp-hdr-hovering{gap:7px}
-  .sp-section-hdr.sp-hdr-hovering .sp-hdr-date{font-size:9px}
-  .sp-section-hdr.sp-hdr-hovering .sp-hdr-price{font-size:12px}
-  .sp-section-hdr.sp-hdr-hovering .sp-hdr-chg{font-size:10px}
+  .sp-chart-hdr-live.sp-hdr-hovering .sp-hdr-vol{display:none}
+  .sp-chart-hdr-live.sp-hdr-hovering{gap:7px}
+  .sp-chart-hdr-live.sp-hdr-hovering .sp-hdr-date{font-size:9px}
+  .sp-chart-hdr-live.sp-hdr-hovering .sp-hdr-price{font-size:12px}
+  .sp-chart-hdr-live.sp-hdr-hovering .sp-hdr-chg{font-size:10px}
 }
 /* Override chart/stats margins inside section cards */
 .sp-section-card .sp-chart-wrap{border-bottom:none}
@@ -4971,6 +5018,25 @@ body.overlay-scroll-locked {
   font-family:var(--mono);
 }
 .dt-section-title::before{content:'';width:3px;height:11px;background:var(--green);border-radius:2px}
+/* Advisor chart host — framed container that holds the shared
+   .sp-chart-wrap from buildChartSvg, so the advisor's full chart sits
+   inside a card visually matching the other dt-sections. */
+.dt-chart-host{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  overflow:hidden;
+}
+.dt-chart-host .sp-chart-wrap{border-bottom:none}
+/* The section title above the chart already handles spacing, so neutralize
+   the .sp-chart-hdr-live section-card padding inheritance when used in
+   advisor (class-based hover readout styling already applied above). */
+.dt-section-title.sp-chart-hdr-live.sp-hdr-hovering{
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:7px;
+  padding:7px 10px;margin-bottom:8px;
+}
 
 .factor-grid{display:grid;grid-template-columns:1fr;gap:6px}
 .factor-row{

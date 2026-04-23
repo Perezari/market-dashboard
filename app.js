@@ -1939,18 +1939,20 @@ function buildChartSvg(sym, meta, timestamps, closes, volumes, rangeKey) {
     return `<span style="position:absolute;left:${pct}%;transform:${xf};font-size:10px;color:var(--dim);font-family:var(--sans);white-space:nowrap;font-weight:500">${lbl}</span>`;
   }).join('');
 
-  // Range buttons + tool buttons
+  // Range buttons + tool buttons — each passes `this` so the handler can
+  // scope its DOM work to the wrap that was actually clicked (critical when
+  // multiple chart wraps exist simultaneously, e.g. stock-detail + advisor).
   const rangeBar = `<div class="sp-chart-hdr">
     <div class="sp-chart-ranges">${
       Object.keys(CHART_RANGE_CFG).map(k=>
-        `<button class="sp-rng-btn${k===rangeKey?' active':''}" onclick="switchChartRange('${k}')">${k}</button>`
+        `<button class="sp-rng-btn${k===rangeKey?' active':''}" onclick="switchChartRange('${k}', this)">${k}</button>`
       ).join('')
     }</div>
     <div class="sp-chart-tools">
-      <button class="sp-tool-btn" onclick="_chartZoom(1)" title="Zoom In"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
-      <button class="sp-tool-btn" onclick="_chartZoom(-1)" title="Zoom Out"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
-      <button class="sp-tool-btn" onclick="_chartScreenshot('${sym}')" title="Screenshot"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
-      <button class="sp-tool-btn" onclick="_chartExpandFull()" title="Expand chart"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+      <button class="sp-tool-btn" onclick="_chartZoom(1, this)" title="Zoom In"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
+      <button class="sp-tool-btn" onclick="_chartZoom(-1, this)" title="Zoom Out"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg></button>
+      <button class="sp-tool-btn" onclick="_chartScreenshot('${sym}', this)" title="Screenshot"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
+      <button class="sp-tool-btn" onclick="_chartExpandFull(this)" title="Expand chart"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
     </div>
   </div>`;
 
@@ -2000,12 +2002,19 @@ function _chartMove(e, overlay) {
   const idx = Math.max(0, Math.min(pts.length-1, Math.round(relX*(pts.length-1))));
   const pt = pts[idx];
 
-  const vl=$('sp-xh-v'), hl=$('sp-xh-h'), dt=$('sp-xh-dot');
+  // Scope all crosshair lookups to the wrap the user is actually hovering.
+  // When multiple chart wraps live in the DOM (e.g. the stock-detail panel
+  // keeps its chart rendered while the advisor DETAIL VIEW opens its own),
+  // getElementById returns whichever one comes first in document order —
+  // often a hidden one. That's why the dot would vanish after visiting the
+  // advisor and coming back to the stock detail.
+  const wrap = overlay.closest('.sp-chart-wrap');
+  if (!wrap) return;
+  const vl = wrap.querySelector('#sp-xh-v');
+  const hl = wrap.querySelector('#sp-xh-h');
+  const dt = wrap.querySelector('.sp-xh-dot');
   if (vl) { vl.setAttribute('x1',pt.svgX.toFixed(1)); vl.setAttribute('x2',pt.svgX.toFixed(1)); vl.setAttribute('opacity','1'); }
   if (hl) { hl.setAttribute('y1',pt.svgY.toFixed(1)); hl.setAttribute('y2',pt.svgY.toFixed(1)); hl.setAttribute('opacity','1'); }
-  // The dot is an HTML element (not SVG) so it stays a perfect circle.
-  // Position via % relative to the .sp-chart-dot-layer which exactly
-  // overlays the 240px price SVG.
   if (dt) {
     const xPct = (pt.svgX / m.W) * 100;
     const yPct = (pt.svgY / m.CHART_H) * 100;
@@ -2015,10 +2024,12 @@ function _chartMove(e, overlay) {
   }
 
   // Instead of a floating tooltip that covers the chart, we update the
-  // chart's own section header inline with the hover data. Must target
-  // by specific ID — there are multiple sp-section-hdr elements (profile,
-  // market data, news) and the first match differs between layouts.
-  const hdr = document.getElementById('sp-chart-hdr');
+  // chart's own section header inline with the hover data. Target the hdr
+  // inside the same panel as the hovered chart — both the stock-detail and
+  // advisor panels share the same .sp-chart-hdr-live hook, and a plain ID
+  // lookup would always hit the first one in the DOM.
+  const panel = overlay.closest('.stock-overlay, .dt-overlay, .chart-fs-overlay');
+  const hdr = (panel && panel.querySelector('.sp-chart-hdr-live')) || document.getElementById('sp-chart-hdr');
   if (!hdr) return;
   const d = new Date(pt.t*1000);
   const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -2044,16 +2055,17 @@ function _chartMove(e, overlay) {
   `;
 }
 function _chartLeave() {
-  // SVG lines use attribute opacity; HTML dot uses style opacity
-  const vl = $('sp-xh-v'); if (vl) vl.setAttribute('opacity','0');
-  const hl = $('sp-xh-h'); if (hl) hl.setAttribute('opacity','0');
-  const dt = $('sp-xh-dot'); if (dt) dt.style.opacity = '0';
-  // Reset the chart header back to just "גרף"
-  const hdr = document.getElementById('sp-chart-hdr');
-  if (hdr) {
+  // Reset every chart's hover state — querySelectorAll with an attribute
+  // selector picks up all copies of the shared IDs, so duplicate-ID
+  // situations (stock-detail + advisor both mounted) can't leave a ghost
+  // dot behind. The .sp-xh-dot class matches the HTML dot; duplicate-ID
+  // copies of sp-xh-v / sp-xh-h get reset via [id="…"] selector.
+  document.querySelectorAll('[id="sp-xh-v"], [id="sp-xh-h"]').forEach(el => el.setAttribute('opacity','0'));
+  document.querySelectorAll('.sp-xh-dot').forEach(el => { el.style.opacity = '0'; });
+  document.querySelectorAll('.sp-chart-hdr-live.sp-hdr-hovering').forEach(hdr => {
     hdr.classList.remove('sp-hdr-hovering');
     hdr.innerHTML = 'גרף';
-  }
+  });
 }
 
 /* ── Helper: rebuild sp-body (center: chart only on desktop, all on mobile) ── */
@@ -2082,7 +2094,7 @@ function _rebuildSpBody(newChartHtml) {
 
   const bodyHtml = `
     <div class="sp-section-card" style="margin:12px">
-      <div class="sp-section-hdr" id="sp-chart-hdr">גרף</div>
+      <div class="sp-section-hdr sp-chart-hdr-live" id="sp-chart-hdr">גרף</div>
       ${newChartHtml}
     </div>
     ${mobileExtra}
@@ -2120,7 +2132,7 @@ const _ZOOM_LEVELS = [1, 0.75, 0.5, 0.25];
 window._chartZoomIdx = 0;
 window._chartOrigPts = null; // שמירת הנתונים המקוריים לפני זום
 
-function _chartZoom(dir) {
+function _chartZoom(dir, btn) {
   // dir: 1 = zoom in (show less), -1 = zoom out (show more)
   const d = window._spData; if (!d) return;
 
@@ -2138,27 +2150,61 @@ function _chartZoom(dir) {
   const start = Math.floor(origPts.length * (1 - frac));
   const sliced = origPts.slice(start);
 
-  const newChart = buildChartSvg(
+  const newChartHtml = buildChartSvg(
     d.sym, d.meta,
     sliced.map(p=>p.t), sliced.map(p=>p.c), sliced.map(p=>p.v),
     window._chartMeta?.rangeKey || '1M'
   );
   // שחזר את הנתונים המקוריים שבuildChartSvg מחק
   window._chartAllPts = origPts;
-  _rebuildSpBody(newChart);
+  if (!newChartHtml) return;
+  // Replace THIS wrap (the one that owns the button), not the first-in-DOM.
+  const wrap = (btn && btn.closest('.sp-chart-wrap')) || document.querySelector('.sp-chart-wrap');
+  if (!wrap) return;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = newChartHtml;
+  const newWrap = tmp.firstElementChild;
+  if (!newWrap) return;
+  wrap.replaceWith(newWrap);
 }
 
-function _chartScreenshot(sym) {
-  const svg = $('sp-chart-svg'); if (!svg) return;
+function _chartScreenshot(sym, btn) {
+  // Scope the SVG lookup to the wrap owning this button — otherwise
+  // getElementById('sp-chart-svg') would grab the first copy in the DOM,
+  // which may be a hidden chart in a different panel.
+  const wrap = (btn && btn.closest('.sp-chart-wrap')) || document.querySelector('.sp-chart-wrap');
+  const svg = wrap ? wrap.querySelector('#sp-chart-svg') : $('sp-chart-svg');
+  if (!svg) return;
 
-  // בנה SVG עם רקע כהה
+  // Resolve CSS custom properties — they DON'T cascade into a standalone SVG
+  // loaded via <img src="blob:...svg+xml">. That's why the preview used to
+  // render as a black rectangle: every fill/stroke was `var(--chart-up)` or
+  // `var(--chart-down)` which the standalone SVG couldn't dereference.
+  const cs = getComputedStyle(document.documentElement);
+  const isLight = document.body.classList.contains('light');
+  const resolve = (name, fallback) => {
+    const v = cs.getPropertyValue(name).trim();
+    return v || fallback;
+  };
+  const chartUp   = resolve('--chart-up',    '#4caf50');
+  const chartDown = resolve('--chart-down',  '#ea4335');
+  const bgCol     = resolve('--bg2', isLight ? '#ffffff' : '#1e1d1c');
+
   const clone = svg.cloneNode(true);
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  // Theme-matched background
   const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
   bg.setAttribute('width','100%'); bg.setAttribute('height','100%');
-  bg.setAttribute('fill','#1e1d1c');
+  bg.setAttribute('fill', bgCol);
   clone.insertBefore(bg, clone.firstChild);
-  const svgStr = new XMLSerializer().serializeToString(clone);
+
+  let svgStr = new XMLSerializer().serializeToString(clone);
+  // Inline the CSS var references so the exported SVG renders anywhere
+  svgStr = svgStr
+    .replace(/var\(--chart-up\)/g, chartUp)
+    .replace(/var\(--chart-down\)/g, chartDown)
+    .replace(/var\(--chart-up-dim\)/g, chartUp)
+    .replace(/var\(--chart-down-dim\)/g, chartDown);
   const svgBlob = new Blob([svgStr], {type:'image/svg+xml;charset=utf-8'});
   const svgUrl = URL.createObjectURL(svgBlob);
 
@@ -2194,6 +2240,7 @@ function _chartScreenshot(sym) {
   document.body.appendChild(modal);
   window._ssSvgUrl = svgUrl;
   window._ssSvg = svg;
+  window._ssBgCol = bgCol;
 }
 
 function _ssDlSvg(sym) {
@@ -2209,7 +2256,8 @@ function _ssDlPng(sym) {
   const scale = 2;
   canvas.width = rect.width * scale; canvas.height = rect.height * scale;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#1e1d1c'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = window._ssBgCol || '#1e1d1c';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
   const img = new Image();
   img.onload = () => {
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -2223,45 +2271,109 @@ function _ssDlPng(sym) {
   img.src = window._ssSvgUrl;
 }
 
-function _chartExpandFull() {
-  const existing = document.getElementById('chart-fs-overlay');
-  if (existing) { existing.remove(); return; }
-  const wrap = document.querySelector('.sp-chart-wrap');
+/* Fullscreen chart — moves the .sp-chart-wrap DOM node INTO the overlay
+   rather than cloning it (old impl did outerHTML clone, which produced
+   duplicate IDs — sp-xh-dot / sp-xh-v / sp-chart-svg — and broke hover
+   because getElementById returned the background copy). On close, the wrap
+   moves back to where it came from. Also hosts its own .sp-chart-hdr-live
+   readout so the crosshair tooltip stays functional in fullscreen. */
+function _chartExpandFull(btn) {
+  if (document.getElementById('chart-fs-overlay')) {
+    _chartCloseFullscreen();
+    return;
+  }
+  // Pick the wrap that owns this button (falls back to the first in DOM
+  // if the caller didn't pass `this` — only legacy callers).
+  const wrap = (btn && btn.closest('.sp-chart-wrap')) || document.querySelector('.sp-chart-wrap');
   if (!wrap) return;
+  // Placeholder so we know where to restore the wrap on close.
+  const placeholder = document.createElement('div');
+  placeholder.id = '_chart-fs-placeholder';
+  placeholder.style.display = 'none';
+  wrap.parentNode.insertBefore(placeholder, wrap);
+
   const overlay = document.createElement('div');
   overlay.id = 'chart-fs-overlay';
   overlay.className = 'chart-fs-overlay';
-  overlay.innerHTML = `
-    <button class="chart-fs-close" onclick="document.getElementById('chart-fs-overlay').remove()">×</button>
-    <div class="chart-fs-inner">${wrap.outerHTML}</div>`;
-  overlay.addEventListener('keydown', e=>{ if(e.key==='Escape') overlay.remove(); });
+
+  const close = document.createElement('button');
+  close.className = 'chart-fs-close';
+  close.type = 'button';
+  close.textContent = '×';
+  close.onclick = _chartCloseFullscreen;
+
+  // Crosshair readout — scoped query in _chartMove finds this one first
+  // because it lives inside the overlay, so the date/price tooltip surfaces
+  // here instead of updating the now-hidden panel header.
+  const readout = document.createElement('div');
+  readout.className = 'chart-fs-readout sp-chart-hdr-live';
+  readout.textContent = 'גרף';
+
+  const inner = document.createElement('div');
+  inner.className = 'chart-fs-inner';
+  inner.appendChild(wrap); // MOVE the node — event listeners survive.
+
+  overlay.append(close, readout, inner);
   document.body.appendChild(overlay);
-  overlay.focus();
+
+  // ESC closes
+  overlay._escHandler = e => { if (e.key === 'Escape') _chartCloseFullscreen(); };
+  document.addEventListener('keydown', overlay._escHandler);
 }
 
-async function switchChartRange(rangeKey) {
+function _chartCloseFullscreen() {
+  const overlay = document.getElementById('chart-fs-overlay');
+  if (!overlay) return;
+  const wrap = overlay.querySelector('.sp-chart-wrap');
+  const placeholder = document.getElementById('_chart-fs-placeholder');
+  if (wrap && placeholder) placeholder.replaceWith(wrap);
+  else if (placeholder) placeholder.remove();
+  if (overlay._escHandler) document.removeEventListener('keydown', overlay._escHandler);
+  overlay.remove();
+}
+
+async function switchChartRange(rangeKey, btn) {
   const d = window._spData; if (!d) return;
   const cfg = CHART_RANGE_CFG[rangeKey]; if (!cfg) return;
-  // איפוס מצב זום
+  // Reset zoom state
   window._chartZoomIdx = 0;
   window._chartOrigPts = null;
-  // optimistic button highlight
-  document.querySelectorAll('.sp-rng-btn').forEach(b=>b.classList.toggle('active', b.textContent===rangeKey));
-  // dim chart
-  const wrap = document.querySelector('.sp-chart-wrap');
-  if (wrap) wrap.style.opacity='.45';
+  // Scope to the wrap that owns the clicked button. When multiple charts
+  // are mounted (stock detail + advisor + fullscreen), document.querySelector
+  // would return whichever comes first in DOM order — often the wrong one.
+  const wrap = (btn && btn.closest('.sp-chart-wrap')) || document.querySelector('.sp-chart-wrap');
+  if (wrap) {
+    wrap.querySelectorAll('.sp-rng-btn').forEach(b => b.classList.toggle('active', b.textContent === rangeKey));
+    wrap.style.opacity = '.45';
+  }
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${d.sym}?range=${cfg.range}&interval=${cfg.interval}${cfg.prepost?'&includePrePost=true':''}`;
     const r   = await fetch(_proxyUrl+'/?url='+encodeURIComponent(url));
-    if (!r.ok) throw new Error();
+    if (!r.ok) throw new Error('fetch failed');
     const json = await r.json();
     const res  = json.chart?.result?.[0];
-    if (!res) throw new Error();
+    if (!res) throw new Error('no result');
     const ts  = res.timestamp||[];
     const cl  = res.indicators?.quote?.[0]?.close||[];
     const vol = res.indicators?.quote?.[0]?.volume||[];
-    const newChart = buildChartSvg(d.sym, d.meta, ts, cl, vol, rangeKey);
-    _rebuildSpBody(newChart);
+    const newChartHtml = buildChartSvg(d.sym, d.meta, ts, cl, vol, rangeKey);
+    if (!newChartHtml) throw new Error('empty chart');
+    const tmp = document.createElement('div');
+    tmp.innerHTML = newChartHtml;
+    const newWrap = tmp.firstElementChild;
+    if (!newWrap || !wrap) throw new Error('no wrap');
+    wrap.replaceWith(newWrap);
+    // If the stock detail panel is visible (not currently fullscreened),
+    // also keep its stored mobile-tab HTML in sync so switching back from
+    // the news/fundamentals tab shows the new range.
+    const stockOverlay = document.getElementById('stock-overlay');
+    const inFs = !!document.getElementById('chart-fs-overlay');
+    if (!inFs && stockOverlay && stockOverlay.classList.contains('open')) {
+      const spBody = document.getElementById('sp-body');
+      if (spBody && spBody.contains(newWrap)) {
+        window._spChartHtml = spBody.innerHTML;
+      }
+    }
   } catch(e) {
     if (wrap) wrap.style.opacity='1';
   }
@@ -2469,7 +2581,7 @@ function renderStockDetail(sym, name, meta, timestamps, closes, volumes, news, d
   // ── Build body: section cards ────────────────────────
   const bodyHtml = `
     <div class="sp-section-card" style="margin:12px">
-      <div class="sp-section-hdr" id="sp-chart-hdr">גרף</div>
+      <div class="sp-section-hdr sp-chart-hdr-live" id="sp-chart-hdr">גרף</div>
       ${chartHtml}
     </div>
     <div class="sp-mobile-section">
@@ -8052,8 +8164,13 @@ function openDetail(sym) {
     </div>
 
     <div class="dt-section">
-      <div class="dt-section-title">גרף 26 שבועות</div>
-      ${renderMiniChart(m.closes)}
+      <div class="dt-section-title sp-chart-hdr-live" id="dt-chart-hdr">גרף</div>
+      <div class="dt-chart-host" id="dt-chart-host">
+        <div class="modal-loading" style="padding:30px">
+          <div class="mini-ring" style="margin:0 auto 10px"></div>
+          טוען גרף...
+        </div>
+      </div>
     </div>
 
     <div class="dt-actions">
@@ -8067,6 +8184,11 @@ function openDetail(sym) {
   `;
 
   $('dt-overlay').classList.add('open');
+
+  // Load the full-featured chart (same component as the stock detail panel:
+  // volume bars, crosshair, range switcher, zoom, screenshot, fullscreen).
+  // Fire-and-forget — the loader fills #dt-chart-host when Yahoo returns.
+  _loadAdvisorChart(s.sym, s.name);
 }
 
 function closeDetail(e) {
@@ -8117,6 +8239,54 @@ function renderMiniChart(closes) {
       <span>$${max.toFixed(2)}</span>
     </div>
   `;
+}
+
+/* ── Advisor panel full chart loader ──────────────────────────
+   Advisor panel used to render a static 26-week mini-chart (no hover, no
+   range switch, no volume). This loader pulls real Yahoo data and builds
+   the same interactive component the stock detail panel uses. Storing
+   context in window._spData means switchChartRange / _chartZoom /
+   _chartScreenshot / _chartExpandFull all work without any further
+   wiring — they already read from window._spData. */
+async function _loadAdvisorChart(sym, name) {
+  const host = $('dt-chart-host'); if (!host) return;
+  const defaultRange = '3M'; // 3 months of daily bars — good balance for an advisor view
+  const cfg = CHART_RANGE_CFG[defaultRange];
+  try {
+    const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=${cfg.range}&interval=${cfg.interval}`;
+    const quoteUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${sym}`;
+    const [cRes, qRes] = await Promise.allSettled([
+      fetch(_proxyUrl+'/?url='+encodeURIComponent(chartUrl)),
+      fetch(_proxyUrl+'/?url='+encodeURIComponent(quoteUrl)),
+    ]);
+    let meta = {}, ts = [], cl = [], vol = [];
+    if (cRes.status === 'fulfilled' && cRes.value.ok) {
+      const cd = await cRes.value.json();
+      const r = cd.chart?.result?.[0];
+      if (r) {
+        meta = r.meta || {};
+        ts = r.timestamp || [];
+        cl = r.indicators?.quote?.[0]?.close || [];
+        vol = r.indicators?.quote?.[0]?.volume || [];
+      }
+    }
+    if (qRes.status === 'fulfilled' && qRes.value.ok) {
+      try {
+        const qd = await qRes.value.json();
+        const q = qd.quoteResponse?.result?.[0];
+        if (q) meta = {...q, ...meta};
+      } catch(e) { /* ignore — chart still renders with chart-meta alone */ }
+    }
+    if (!cl.filter(v => v != null).length) {
+      host.innerHTML = '<div style="padding:20px;text-align:center;color:var(--dim);font-size:12px">לא ניתן לטעון גרף כרגע</div>';
+      return;
+    }
+    // Make the chart machinery pick us up (range-switch, zoom, screenshot).
+    window._spData = { sym, name: name||sym, meta, chartTs: ts, chartCl: cl, chartVol: vol, news: [], dq: {}, macro: { series:[], results:{}, sector:null } };
+    host.innerHTML = buildChartSvg(sym, meta, ts, cl, vol, defaultRange);
+  } catch(e) {
+    host.innerHTML = '<div style="padding:20px;text-align:center;color:var(--dim);font-size:12px">שגיאה בטעינת הגרף</div>';
+  }
 }
 
 // ═══ CLOUD SYNC (Supabase) ═══
