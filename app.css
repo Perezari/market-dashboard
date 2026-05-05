@@ -2131,6 +2131,29 @@ body::after{
 }
 .tb-logo svg{width:17px;height:17px;stroke:var(--green)}
 
+/* ═══════════ STOCKPULSE LOGO (logo.png)
+   Custom SP monogram rendered as a raster image. Sits flush inside the
+   container so the logo's own black background reads as the badge.
+   Same image at three sizes: term-bar (32px), sidebar nav (40px),
+   login overlay (36px). */
+.sp-logo-img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+  border-radius:inherit;
+}
+/* Override the green-soft container background so the logo's black
+   background is the visible badge — not a colored frame around it. */
+.tb-logo,
+.sp-sidenav-logo,
+#login-overlay .lo-brand-icon{
+  background:transparent !important;
+  border:none !important;
+  padding:0 !important;
+  overflow:hidden;
+}
+
 @media(max-width:1100px){
   .tb-brand-sub{display:none}
 }
@@ -2165,7 +2188,25 @@ body::after{
 .wave-deco svg{width:100%;height:100%;display:block}
 
 /* ═══════════ PAGE & LAYOUT ═══════════ */
-.page{position:relative;z-index:1;max-width:1700px;margin:0 auto;padding:14px 18px 40px}
+/* Match the breathing room of the brief view (.bf-page): narrower max-width
+   so the 3-column grid doesn't sprawl edge-to-edge on wide monitors, plus
+   roomier side padding. The side columns then get card chrome (see below)
+   so they read as discrete elevated panels rather than naked sections. */
+.page{position:relative;z-index:1;max-width:1500px;margin:0 auto;padding:20px 24px 60px}
+
+/* Side columns (.col without .main): wrap each section in a "card" so
+   sectors/movers/news/events feel like the brief view's calendar panel —
+   bg2 surface, soft border, rounded corners, consistent inner padding. */
+.col:not(.main) section.compact{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:14px 14px 12px;
+}
+.col:not(.main) section.compact > .sec-label{
+  margin:0 0 12px;
+  padding:0 0 10px;
+}
 
 /* ═══════════ HEADER WINDOW ═══════════ */
 .hdr-window{
@@ -3008,6 +3049,19 @@ body.light .col.main .sectors-card .t tbody tr.avgrow td.sec-cell{background:var
   color:var(--text) !important;font-size:10px !important;
   overflow:hidden;text-overflow:ellipsis;min-width:0;
 }
+/* When the Claude brief is loaded, swap the cosmetic URL for the actual
+   analysis date so the user knows which trading day the verdict + bullets
+   refer to. Set via JS: subEl.dataset.claudeDate + classList.add('has-claude').
+   Uses var(--sans) (Rubik) so the Hebrew renders properly — the parent
+   uses --mono (JetBrains Mono) which doesn't have Hebrew glyphs. */
+.col.main .ai-brief-sub.has-claude::after{
+  content:'· ניתוח Claude · ' attr(data-claude-date);
+  color:var(--green) !important;
+  font-family:var(--sans) !important;
+  font-weight:500 !important;
+  font-size:11px !important;
+  letter-spacing:0 !important;
+}
 .col.main .ai-brief-actions{display:none !important}
 .col.main .ai-verdict{
   display:flex !important;align-items:center !important;gap:12px !important;
@@ -3056,6 +3110,12 @@ body.light .col.main .sectors-card .t tbody tr.avgrow td.sec-cell{background:var
   border:1px solid var(--border) !important;border-radius:8px !important;
   display:flex !important;flex-direction:column !important;gap:3px !important;
   margin:0 !important;box-shadow:none !important;min-width:0;
+  /* Kill the inherited 0.15s background transition so theme toggle is
+     INSTANT, not animated. The base .ai-signal rule (line ~1809) sets
+     `transition:background .15s` for hover smoothness — but that same
+     transition fires on theme switch and the user sees the white→dark
+     animation as a "white flash" on the tiles. */
+  transition:none !important;
 }
 .col.main .ai-s-hdr{display:flex !important;align-items:center !important;gap:6px !important;direction:ltr}
 .col.main .ai-s-dot{width:6px !important;height:6px !important;border-radius:50% !important;flex-shrink:0}
@@ -5535,6 +5595,22 @@ body.overlay-scroll-locked {
   transition:opacity .35s ease;
 }
 .page-loading-overlay.hidden{opacity:0;pointer-events:none}
+/* Splash logo — soft "breathing" pulse so the user sees the page is alive
+   even before the loader text rotates. Border-radius matches iOS's icon
+   curvature so the visual continuity is preserved when launched from the
+   home screen. */
+.page-loading-logo{
+  width:72px;height:72px;
+  border-radius:16px;
+  display:block;
+  animation:splash-pulse 2.4s ease-in-out infinite;
+  box-shadow:0 8px 24px rgba(0,0,0,.5),
+             0 0 0 1px rgba(79,199,138,.18);
+}
+@keyframes splash-pulse{
+  0%,100%{transform:scale(1);opacity:.95}
+  50%   {transform:scale(1.03);opacity:1}
+}
 .page-loading-ring{
   width:32px;height:32px;
   border:3px solid var(--border);border-top-color:var(--green);
@@ -6845,3 +6921,636 @@ table.mth-factors tr:last-child td{border-bottom:none}
     font-size:12px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   BRIEF VIEW — AI report viewer with calendar.
+   Reuses :root tokens (--bg2/3/4, --border/2, --text/dim, --green).
+   ═══════════════════════════════════════════════════════════════ */
+
+#view-brief{display:none}
+#view-brief.active{display:block}
+
+.bf-page{
+  max-width:1400px;
+  margin:0 auto;
+  padding:20px 24px 60px;
+  position:relative;
+  z-index:1;
+}
+
+.bf-toolbar{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:16px;
+  padding-bottom:14px;
+  border-bottom:1px solid var(--border);
+}
+.bf-tabs{
+  display:flex;
+  gap:2px;
+  background:var(--bg3);
+  padding:3px;
+  border-radius:8px;
+  border:1px solid var(--border);
+}
+.bf-tab{
+  padding:6px 16px;
+  background:transparent;
+  border:none;
+  color:var(--dim);
+  font-size:12px;
+  font-weight:600;
+  font-family:var(--sans);
+  cursor:pointer;
+  border-radius:6px;
+  transition:all .15s;
+}
+.bf-tab:hover{color:var(--text)}
+.bf-tab.active{background:var(--green);color:#fff}
+body.light .bf-tab.active{background:var(--green);color:#fff}
+
+.bf-spacer{flex:1}
+
+.bf-icon-btn{
+  width:32px;height:32px;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:6px;
+  color:var(--dim);
+  cursor:pointer;
+  transition:all .15s;
+}
+.bf-icon-btn:hover{color:var(--green);border-color:var(--green)}
+.bf-icon-btn svg{width:15px;height:15px}
+
+.bf-layout{
+  display:grid;
+  grid-template-columns:300px 1fr;
+  gap:20px;
+  align-items:start;
+}
+
+.bf-cal-wrap{
+  position:sticky;top:16px;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:14px;
+  display:flex;flex-direction:column;gap:10px;
+}
+.bf-cal-header{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+.bf-cal-month{
+  font-size:13px;font-weight:700;color:var(--text);
+  text-align:center;flex:1;text-transform:capitalize;
+}
+.bf-cal-nav{
+  width:26px;height:26px;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:transparent;
+  border:1px solid var(--border);
+  border-radius:5px;
+  color:var(--dim);
+  cursor:pointer;
+  transition:all .15s;
+}
+.bf-cal-nav:hover{color:var(--green);border-color:var(--green)}
+.bf-cal-nav svg{width:14px;height:14px}
+
+.bf-calendar{
+  display:grid;
+  grid-template-columns:repeat(7, 1fr);
+  gap:3px;
+}
+.bf-calendar.weekly-mode{
+  grid-template-columns:1fr;
+  gap:4px;
+}
+.bf-cal-dow{
+  font-size:10px;font-weight:600;color:var(--dim);
+  text-align:center;padding:4px 0 6px;letter-spacing:.4px;
+}
+.bf-cal-cell{
+  aspect-ratio:1;
+  position:relative;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--bg3);
+  border:1px solid transparent;
+  border-radius:6px;
+  cursor:pointer;
+  transition:all .15s;
+  min-height:32px;
+}
+.bf-cal-cell.empty{background:transparent;cursor:default;pointer-events:none}
+.bf-cal-cell:hover:not(.empty):not(.future){border-color:var(--border2)}
+.bf-cal-num{
+  font-size:11px;font-weight:600;color:var(--text);
+  font-family:var(--mono);
+}
+.bf-cal-cell.future .bf-cal-num{color:var(--dim);opacity:.4}
+.bf-cal-cell.future{cursor:default}
+.bf-cal-cell.today{border-color:var(--border2);background:var(--bg4)}
+.bf-cal-cell.today .bf-cal-num{color:var(--text);font-weight:800}
+.bf-cal-cell.has-report{background:linear-gradient(180deg, var(--bg3) 0%, var(--bg4) 100%)}
+.bf-cal-cell.has-report .bf-cal-num{color:var(--text)}
+.bf-cal-cell.selected{background:var(--green);border-color:var(--green)}
+.bf-cal-cell.selected .bf-cal-num{color:#fff;font-weight:700}
+.bf-cal-cell.selected .bf-cal-dot{background:#fff}
+
+.bf-cal-dot{
+  position:absolute;bottom:3px;
+  width:4px;height:4px;border-radius:50%;
+  background:var(--green);
+}
+/* Direction-colored dots: green = S&P closed up, red = closed down.
+   The default green still applies if metadata is missing (older briefs). */
+.bf-cal-cell.dir-up .bf-cal-dot{background:var(--green)}
+.bf-cal-cell.dir-down .bf-cal-dot{background:#e05050}
+.bf-week-cell.dir-up .bf-cal-dot{background:var(--green)}
+.bf-week-cell.dir-down .bf-cal-dot{background:#e05050}
+
+.bf-week-cell{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:8px 10px;
+  background:var(--bg3);
+  border:1px solid transparent;
+  border-radius:6px;
+  cursor:pointer;
+  transition:all .15s;
+  position:relative;
+}
+.bf-week-cell:hover:not(.future){border-color:var(--border2)}
+.bf-week-cell.future{cursor:default;opacity:.5}
+.bf-week-cell.has-report{background:linear-gradient(90deg, var(--bg3) 0%, var(--bg4) 100%)}
+.bf-week-cell.selected{background:var(--green);border-color:var(--green)}
+.bf-week-cell.selected .bf-week-id,
+.bf-week-cell.selected .bf-week-range{color:#fff}
+.bf-week-id{font-size:11px;font-weight:700;color:var(--text);font-family:var(--mono)}
+.bf-week-range{font-size:10px;color:var(--dim);direction:ltr}
+
+.bf-today-btn{
+  margin-top:4px;
+  padding:6px 10px;
+  background:transparent;
+  border:1px solid var(--border);
+  border-radius:5px;
+  color:var(--dim);
+  font-size:11px;
+  font-family:var(--sans);
+  cursor:pointer;
+  transition:all .15s;
+}
+.bf-today-btn:hover{color:var(--green);border-color:var(--green)}
+
+.bf-report{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:20px 22px;
+  min-height:400px;
+}
+.bf-report-header{
+  display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  padding-bottom:12px;margin-bottom:14px;
+  border-bottom:1px solid var(--border);
+}
+.bf-report-title{font-size:15px;font-weight:700;color:var(--text)}
+.bf-report-meta{font-size:10px;color:var(--dim);font-family:var(--mono)}
+
+.bf-report-grid{
+  display:grid;
+  grid-template-columns:1fr 220px;
+  gap:24px;
+  align-items:start;
+}
+.bf-report-body{
+  font-size:14px;line-height:1.85;color:var(--text);
+  -webkit-user-select:text;user-select:text;
+}
+.bf-report-body h1{font-size:17px;color:var(--green);font-weight:800;margin:22px 0 10px}
+.bf-report-body h2{font-size:15px;color:var(--green);font-weight:700;margin:20px 0 8px}
+.bf-report-body h3{font-size:14px;color:var(--text);font-weight:700;margin:16px 0 6px}
+.bf-report-body p{margin:0 0 12px}
+.bf-report-body strong{color:var(--text);font-weight:700}
+.bf-report-body em{font-style:italic;color:var(--dim);font-size:12px}
+.bf-report-body ul{margin:0 0 12px;padding-right:20px;padding-left:0}
+.bf-report-body li{margin-bottom:4px}
+.bf-report-body hr{border:none;border-top:1px solid var(--border);margin:20px 0}
+.bf-report-body a{color:var(--green);text-decoration:none}
+.bf-report-body a:hover{text-decoration:underline}
+
+.bf-ticker{
+  display:inline-flex;align-items:center;gap:3px;
+  padding:1px 6px;margin:0 1px;
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:4px;
+  font-family:var(--mono);
+  font-size:11px;font-weight:700;color:var(--green);
+  cursor:pointer;
+  transition:all .15s;
+  direction:ltr;vertical-align:baseline;
+}
+.bf-ticker:hover{border-color:var(--green);background:var(--bg4)}
+.bf-ticker .chg{font-size:9px;font-weight:600}
+.bf-ticker .chg.up{color:#3da66e}
+.bf-ticker .chg.down{color:#e05050}
+.bf-ticker .chg.flat{color:var(--dim)}
+
+.bf-report-side{
+  display:flex;flex-direction:column;gap:14px;
+  position:sticky;top:16px;
+}
+.bf-side-block{
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:10px 12px;
+}
+.bf-side-h{
+  font-size:9px;text-transform:uppercase;letter-spacing:.6px;
+  color:var(--dim);margin-bottom:8px;font-weight:700;
+}
+
+.bf-snap{display:flex;flex-direction:column;gap:3px}
+.bf-snap-row{
+  display:flex;justify-content:space-between;align-items:baseline;
+  font-family:var(--mono);font-size:11px;
+  padding:2px 0;direction:ltr;
+}
+.bf-snap-row .name{color:var(--dim);font-size:10px}
+.bf-snap-row .val.up{color:#3da66e}
+.bf-snap-row .val.down{color:#e05050}
+.bf-snap-row .val.flat{color:var(--text)}
+
+.bf-tickers-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:4px;
+}
+.bf-ticker-card{
+  display:flex;flex-direction:column;
+  padding:5px 7px;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:5px;
+  cursor:pointer;
+  transition:all .15s;
+  direction:ltr;
+}
+.bf-ticker-card:hover{border-color:var(--green)}
+.bf-ticker-card .sym{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--green)}
+.bf-ticker-card .pct{font-family:var(--mono);font-size:10px;font-weight:600}
+.bf-ticker-card .pct.up{color:#3da66e}
+.bf-ticker-card .pct.down{color:#e05050}
+.bf-ticker-card .pct.flat{color:var(--dim)}
+
+.bf-sources summary{
+  cursor:pointer;font-size:11px;color:var(--dim);
+  list-style:none;user-select:none;
+}
+.bf-sources summary::-webkit-details-marker{display:none}
+.bf-sources summary:hover{color:var(--green)}
+.bf-sources summary::before{content:'▸ ';display:inline-block;transition:transform .15s}
+.bf-sources[open] summary::before{transform:rotate(90deg)}
+.bf-sources-list{list-style:none;margin:8px 0 0;padding:0;max-height:240px;overflow-y:auto}
+.bf-sources-list li{padding:3px 0;border-top:1px solid var(--border);font-size:10px}
+.bf-sources-list li:first-child{border-top:none}
+.bf-sources-list a{
+  color:var(--dim);text-decoration:none;direction:ltr;
+  display:inline-block;max-width:100%;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.bf-sources-list a:hover{color:var(--green)}
+
+.bf-empty,
+.bf-loading,
+.bf-error{
+  text-align:center;
+  padding:60px 20px;
+  color:var(--dim);
+}
+.bf-empty-title{font-size:14px;color:var(--text);font-weight:600;margin-bottom:6px}
+.bf-empty-sub{font-size:12px;color:var(--dim);margin-bottom:14px}
+.bf-empty-hint{font-size:11px;color:var(--dim);max-width:380px;margin:0 auto;line-height:1.6}
+.bf-loading{font-size:12px}
+.bf-error{color:#e05050;font-size:12px}
+
+.bf-setup{
+  max-width:480px;
+  margin:60px auto 0;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:28px 26px;
+  display:flex;flex-direction:column;gap:14px;
+}
+.bf-setup-title{font-size:15px;font-weight:700;color:var(--text)}
+.bf-setup-sub{font-size:12px;color:var(--dim);line-height:1.7}
+.bf-setup-sub code{
+  background:var(--bg3);
+  padding:1px 6px;
+  border-radius:3px;
+  font-family:var(--mono);
+  font-size:11px;
+  color:var(--green);
+  direction:ltr;
+  display:inline-block;
+}
+.bf-setup-input{
+  background:var(--bg3);
+  border:1px solid var(--border2);
+  border-radius:6px;
+  padding:10px 14px;
+  color:var(--text);
+  font-family:var(--mono);
+  font-size:12px;
+  width:100%;
+  outline:none;
+  transition:border-color .15s;
+  direction:ltr;
+  -webkit-user-select:text;user-select:text;
+}
+.bf-setup-input:focus{border-color:var(--green)}
+.bf-setup-err{font-size:11px;color:#e05050;min-height:14px}
+.bf-setup-btn{
+  background:var(--green);
+  border:none;
+  color:#fff;
+  padding:10px 18px;
+  border-radius:6px;
+  font-size:13px;font-weight:600;font-family:var(--sans);
+  cursor:pointer;
+  transition:opacity .15s;
+}
+.bf-setup-btn:hover{opacity:.9}
+
+@media (max-width: 950px){
+  .bf-page{padding:12px 12px 80px}
+  .bf-layout{grid-template-columns:1fr;gap:14px}
+  .bf-cal-wrap{position:static;padding:10px}
+  .bf-report{padding:14px 14px}
+  .bf-report-grid{grid-template-columns:1fr;gap:14px}
+  .bf-report-side{position:static}
+  .bf-report-body{font-size:13px;line-height:1.75}
+  .bf-report-body h1{font-size:15px}
+  .bf-report-body h2{font-size:14px}
+  .bf-tickers-grid{grid-template-columns:repeat(3, 1fr)}
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AI BRIEF CARD — design polish (Batch A: KPI 2×2 medium, verdict
+   gradient, loading skeleton). All scoped to .col.main .ai-* so the
+   existing widget styling outside the dashboard view stays untouched.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* KPI tiles: 2×2 on medium widths (821-1280px) where 1×4 looks squeezed.
+   Wide (>1280px) keeps 1×4, mobile (≤820px) is already 2×2 in the existing
+   media-query block above. */
+@media (min-width: 821px) and (max-width: 1280px){
+  .col.main .ai-signals{grid-template-columns:repeat(2,1fr) !important}
+}
+
+/* Verdict box — subtle directional gradient adds dimension without noise.
+   Uses the existing token palette so it inherits theme switches. */
+.col.main .ai-verdict{
+  background:linear-gradient(125deg, var(--green-soft) 0%, transparent 75%) !important,
+             var(--bg2) !important;
+  background-color:var(--bg2) !important;
+  background-image:linear-gradient(125deg, var(--green-soft) 0%, transparent 75%) !important;
+}
+.col.main .ai-verdict.mixed{
+  background-color:var(--bg2) !important;
+  background-image:linear-gradient(125deg, rgba(240,181,106,.14) 0%, transparent 75%) !important;
+}
+.col.main .ai-verdict.neg{
+  background-color:var(--bg2) !important;
+  background-image:linear-gradient(125deg, rgba(231,115,133,.14) 0%, transparent 75%) !important;
+}
+
+/* Loading skeleton: subtle pulse on the verdict while Claude data is in
+   flight. Class added by the brief-enhancer JS, removed when data lands. */
+@keyframes ai-claude-pulse{
+  0%, 100%{opacity:.55}
+  50%{opacity:1}
+}
+.col.main .ai-verdict.claude-loading .ai-verdict-text{
+  animation:ai-claude-pulse 1.4s ease-in-out infinite;
+}
+.col.main .ai-verdict.claude-loading::after{
+  content:'';
+  position:absolute;top:6px;left:6px;
+  width:6px;height:6px;border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 8px var(--green);
+  animation:ai-claude-pulse 1.4s ease-in-out infinite;
+}
+.col.main .ai-verdict{position:relative}
+
+/* Mention badge — small green dot appended to ticker labels across the
+   dashboard when Claude mentioned that ticker in today's brief.
+   Click navigates to the brief view at the relevant date. */
+.ai-mention-badge{
+  display:inline-block;
+  width:6px;height:6px;
+  border-radius:50%;
+  background:var(--green);
+  margin:0 5px 0 0;
+  vertical-align:middle;
+  cursor:pointer;
+  flex-shrink:0;
+  transition:transform .15s, box-shadow .15s;
+  box-shadow:0 0 4px rgba(79,199,138,.4);
+}
+.ai-mention-badge:hover{
+  transform:scale(1.6);
+  box-shadow:0 0 8px var(--green);
+}
+/* Slightly larger when sitting next to a small ticker text, so it reads
+   as an obvious indicator rather than a stray pixel. */
+.mover-sym .ai-mention-badge,
+td.sec-cell .sym .ai-mention-badge{
+  width:5px;height:5px;
+  margin:0 4px 0 0;
+}
+
+/* News tab — Claude variant. The dot is a flex child (not absolute) so
+   it positions cleanly in the RTL layout without overlapping the text. */
+.news-tab.news-tab-claude{
+  display:inline-flex !important;
+  align-items:center;
+  gap:6px;
+}
+.news-tab.news-tab-claude::before{
+  content:'';
+  display:inline-block;
+  width:6px;height:6px;
+  border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 4px var(--green);
+  flex-shrink:0;
+}
+.news-tab.news-tab-claude.active::before{
+  background:#fff;
+  box-shadow:0 0 6px rgba(255,255,255,.6);
+}
+
+/* Claude-searched-queries strip rendered above the source cards. */
+.news-claude-searches{
+  padding:8px 10px 10px;
+  border-bottom:1px solid var(--border);
+  margin-bottom:6px;
+  font-family:var(--sans);
+}
+.news-claude-searches-label{
+  font-size:10px;font-weight:600;color:var(--dim);
+  margin-bottom:6px;letter-spacing:.3px;
+}
+.news-claude-q{
+  display:inline-block;
+  font-family:var(--mono);
+  font-size:10px;color:var(--green);
+  background:var(--bg3);
+  border:1px solid var(--border);
+  padding:2px 7px;border-radius:10px;
+  margin:2px 3px 2px 0;
+  direction:ltr;
+}
+
+/* Sector deep-dive: Claude commentary block injected at top of the
+   sector holdings modal. Uses subtle green accent + Rubik for readability. */
+.claude-sector-commentary{
+  margin:0 0 14px;
+  padding:12px 14px;
+  background:linear-gradient(125deg, var(--green-soft) 0%, transparent 75%), var(--bg3);
+  border:1px solid var(--green-dim);
+  border-radius:8px;
+  font-family:var(--sans);
+}
+.claude-sector-commentary .csc-hdr{
+  display:flex;align-items:center;gap:8px;
+  margin-bottom:8px;
+  padding-bottom:8px;
+  border-bottom:1px solid var(--border);
+}
+.claude-sector-commentary .csc-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 6px var(--green);
+  flex-shrink:0;
+}
+.claude-sector-commentary .csc-title{
+  font-size:12px;font-weight:700;color:var(--text);
+  flex:1;
+}
+.claude-sector-commentary .csc-link{
+  font-size:11px;color:var(--green);
+  text-decoration:none;
+}
+.claude-sector-commentary .csc-link:hover{text-decoration:underline}
+.claude-sector-commentary .csc-body p{
+  font-size:13px;
+  line-height:1.7;
+  color:var(--text);
+  margin:0 0 8px;
+}
+.claude-sector-commentary .csc-body p:last-child{margin-bottom:0}
+.claude-sector-commentary strong{color:var(--green);font-weight:700}
+.claude-sector-commentary em{font-style:italic;color:var(--dim);font-size:12px}
+.claude-sector-commentary .csc-ticker{
+  display:inline-block;
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  color:var(--green);
+  background:var(--bg2);
+  border:1px solid var(--border);
+  padding:1px 6px;border-radius:4px;
+  direction:ltr;vertical-align:baseline;
+  margin:0 1px;
+}
+
+/* Recap widget — sits inside the AI brief card, below the action bullets.
+   Compares yesterday's Long/Avoid/Watch picks to today's actual move. */
+.claude-recap{
+  margin:12px 16px 0 !important;
+  padding:12px 14px;
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:8px;
+  font-family:var(--sans);
+}
+.claude-recap .cr-hdr{
+  display:flex;align-items:center;gap:8px;
+  padding-bottom:10px;
+  margin-bottom:10px;
+  border-bottom:1px solid var(--border);
+}
+.claude-recap .cr-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 6px var(--green);
+  flex-shrink:0;
+}
+.claude-recap .cr-title{
+  font-size:11px;font-weight:700;color:var(--text);
+  flex:1;letter-spacing:.2px;
+}
+.claude-recap .cr-link{
+  font-size:10px;color:var(--green);
+  text-decoration:none;
+}
+.claude-recap .cr-link:hover{text-decoration:underline}
+
+.claude-recap .cr-rows{
+  display:flex;flex-direction:column;gap:6px;
+}
+.claude-recap .cr-row{
+  display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;
+}
+.claude-recap .cr-label{
+  font-size:10px;font-weight:700;letter-spacing:.4px;
+  text-transform:uppercase;
+  min-width:46px;padding:3px 7px;
+  border-radius:4px;
+  font-family:var(--mono);
+  flex-shrink:0;
+}
+.claude-recap .cr-label-long{background:rgba(79,199,138,.14);color:var(--green)}
+.claude-recap .cr-label-avoid{background:rgba(231,115,133,.12);color:#e05050}
+.claude-recap .cr-label-watch{background:var(--bg4);color:var(--dim)}
+.claude-recap .cr-pills{
+  display:flex;flex-wrap:wrap;gap:4px;flex:1;min-width:0;
+}
+.claude-recap .cr-pill{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 7px;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:4px;
+  font-size:11px;
+  direction:ltr;
+}
+.claude-recap .cr-pill.up{border-color:rgba(79,199,138,.4)}
+.claude-recap .cr-pill.down{border-color:rgba(231,115,133,.4)}
+.claude-recap .cr-sym{
+  font-family:var(--mono);font-weight:700;color:var(--text);
+}
+.claude-recap .cr-pct{
+  font-family:var(--mono);font-weight:600;font-size:10px;
+}
+.claude-recap .cr-pill.up .cr-pct{color:var(--green)}
+.claude-recap .cr-pill.down .cr-pct{color:#e05050}
+.claude-recap .cr-pill.neu .cr-pct{color:var(--dim)}
+.claude-recap .cr-mark{
+  font-size:10px;font-weight:800;
+  margin-right:1px;
+}
+.claude-recap .cr-foot{
+  margin-top:10px;
+  padding-top:8px;
+  border-top:1px dashed var(--border);
+  font-size:10px;color:var(--dim);text-align:center;
+}
+

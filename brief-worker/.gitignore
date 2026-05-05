@@ -1,0 +1,11 @@
+# Wrangler build artifacts & local secrets
+.wrangler/
+wrangler.toml.bak
+.dev.vars
+.dev.vars.*
+
+# Node
+node_modules/
+
+# Logs
+*.log

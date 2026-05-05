@@ -1,0 +1,36 @@
+# StockPulse Market Brief Worker
+# ================================
+# התקנה (ראה DEPLOY.md לצעדים מפורטים):
+#   1. wrangler kv:namespace create BRIEFS_KV
+#   2. החלף את ה-id למטה בערך שהפקודה החזירה
+#   3. wrangler secret put ANTHROPIC_API_KEY
+#   4. wrangler secret put CRON_SECRET
+#   5. wrangler deploy
+
+name = "stockpulse-brief-worker"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+workers_dev = true
+preview_urls = false
+
+# ─── KV Namespace ───
+# צור עם: wrangler kv:namespace create BRIEFS_KV
+# הדבק את ה-id שתקבל כאן:
+[[kv_namespaces]]
+binding = "BRIEFS_KV"
+id = "b1e7f89a77c2451ebb4f818c05f17fb8"
+
+# ─── Cron Triggers ───
+# Cloudflare cron הוא ב-UTC בלבד. שעון ישראל = UTC+2 (חורף) / UTC+3 (קיץ).
+# 22:00 UTC = 00:00 IST (חורף) / 01:00 IST (קיץ) — אחרי סגירת השוק האמריקאי.
+# 19:00 UTC ביום ראשון = 21:00 IST (חורף) / 22:00 IST (קיץ) — לפני פתיחת שבוע ישראלי.
+# הערה: Cloudflare דורש "SUN" (לא "0") לציון יום ראשון בשדה day-of-week.
+[triggers]
+crons = [
+  "0 22 * * 1-5",   # יומי: ימי חול, 22:00 UTC
+  "0 19 * * SUN",   # שבועי: יום ראשון, 19:00 UTC
+]
+
+# ─── Variables (ניתן לדריסה) ───
+[vars]
+# שום משתנה ציבורי כרגע — הכל בסיקרטים

@@ -967,17 +967,87 @@ function initNewsSection() {
   const tabs = document.createElement('div');
   tabs.className = 'news-tabs';
   tabs.innerHTML = `
-    <button class="news-tab active" onclick="switchNewsTab('he')">עברית</button>
-    <button class="news-tab" onclick="switchNewsTab('en')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> בעולם</button>`;
+    <button class="news-tab active" data-tab="he" onclick="switchNewsTab('he')">עברית</button>
+    <button class="news-tab" data-tab="en" onclick="switchNewsTab('en')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> בעולם</button>
+    <button class="news-tab news-tab-claude" data-tab="claude" onclick="switchNewsTab('claude')" title="מקורות שClaude קרא כדי לכתוב את הדוח של היום">Claude</button>`;
   hdr.appendChild(tabs);
   fetchHebrewNews();
 }
 function switchNewsTab(lang) {
   _activeNewsTab = lang;
   document.querySelectorAll('.news-tab').forEach(b =>
-    b.classList.toggle('active', b.textContent.includes(lang === 'he' ? 'עברית' : 'בעולם')));
-  if (lang === 'he') fetchHebrewNews(); else fetchEnglishNews();
+    b.classList.toggle('active', b.dataset.tab === lang));
+  if (lang === 'he') fetchHebrewNews();
+  else if (lang === 'en') fetchEnglishNews();
+  else if (lang === 'claude') fetchClaudeSources();
 }
+
+// Render Claude's source list — the URLs Claude actually read while
+// writing today's brief. More signal than RSS noise on days when there's
+// a clear thesis. Pulls from the in-memory cache populated by the brief
+// enhancer; falls back to localStorage cache from brief.js.
+function fetchClaudeSources() {
+  const grid = document.getElementById('news-grid');
+  if (!grid) return;
+
+  let data = window.__claudeBriefCache || null;
+  if (!data) {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const raw = localStorage.getItem('sp_brief_cache_daily:' + today);
+      if (raw) data = JSON.parse(raw);
+    } catch (_) {}
+  }
+
+  const sources = (data && Array.isArray(data.sources)) ? data.sources : [];
+  // De-duplicate by URL (Claude sometimes returns the same URL twice)
+  const seen = new Set();
+  const unique = sources.filter((s) => {
+    if (!s || !s.url || seen.has(s.url)) return false;
+    seen.add(s.url);
+    return true;
+  });
+
+  if (unique.length === 0) {
+    const briefUrlSet = !!(localStorage.getItem('app_brief_worker_url') || '').trim();
+    grid.innerHTML = `
+      <div class="modal-loading" style="color:var(--dim);font-size:12px;padding:18px;text-align:center">
+        ${briefUrlSet
+          ? 'דוח Claude עוד לא נטען או שלא היו חיפושים היום.<br>נסה שוב בעוד כמה שניות.'
+          : 'הגדר תחילה את ה-Brief Worker בכרטיסיית "דוחות AI" כדי לראות את המקורות של Claude.'}
+      </div>`;
+    return;
+  }
+
+  const safe = (s) => String(s || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  const cards = unique.slice(0, 30).map((s) => {
+    let domain = '';
+    try { domain = new URL(s.url).hostname.replace(/^www\./, ''); } catch (_) {}
+    const fav = domain ? `<img src="${_faviconUrl(domain)}" class="news-badge-favicon" alt="" onerror="this.style.display='none'">` : '';
+    return `
+      <a href="${safe(s.url)}" target="_blank" rel="noopener noreferrer" class="news-card">
+        <div class="news-card-text">
+          <div class="news-title" style="direction:ltr;text-align:left">${safe(s.title || s.url)}</div>
+          <div class="news-meta" style="direction:ltr;justify-content:flex-start;gap:8px">
+            <span class="news-source-badge">${fav}<span>${safe(domain || 'web')}</span></span>
+          </div>
+        </div>
+      </a>`;
+  }).join('');
+
+  const searchesHtml = (data.searchesUsed && data.searchesUsed.length)
+    ? `<div class="news-claude-searches">
+         <div class="news-claude-searches-label">חיפושים שClaude ביצע:</div>
+         ${data.searchesUsed.slice(0, 12).map((q) =>
+           `<span class="news-claude-q">${safe(q)}</span>`).join('')}
+       </div>` : '';
+
+  grid.innerHTML = searchesHtml + cards;
+}
+window.fetchClaudeSources = fetchClaudeSources;
 
 async function fetchAndRenderMovers() {
   // 1. אוספים את כל הסמלים הייחודיים מתוך המילון של הסקטורים (220 מניות)
@@ -5088,6 +5158,648 @@ window.showKey = function(){
     setTimeout(simpleAIBrief, 1500);
     setTimeout(simpleAIBrief, 3500);
   });
+})();
+
+/* ──────────── [3.5] AI BRIEF ENHANCEMENT (Claude analysis from brief-worker) ────────────
+   Lays the daily brief from the Brief Worker on top of simpleAIBrief()'s
+   templated card. When a brief exists for today (or the most recent trading
+   day), we swap:
+     • the verdict line → Claude's opening **bold** thesis
+     • the watch / risk / opportunity bullets → parsed Trading Setup
+   If no Brief Worker URL is configured, this is a no-op and the canned card
+   stays as-is. */
+(function () {
+  'use strict';
+  let cached = null;
+  let inFlight = false;
+
+  function workerUrl() {
+    return (localStorage.getItem('app_brief_worker_url') || '').replace(/\/+$/, '');
+  }
+
+  // Strip Claude's "thinking" preamble — when web_search is used, Claude
+  // sometimes leaks intermediate thoughts ("אבדוק חדשות...", "יש לי קונטקסט...")
+  // BEFORE the actual report. The real report typically starts with a
+  // **bold** thesis. If we find one and there's substantial text before it,
+  // assume that text is thinking and trim it.
+  function stripThinkingPreamble(md) {
+    if (!md) return md;
+    const boldIdx = md.indexOf('**');
+    if (boldIdx > 50 && boldIdx < 500) return md.slice(boldIdx);
+    return md;
+  }
+
+  // Pull the opening thesis line — prefer **bold** if present (Claude's
+  // few-shot prompt asks for it), otherwise fall back to the first
+  // substantial paragraph. Returns plain markdown — render() handles **.
+  function extractThesis(md) {
+    if (!md) return null;
+    md = stripThinkingPreamble(md);
+    // 1. First **bold** paragraph that's a real sentence (40-800 chars,
+    //    long enough to skip short section headers like **Setup**).
+    const bold = md.match(/\*\*([^*]{40,800}?)\*\*/);
+    if (bold) return bold[1].trim();
+    // 2. Fallback: first paragraph of substantial length, skipping any
+    //    leading "# Header" lines or very short metadata lines.
+    const paras = md.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+    for (const p of paras) {
+      const stripped = p.replace(/^#+\s+/, '').trim();
+      if (stripped.length < 40) continue;       // too short = probably a label
+      if (/^[*\-•]\s/.test(stripped)) continue; // bullet — not a thesis
+      return stripped;
+    }
+    return null;
+  }
+
+  // Parse the "קצר טווח" sub-section under the Trading Setup heading.
+  // Claude's format varies ("Long:", "Long bias:", "Avoid:", "Avoid/Short bias:",
+  // "Watch:", "Watch tonight:") so we match loosely.
+  function extractShortTermSetup(md) {
+    if (!md) return null;
+    const startIdx = md.search(/קצר[\s ]+טווח/);
+    if (startIdx === -1) return scanForSetupAnywhere(md);
+    const tail = md.slice(startIdx);
+    // Stop at the next major section (בינוני / ארוך / horizontal rule / disclaimer)
+    const stopIdx = tail.search(/\n\s*(?:\*\*)?(?:בינוני|ארוך|---|אין באמור|\*אין באמור)/);
+    const section = stopIdx === -1 ? tail.slice(0, 2500) : tail.slice(0, stopIdx);
+    return parseSetupSection(section);
+  }
+
+  // Scan the whole brief for "Long: / Avoid: / Watch:" lines anywhere.
+  // Used as a fallback when the "קצר טווח" anchor isn't present.
+  function scanForSetupAnywhere(md) {
+    return parseSetupSection(md);
+  }
+
+  function parseSetupSection(section) {
+    // Each label can appear bare ("Long:"), bolded ("**Long bias:**"),
+    // or as a bullet ("- Long bias:"). Match loosely.
+    const patterns = [
+      { key: 'long',
+        re: /(?:^|\n)\s*[*\-]?\s*\**\s*(Long(?:\s+(?:bias|selectively))?)\**\s*[:：]\s*([^\n]+)/i },
+      { key: 'avoid',
+        re: /(?:^|\n)\s*[*\-]?\s*\**\s*(Avoid(?:\/Short\s+bias)?|Short\s+bias)\**\s*[:：]\s*([^\n]+)/i },
+      { key: 'watch',
+        re: /(?:^|\n)\s*[*\-]?\s*\**\s*(Watch(?:\s+(?:tonight|today))?)\**\s*[:：]\s*([^\n]+)/i },
+    ];
+    const out = { long: null, avoid: null, watch: null };
+    patterns.forEach(({ key, re }) => {
+      const m = section.match(re);
+      if (m && m[2]) out[key] = m[2].replace(/\*+$/g, '').trim();
+    });
+    return (out.long || out.avoid || out.watch) ? out : null;
+  }
+
+
+  // Reuse the cache populated by brief.js when the user visits the Brief tab.
+  function readLocalCache() {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const raw = localStorage.getItem('sp_brief_cache_daily:' + today);
+      if (raw) return JSON.parse(raw);
+    } catch (_) {}
+    return null;
+  }
+
+  async function loadBrief() {
+    if (cached) return cached;
+    cached = readLocalCache();
+    if (cached) { window.__claudeBriefCache = cached; return cached; }
+
+    const base = workerUrl();
+    if (!base || inFlight) return null;
+
+    inFlight = true;
+    try {
+      const resp = await fetch(`${base}/brief/daily`);
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      if (data && data.brief) {
+        cached = data;
+        // Expose to other modules (e.g. fetchClaudeSources in news section)
+        // without forcing them to refetch from the worker.
+        window.__claudeBriefCache = cached;
+        // If today's date doesn't match what /brief/daily returned (maybe
+        // it was stale), update the local cache under the actual key too.
+        if (data.cacheKey) {
+          try { localStorage.setItem('sp_brief_cache_' + data.cacheKey, JSON.stringify(data)); } catch (_) {}
+        }
+      }
+      return cached;
+    } catch (e) {
+      console.warn('[AI Brief enhance] fetch failed:', e);
+      return null;
+    } finally {
+      inFlight = false;
+    }
+  }
+
+  // Light **markdown** → <strong> for inline rendering inside the card.
+  function mdInline(s) {
+    return String(s || '').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  }
+
+  // Idempotency guard — prevent the MutationObserver below from
+  // ping-ponging when our own writes trigger more mutations.
+  let _applying = false;
+
+  function applyEnhancement() {
+    if (_applying) return;
+    if (!cached || !cached.brief) return;
+    _applying = true;
+    try {
+      _applyEnhancementUnsafe();
+    } finally {
+      // Defer the unlock so any mutation events queued from our writes
+      // see the flag set and skip re-entering.
+      setTimeout(() => { _applying = false; }, 50);
+    }
+  }
+
+  function _applyEnhancementUnsafe() {
+    if (!cached || !cached.brief) return;
+
+    // 1. Replace the verdict text with Claude's bold thesis.
+    //    Idempotent: only write if the current innerHTML differs from
+    //    what we'd produce, so mutation observers don't trigger cycles.
+    const thesis = extractThesis(cached.brief);
+    if (thesis) {
+      const vText = document.getElementById('ai-verdict-text');
+      const expected = mdInline(thesis);
+      if (vText && vText.innerHTML !== expected) {
+        vText.innerHTML = expected;
+        vText.dataset.source = 'claude';
+      }
+    }
+
+    // 2. Replace the action bullets with Claude's short-term Trading Setup.
+    //    Keep the breadth-advice row at the end (it has its own data source).
+    const setup = extractShortTermSetup(cached.brief);
+    if (setup) {
+      const actionsEl = document.getElementById('ai-actions');
+      if (actionsEl) {
+        const breadthRow = Array.from(actionsEl.querySelectorAll('.ai-a-row'))
+          .find((r) => /רוחב שוק/.test(r.textContent || ''));
+        const breadthHtml = breadthRow ? breadthRow.outerHTML : '';
+
+        const row = (label, text, tone) => {
+          if (!text) return '';
+          return `<div class="ai-a-row" data-source="claude"><div class="ai-a-dot ${tone}"></div><div class="ai-a-txt ${tone}"><b>${label}:</b> ${mdInline(text)}</div></div>`;
+        };
+
+        const rows = [
+          row('עקוב', setup.watch, ''),
+          row('סיכון', setup.avoid, 'neg'),
+          row('הזדמנות', setup.long, 'pos'),
+        ].filter(Boolean);
+
+        if (rows.length) {
+          const expected = rows.join('') + breadthHtml;
+          if (actionsEl.innerHTML !== expected) {
+            actionsEl.innerHTML = expected;
+            actionsEl.dataset.source = 'claude';
+          }
+        }
+      }
+    }
+
+    // 3. Replace the cosmetic "stockpulse://..." subtitle with the actual
+    //    trading day the Claude analysis covers, so the user knows what
+    //    period the verdict + action bullets refer to. The KPI tiles and
+    //    micro-stats stay live (today) — the date label is scoped to the
+    //    Claude-sourced content above and below.
+    if (cached.dataAsOf) {
+      const subEl = document.querySelector('.ai-brief-sub');
+      if (subEl) {
+        const d = new Date(cached.dataAsOf);
+        const dateStr = d.toLocaleDateString('he-IL', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        });
+        const dayName = d.toLocaleDateString('he-IL', { weekday: 'long' });
+        subEl.dataset.claudeDate = `${dateStr} · ${dayName}`;
+        subEl.classList.add('has-claude');
+      }
+    }
+  }
+
+  function setLoading(isLoading) {
+    const v = document.getElementById('ai-verdict');
+    if (v) v.classList.toggle('claude-loading', !!isLoading);
+  }
+
+  // Find the paragraph in the brief that mentions a given ticker, for use
+  // as a tooltip preview on the mention badge.
+  function findExcerptForTicker(briefMd, ticker) {
+    if (!briefMd || !ticker) return null;
+    const re = new RegExp(`\\(${ticker}\\)`);
+    const idx = briefMd.search(re);
+    if (idx === -1) return null;
+    const start = briefMd.lastIndexOf('\n\n', idx);
+    const end = briefMd.indexOf('\n\n', idx);
+    const para = briefMd.slice(
+      start === -1 ? 0 : start + 2,
+      end === -1 ? briefMd.length : end
+    );
+    // Strip markdown emphasis for tooltip plain-text rendering
+    return para.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1').trim();
+  }
+
+  // Append a small "mentioned in Claude brief" dot to a DOM element.
+  // Idempotent — won't double-add. Click navigates to the brief view at
+  // the relevant date.
+  function addMentionBadge(el, ticker) {
+    if (!el || el.querySelector(':scope > .ai-mention-badge')) return;
+    const excerpt = findExcerptForTicker(cached?.brief, ticker);
+    const badge = document.createElement('span');
+    badge.className = 'ai-mention-badge';
+    badge.setAttribute('aria-label', `Mentioned in Claude brief: ${ticker}`);
+    const tip = excerpt
+      ? `(${ticker}) — מוזכר בדוח Claude:\n\n${excerpt.slice(0, 380)}${excerpt.length > 380 ? '…' : ''}`
+      : `(${ticker}) — מוזכר בדוח Claude של היום`;
+    badge.title = tip;
+    badge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const datePart = (cached && cached.cacheKey) ? cached.cacheKey.split(':')[1] : '';
+      location.hash = datePart ? `#/brief/daily/${datePart}` : '#/brief';
+    });
+    el.appendChild(badge);
+  }
+
+  // Sector deep-dive: when openSectorModal renders holdings, inject any
+  // paragraphs from Claude's brief that mention this sector or the ETF
+  // ticker. Idempotent — won't duplicate. Skipped silently if no Claude
+  // data is loaded.
+  function injectSectorCommentary() {
+    if (!cached || !cached.brief) return;
+    const body = document.getElementById('modal-body');
+    if (!body) return;
+    if (body.querySelector('.claude-sector-commentary')) return; // already injected
+    // Only inject after the holdings table has rendered (skip the loading state)
+    if (!body.querySelector('.htbl2')) return;
+
+    const titleEl = document.getElementById('modal-title');
+    const titleTxt = (titleEl?.textContent || '').trim();
+    // Title format: "אחזקות טכנולוגיה (XLK)" — extract sector name + ticker
+    const tickerM = titleTxt.match(/\(([A-Z]+)\)/);
+    const ticker = tickerM ? tickerM[1] : '';
+    const sectorName = titleTxt.replace(/^אחזקות\s+/, '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+
+    if (!ticker && !sectorName) return;
+
+    // Split brief into paragraphs and find ones that mention this sector
+    // or its ETF. Match Hebrew sector name OR (TICKER) parenthesized form.
+    const paras = cached.brief.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+    const matched = [];
+    paras.forEach((p) => {
+      if (matched.length >= 3) return;
+      const hitsName = sectorName && p.includes(sectorName);
+      const hitsTicker = ticker && new RegExp(`\\(${ticker}\\)`).test(p);
+      if (hitsName || hitsTicker) matched.push(p);
+    });
+
+    if (matched.length === 0) return;
+
+    // Light markdown render (bold + ticker chips)
+    const renderPara = (md) => {
+      let html = String(md)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+      // Inline ticker chip
+      html = html.replace(/\(([A-Z]{1,6}(?:[.\-][A-Z]{1,3})?)\)/g, (m, t) => {
+        const skip = new Set(['AI','EU','US','UK','CPI','GDP','FOMC','API','ETF','EPS','YOY','QOQ']);
+        if (skip.has(t)) return m;
+        return `<span class="csc-ticker">${t}</span>`;
+      });
+      return html;
+    };
+
+    const datePart = (cached.cacheKey || '').split(':')[1] || '';
+    const dateLink = datePart ? `<a class="csc-link" href="#/brief/daily/${datePart}">דוח מלא →</a>` : '';
+
+    const html = `
+      <div class="claude-sector-commentary">
+        <div class="csc-hdr">
+          <div class="csc-dot"></div>
+          <span class="csc-title">ניתוח Claude על ${sectorName || ticker}</span>
+          ${dateLink}
+        </div>
+        <div class="csc-body">
+          ${matched.map((p) => `<p>${renderPara(p)}</p>`).join('')}
+        </div>
+      </div>`;
+    body.insertAdjacentHTML('afterbegin', html);
+  }
+
+  // Sweep the DOM for ticker labels and tag the ones Claude mentioned today.
+  // Targets the well-known ticker-display patterns in this codebase:
+  // sector rows, top movers, index cards, history rows, advisor table.
+  // Re-runs after every simpleAIBrief tick (which the existing mutation
+  // observer triggers when sector data updates), so badges survive re-renders.
+  function markTickersInDom() {
+    if (!cached || !Array.isArray(cached.tickers) || cached.tickers.length === 0) return;
+    const tickerSet = new Set(cached.tickers.map((t) => String(t).toUpperCase()));
+
+    // Sector rows: <span class="sym"> inside <td class="sec-cell"> of tr[data-sym]
+    document.querySelectorAll('tr[data-sym] td.sec-cell .sym').forEach((el) => {
+      const t = (el.textContent || '').trim().toUpperCase();
+      if (tickerSet.has(t)) addMentionBadge(el, t);
+    });
+
+    // Top movers: .mover-sym text content is the ticker
+    document.querySelectorAll('.mover-sym').forEach((el) => {
+      const t = (el.textContent || '').trim().toUpperCase();
+      if (tickerSet.has(t)) addMentionBadge(el, t);
+    });
+
+    // Index cards: ticker is in onclick="openStockDetail('SPY',...)"
+    document.querySelectorAll('.idx-card[onclick]').forEach((el) => {
+      const m = (el.getAttribute('onclick') || '').match(/openStockDetail\(['"]([A-Z][A-Z0-9.\-]*)['"]/);
+      if (!m) return;
+      const t = m[1].toUpperCase();
+      if (tickerSet.has(t)) addMentionBadge(el, t);
+    });
+
+    // Advisor table: <td class="sym"><b>SPY</b>
+    document.querySelectorAll('td.sym > b').forEach((el) => {
+      const t = (el.textContent || '').trim().toUpperCase();
+      if (/^[A-Z][A-Z0-9.\-]*$/.test(t) && tickerSet.has(t)) addMentionBadge(el, t);
+    });
+
+    // Holdings table inside sector modal: <tr class="hrow2"> with onclick
+    document.querySelectorAll('tr.hrow2[onclick]').forEach((el) => {
+      const m = (el.getAttribute('onclick') || '').match(/openStockDetail\(['"]([A-Z][A-Z0-9.\-]*)['"]/);
+      if (!m) return;
+      const t = m[1].toUpperCase();
+      const target = el.querySelector('td:first-child') || el;
+      if (tickerSet.has(t)) addMentionBadge(target, t);
+    });
+  }
+
+  // Wrap simpleAIBrief — after the canned render, layer Claude's content.
+  // Polls until simpleAIBrief is defined since it lives in an IIFE and is
+  // only attached to window after that IIFE runs.
+  function wrap() {
+    if (typeof window.simpleAIBrief !== 'function') {
+      setTimeout(wrap, 200);
+      return;
+    }
+    const original = window.simpleAIBrief;
+    window.simpleAIBrief = function () {
+      original();
+      if (cached) {
+        applyEnhancement();
+        markTickersInDom();
+        buildRecap();
+      } else if (workerUrl()) {
+        // Pulse the verdict while we wait for Claude — only if a Worker is
+        // configured. Without a Worker URL, the canned render is final.
+        setLoading(true);
+        loadBrief().then((data) => {
+          setLoading(false);
+          if (data) {
+            applyEnhancement();
+            markTickersInDom();
+            buildRecap();
+          }
+        });
+      }
+    };
+  }
+
+  // ─── Recap widget ───────────────────────────────────────────────────────
+  // Compares yesterday's Trading Setup picks (Long / Avoid / Watch) against
+  // today's actual market move. Built as a sibling of the AI brief card so
+  // the user can scan how Claude's calls played out without leaving the
+  // dashboard.
+  let recapBuilt = false;
+
+  const NON_TICKER = new Set([
+    'AI','EU','US','UK','OK','IPO','CPI','GDP','FOMC','CEO','CFO','API','ETF',
+    'EPS','YOY','QOQ','YTD','MTD','WTD','MTOK','BPS','GPU','CPU','TPU','NPU',
+    'AWS','SAAS','RPO','ROIC','EBIT','EBITDA','UAE','OPEC','NATO','UN','TLV',
+  ]);
+
+  function tickersFrom(text) {
+    if (!text) return [];
+    const out = [];
+    const re = /\(([A-Z]{1,6}(?:[.\-][A-Z]{1,3})?)\)/g;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      if (!NON_TICKER.has(m[1]) && !out.includes(m[1])) out.push(m[1]);
+    }
+    return out;
+  }
+
+  async function fetchTickerChange(ticker) {
+    const proxy = (localStorage.getItem('app_proxy_url') || '').replace(/\/+$/, '');
+    if (!proxy) return null;
+    // Yahoo uses hyphens (BRK-B), Claude writes dots (BRK.B).
+    const yahooSym = String(ticker).replace(/\./g, '-');
+    const yahoo = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym)}?range=2d&interval=1d`;
+    try {
+      const r = await fetch(`${proxy}/?url=${encodeURIComponent(yahoo)}`);
+      if (!r.ok) return null;
+      const j = await r.json();
+      const result = j.chart?.result?.[0];
+      if (!result) return null;
+      const closes = result.indicators?.quote?.[0]?.close || [];
+      const last = closes[closes.length - 1] ?? result.meta?.regularMarketPrice;
+      const prev = closes[closes.length - 2] ?? result.meta?.previousClose;
+      if (last == null || prev == null) return null;
+      return ((last - prev) / prev) * 100;
+    } catch (_) { return null; }
+  }
+
+  async function buildRecap() {
+    if (recapBuilt) return;
+    if (!cached || !cached.cacheKey) return;
+    const base = workerUrl();
+    if (!base) return;
+    const proxy = (localStorage.getItem('app_proxy_url') || '').replace(/\/+$/, '');
+    if (!proxy) return; // no way to fetch live prices
+
+    // Find the most recent brief that's NOT today's
+    let listData;
+    try {
+      const r = await fetch(`${base}/brief/list?type=daily`);
+      if (!r.ok) return;
+      listData = await r.json();
+    } catch (_) { return; }
+
+    const entries = (listData.daily || [])
+      .map((e) => (typeof e === 'string' ? { id: e } : e))
+      .filter((e) => e && e.id);
+    if (entries.length < 2) return;
+
+    const todayId = cached.cacheKey.split(':')[1] || '';
+    entries.sort((a, b) => b.id.localeCompare(a.id));
+    const yesterday = entries.find((e) => e.id < todayId);
+    if (!yesterday) return;
+
+    // Load yesterday's brief
+    let yData;
+    try {
+      const r = await fetch(`${base}/brief/daily/${yesterday.id}`);
+      if (!r.ok) return;
+      yData = await r.json();
+    } catch (_) { return; }
+    if (!yData?.brief) return;
+
+    const setup = extractShortTermSetup(yData.brief);
+    if (!setup) return;
+
+    const longs = tickersFrom(setup.long).slice(0, 6);
+    const avoids = tickersFrom(setup.avoid).slice(0, 6);
+    const watches = tickersFrom(setup.watch).slice(0, 4);
+    if (longs.length + avoids.length + watches.length === 0) return;
+
+    // Fetch current prices in parallel (capped to ~12 tickers max)
+    const all = Array.from(new Set([...longs, ...avoids, ...watches]));
+    const prices = {};
+    await Promise.allSettled(all.map(async (t) => {
+      const p = await fetchTickerChange(t);
+      if (p != null) prices[t] = p;
+    }));
+
+    renderRecap(yesterday.id, longs, avoids, watches, prices);
+    recapBuilt = true;
+  }
+
+  function renderRecap(yId, longs, avoids, watches, prices) {
+    const card = document.querySelector('.ai-brief-card');
+    if (!card) return;
+    let widget = document.getElementById('claude-recap');
+    if (!widget) {
+      widget = document.createElement('div');
+      widget.id = 'claude-recap';
+      widget.className = 'claude-recap';
+      // Insert before the educational panel (or at end if not found)
+      const eduPanel = document.getElementById('ai-edu-panel');
+      if (eduPanel) eduPanel.before(widget); else card.appendChild(widget);
+    }
+
+    const fmtPct = (p) => p == null ? '—' : `${p >= 0 ? '+' : ''}${p.toFixed(2)}%`;
+    const cls = (p) => p == null ? 'neu' : p > 0.05 ? 'up' : p < -0.05 ? 'down' : 'neu';
+    const judge = (kind, p) => {
+      if (p == null) return '';
+      if (kind === 'long') return p > 0 ? '✓' : p < 0 ? '✗' : '';
+      if (kind === 'avoid') return p < 0 ? '✓' : p > 0 ? '✗' : '';
+      return '';
+    };
+
+    const renderPills = (kind, label, tickers) => {
+      if (tickers.length === 0) return '';
+      const items = tickers.map((t) => {
+        const p = prices[t];
+        const mark = judge(kind, p);
+        return `
+          <span class="cr-pill ${cls(p)}" data-ticker="${t}">
+            <span class="cr-sym">${t}</span>
+            <span class="cr-pct">${fmtPct(p)}</span>
+            ${mark ? `<span class="cr-mark">${mark}</span>` : ''}
+          </span>`;
+      }).join('');
+      return `<div class="cr-row"><span class="cr-label cr-label-${kind}">${label}</span><div class="cr-pills">${items}</div></div>`;
+    };
+
+    const dateStr = new Date(yId + 'T12:00:00').toLocaleDateString('he-IL', {
+      day: '2-digit', month: '2-digit',
+    });
+
+    widget.innerHTML = `
+      <div class="cr-hdr">
+        <span class="cr-dot"></span>
+        <span class="cr-title">Recap · התחזית של Claude מ-${dateStr}</span>
+        <a class="cr-link" href="#/brief/daily/${yId}">לדוח המלא →</a>
+      </div>
+      <div class="cr-rows">
+        ${renderPills('long', 'Long', longs)}
+        ${renderPills('avoid', 'Avoid', avoids)}
+        ${renderPills('watch', 'Watch', watches)}
+      </div>
+      <div class="cr-foot">השוואה לשינוי היומי של היום · ✓ אומת · ✗ הופרך</div>`;
+  }
+
+  // Watch the AI Brief card for content overwrites. The original simpleAIBrief
+  // re-renders the verdict + action bullets every time sector data updates
+  // (via its own internal MutationObserver), bypassing our wrapper because
+  // it calls the local closure reference — not window.simpleAIBrief. We
+  // detect those overwrites here and re-apply Claude's content.
+  function installAIBriefObserver() {
+    const ids = ['ai-verdict-text', 'ai-actions'];
+    let pending = false;
+    const trigger = () => {
+      if (pending || _applying || !cached) return;
+      pending = true;
+      // Microtask — runs after the current sync block (i.e. after the
+      // canned render's mutations are queued) but BEFORE the browser
+      // paints. Replaces the prior 30ms setTimeout, which let the canned
+      // content paint briefly during theme toggles ("ריצוד").
+      Promise.resolve().then(() => {
+        pending = false;
+        if (cached) applyEnhancement();
+      });
+    };
+
+    const tryAttach = () => {
+      let attached = 0;
+      ids.forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el || el.dataset.briefObserved === '1') return;
+        el.dataset.briefObserved = '1';
+        new MutationObserver(trigger).observe(el, {
+          childList: true,
+          characterData: true,
+          subtree: true,
+        });
+        attached++;
+      });
+      if (attached < ids.length) setTimeout(tryAttach, 500);
+    };
+    tryAttach();
+  }
+
+  // Watch the sector-modal body for content changes — when openSectorModal
+  // finishes rendering holdings, inject Claude's commentary on that sector.
+  function installSectorObserver() {
+    const body = document.getElementById('modal-body');
+    if (!body) {
+      setTimeout(installSectorObserver, 500);
+      return;
+    }
+    const obs = new MutationObserver(() => {
+      // Defer to next tick so we observe the final layout, not intermediate
+      setTimeout(injectSectorCommentary, 50);
+    });
+    obs.observe(body, { childList: true });
+  }
+
+  // Initial Claude load + apply on page-load: don't wait for someone to
+  // call window.simpleAIBrief — kick off the fetch ourselves so the
+  // observer-driven re-applies have data to work with from the start.
+  function bootEnhancer() {
+    loadBrief().then((data) => {
+      if (data) applyEnhancement();
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      wrap();
+      installAIBriefObserver();
+      installSectorObserver();
+      bootEnhancer();
+    });
+  } else {
+    wrap();
+    installAIBriefObserver();
+    installSectorObserver();
+    bootEnhancer();
+  }
 })();
 
 
@@ -11804,17 +12516,25 @@ document.addEventListener('keydown', e => {
 
 (function(){
   "use strict";
-  const VIEWS = ['dashboard', 'macro', 'advisor'];
+  const VIEWS = ['dashboard', 'macro', 'advisor', 'brief'];
 
-  function currentRoute(){
+  // Parse the hash into {route, params}.
+  // "#/brief"                       → { route:'brief', params:[] }
+  // "#/brief/daily/2026-05-04"      → { route:'brief', params:['daily','2026-05-04'] }
+  // "#/brief/weekly/2026-W18"       → { route:'brief', params:['weekly','2026-W18'] }
+  function parseRoute(){
     const h = (location.hash || '').replace(/^#\/?/, '');
-    return VIEWS.includes(h) ? h : 'dashboard';
+    const parts = h.split('/').filter(Boolean);
+    const route = VIEWS.includes(parts[0]) ? parts[0] : 'dashboard';
+    return { route, params: parts.slice(1) };
   }
+
+  function currentRoute(){ return parseRoute().route; }
 
   let previousRoute = null;
 
   function applyRoute(){
-    const r = currentRoute();
+    const { route: r, params } = parseRoute();
     // Show / hide views
     VIEWS.forEach(v => {
       const el = document.getElementById('view-' + v);
@@ -11851,6 +12571,9 @@ document.addEventListener('keydown', e => {
     }
     if (r === 'advisor' && typeof window.initAdvisor === 'function') {
       try { window.initAdvisor(); } catch(e){ console.error('initAdvisor:', e); }
+    }
+    if (r === 'brief' && typeof window.initBrief === 'function') {
+      try { window.initBrief(params); } catch(e){ console.error('initBrief:', e); }
     }
   }
 

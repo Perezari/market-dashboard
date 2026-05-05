@@ -6,11 +6,14 @@
 <meta name="theme-color" content="#0b1311">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="StockPulse Terminal">
+<meta name="apple-mobile-web-app-title" content="StockPulse">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="application-name" content="StockPulse">
+<meta name="format-detection" content="telephone=no">
 <title>StockPulse · Terminal</title>
-<link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="apple-touch-icon" href="favicon.svg">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="apple-touch-icon" sizes="180x180" href="logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -20,7 +23,7 @@
 
 <!-- Consolidated stylesheet -->
 <!-- Consolidated stylesheet (cache-bust via ?v= to force fresh load after rebuilds) -->
-<link rel="stylesheet" href="app.css?v=2026-04-22-sync-race">
+<link rel="stylesheet" href="app.css?v=2026-05-05-no-flash">
 </head>
 <body>
 
@@ -28,10 +31,7 @@
      .hidden). Appears on every visit to prevent the "chaotic rearrange"
      look as widgets, charts, and quotes fill in asynchronously. -->
 <div id="page-loading" class="page-loading-overlay">
-  <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.9">
-    <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
-    <polyline points="16 7 22 7 22 13"/>
-  </svg>
+  <img class="page-loading-logo" src="logo.png" alt="StockPulse" width="72" height="72">
   <div class="page-loading-ring"></div>
   <div class="page-loading-text" id="page-loading-text">מאתחל...</div>
   <div class="page-loading-stages" id="page-loading-stages">
@@ -55,12 +55,7 @@
     <div class="lo-body">
       <div class="lo-brand">
         <h1>StockPulse</h1>
-        <div class="lo-brand-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
-            <polyline points="16 7 22 7 22 13"/>
-          </svg>
-        </div>
+        <div class="lo-brand-icon"><img class="sp-logo-img" src="logo.png" alt="StockPulse"></div>
       </div>
       <div class="lo-tagline">
         <span>Real-Time</span><span class="lo-dot"></span>
@@ -162,11 +157,7 @@
       <div class="tb-brand-title">StockPulse Terminal</div>
       <div class="tb-brand-sub">Yahoo Finance · Real-Time</div>
     </div>
-    <div class="tb-logo">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
-      </svg>
-    </div>
+    <div class="tb-logo"><img class="sp-logo-img" src="logo.png" alt="StockPulse"></div>
   </div>
 </div>
 
@@ -184,11 +175,7 @@
 
 <!-- SIDEBAR NAV (shared between dashboard.html and macro.html) -->
 <nav class="sp-sidenav" id="sp-sidenav">
-  <div class="sp-sidenav-logo" title="StockPulse Terminal">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
-    </svg>
-  </div>
+  <div class="sp-sidenav-logo" title="StockPulse Terminal"><img class="sp-logo-img" src="logo.png" alt="StockPulse"></div>
   <div class="sp-sidenav-items">
     <a href="#/dashboard" data-route="dashboard" class="sp-nav-item" data-tooltip="דשבורד">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
@@ -198,6 +185,9 @@
     </a>
     <a href="#/advisor" data-route="advisor" class="sp-nav-item" data-tooltip="אדווייזר">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><polyline points="8.21 13.89 7 22 12 19 17 22 15.79 13.88"/></svg>
+    </a>
+    <a href="#/brief" data-route="brief" class="sp-nav-item" data-tooltip="דוחות AI">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="8" cy="15" r="1" fill="currentColor"/><circle cx="12" cy="15" r="1" fill="currentColor"/><circle cx="16" cy="15" r="1" fill="currentColor"/></svg>
     </a>
     <button class="sp-nav-item" data-tooltip="ייצוא PDF" onclick="if(window.exportDashboardPDF)exportDashboardPDF()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
@@ -232,6 +222,10 @@
   <a href="#/advisor" data-route="advisor" class="sp-bn-item">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><polyline points="8.21 13.89 7 22 12 19 17 22 15.79 13.88"/></svg>
     <span class="sp-bn-label">אדווייזר</span>
+  </a>
+  <a href="#/brief" data-route="brief" class="sp-bn-item">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="8" cy="15" r="1" fill="currentColor"/><circle cx="12" cy="15" r="1" fill="currentColor"/><circle cx="16" cy="15" r="1" fill="currentColor"/></svg>
+    <span class="sp-bn-label">דוחות</span>
   </a>
   <button class="sp-bn-item" onclick="toggleMobileMenu()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="1.5"/><circle cx="5" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
@@ -871,6 +865,14 @@
 </div>
 </section>
 
+<!-- ─────────── BRIEF (AI REPORTS) VIEW ─────────── -->
+<!-- Calendar + report viewer for AI-generated daily/weekly market briefs.
+     Content is rendered by brief.js (window.initBrief), invoked by the
+     router when route === 'brief'. -->
+<section class="view" id="view-brief" data-view="brief">
+  <!-- Populated dynamically -->
+</section>
+
 <!-- ═══ AUTH MODAL (login / logout) ═══
      Placed OUTSIDE any .view section so it's accessible from dashboard, macro,
      AND advisor tabs. Earlier it was nested inside view-advisor, which meant
@@ -955,7 +957,11 @@
 
 <!-- Consolidated script -->
 <!-- Consolidated script (cache-bust via ?v=) -->
-<script src="app.js?v=2026-04-22-sync-race"></script>
+<script src="app.js?v=2026-05-05-no-flash"></script>
+
+<!-- Brief module: AI report viewer with calendar (loaded after app.js so the
+     router exists). Initialized via window.initBrief() from app.js applyRoute. -->
+<script src="brief.js?v=2026-05-05-brk-fix"></script>
 
 </body>
 </html>
